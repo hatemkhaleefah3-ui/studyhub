@@ -24,7 +24,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
 
       - name: Install dependencies
@@ -36,10 +36,8 @@ jobs:
           NODE_ENV: production
 
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/pages-action@v1
+        uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: 881729b081362dc409baddcd144086a9
-          projectName: studyhub
-          directory: artifacts/study-hub/dist/public
-          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+          command: pages deploy artifacts/study-hub/dist/public --project-name=studyhub
