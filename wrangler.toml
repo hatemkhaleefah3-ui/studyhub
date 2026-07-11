@@ -1,6 +1,5 @@
 name = "study-hub"
 compatibility_date = "2024-09-23"
-pages_build_output_dir = "artifacts/study-hub/dist/public"
 
 pages_build_output_dir = "artifacts/study-hub/dist/public"
 
