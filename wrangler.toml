@@ -5,4 +5,5 @@ pages_build_output_dir = "artifacts/study-hub/dist/public"
 [[d1_databases]]
 binding = "DB"
 database_name = "study-hub-db"
-database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+database_id = "1504649d-4252-4e1f-b1a8-6959e41d42ff
+"
