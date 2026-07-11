@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "Study Hub"
+version = "1.0.0"
+id = "artifacts/study-hub"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19937
+
+[services.development]
+run = "pnpm --filter @workspace/study-hub run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/study-hub", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/study-hub/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19937"
+BASE_PATH = "/"
