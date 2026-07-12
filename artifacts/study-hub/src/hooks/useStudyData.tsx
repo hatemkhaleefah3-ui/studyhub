@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { api } from '@/lib/api';
+import { api, ArchiveEntry } from '@/lib/api';
 
 export type Theme = 'light' | 'dark';
 export type AccentColor = 'blue' | 'green' | 'orange' | 'red' | 'purple' | 'teal';
@@ -95,6 +95,12 @@ interface StudyDataContextType {
   updateSettings: (s: Partial<Settings>) => void;
   resetData: () => void;
   importData: (data: any) => void;
+
+  archive: ArchiveEntry[];
+  isArchiveLoaded: boolean;
+  refreshArchive: () => void;
+  restoreArchiveItem: (id: string) => void;
+  permanentlyDeleteArchiveItem: (id: string) => void;
 }
 
 const defaultSettings: Settings = { theme: 'light', accentColor: 'blue' };
@@ -125,6 +131,8 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [archive, setArchive] = useState<ArchiveEntry[]>([]);
+  const [isArchiveLoaded, setIsArchiveLoaded] = useState(false);
 
   // Load from API on mount
   useEffect(() => {
@@ -141,6 +149,29 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
       .finally(() => {
         setIsLoaded(true);
       });
+  }, []);
+
+  const refreshArchive = useCallback(() => {
+    api.getArchive()
+      .then(setArchive)
+      .catch((err) => console.error('Failed to load archive:', err))
+      .finally(() => setIsArchiveLoaded(true));
+  }, []);
+
+  const restoreArchiveItem = useCallback((id: string) => {
+    api.restoreArchiveItem(id)
+      .then(({ category, item }) => {
+        if (category === 'subject') setSubjects((prev) => [...prev, item]);
+        if (category === 'schedule') setSchedule((prev) => [...prev, item]);
+        if (category === 'checklist') setChecklist((prev) => [...prev, item]);
+        setArchive((prev) => prev.filter((a) => a.id !== id));
+      })
+      .catch(console.error);
+  }, []);
+
+  const permanentlyDeleteArchiveItem = useCallback((id: string) => {
+    setArchive((prev) => prev.filter((a) => a.id !== id));
+    api.permanentlyDeleteArchiveItem(id).catch(console.error);
   }, []);
 
   // Apply theme to DOM
@@ -445,6 +476,11 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
         updateSettings,
         resetData,
         importData,
+        archive,
+        isArchiveLoaded,
+        refreshArchive,
+        restoreArchiveItem,
+        permanentlyDeleteArchiveItem,
       }}
     >
       {isLoaded ? children : (

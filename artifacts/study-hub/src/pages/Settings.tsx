@@ -1,6 +1,7 @@
 import { useStudyData } from "@/hooks/useStudyData";
 import { GlassCard } from "@/components/shared/GlassCard";
-import { Moon, Sun } from "lucide-react";
+import { Moon, Sun, Archive, ChevronRight } from "lucide-react";
+import { Link } from "wouter";
 
 export function Settings() {
   const { settings, updateSettings } = useStudyData();
@@ -39,6 +40,20 @@ export function Settings() {
             </button>
           </div>
         </GlassCard>
+
+        {/* Archive */}
+        <Link href="/archive">
+          <GlassCard className="p-6 flex items-center gap-4 hover:scale-[1.01] transition-transform cursor-pointer" data-testid="link-archive">
+            <div className="w-12 h-12 rounded-2xl bg-secondary/60 flex items-center justify-center shrink-0">
+              <Archive className="w-5 h-5 text-muted-foreground" />
+            </div>
+            <div className="flex-1">
+              <p className="font-medium text-lg">Archive</p>
+              <p className="text-sm text-muted-foreground">View and restore deleted items</p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" />
+          </GlassCard>
+        </Link>
       </div>
     </div>
   );

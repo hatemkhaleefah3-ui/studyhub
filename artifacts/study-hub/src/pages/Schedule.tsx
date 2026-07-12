@@ -4,6 +4,7 @@ import { GlassCard } from "@/components/shared/GlassCard";
 import { BottomSheet } from "@/components/shared/BottomSheet";
 import { ConfirmSheet } from "@/components/shared/ConfirmSheet";
 import { FabPortal } from "@/components/shared/FabPortal";
+import { SwipeableRow } from "@/components/shared/SwipeableRow";
 import { format, startOfWeek, addDays, isSameDay } from "date-fns";
 import { Plus, CheckCircle, Link2, Pencil, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -165,57 +166,62 @@ export function Schedule() {
             const isDone = linkedItem ? linkedItem.done : ev.done;
 
             return (
-              <GlassCard
+              <SwipeableRow
                 key={ev.id}
-                className={`p-4 flex gap-4 transition-all group ${isDone ? 'opacity-50' : ''}`}
-                data-testid={`event-${ev.id}`}
+                onEdit={() => openEdit(ev.id)}
+                onDelete={() => setDeletingId(ev.id)}
               >
-                <div className="w-16 shrink-0 text-center flex flex-col items-center justify-center border-r border-border/50 pr-4">
-                  <span className="text-lg font-bold">{format(new Date(ev.datetime), "HH:mm")}</span>
-                </div>
-                <div
-                  className="w-1.5 rounded-full shrink-0"
-                  style={{ backgroundColor: subject?.color || 'hsl(var(--primary))' }}
-                />
-                <div className="flex-1 py-1 min-w-0">
-                  <h3 className={`font-semibold text-lg ${isDone ? 'line-through' : ''}`}>{ev.title}</h3>
-                  <p className="text-sm text-muted-foreground mt-0.5">{subject?.name}</p>
-                  {ev.note && (
-                    <p className="text-sm mt-2 text-muted-foreground/80 bg-secondary/50 p-2 rounded-lg">{ev.note}</p>
-                  )}
+                <GlassCard
+                  className={`p-4 flex gap-4 transition-all group ${isDone ? 'opacity-50' : ''}`}
+                  data-testid={`event-${ev.id}`}
+                >
+                  <div className="w-16 shrink-0 text-center flex flex-col items-center justify-center border-r border-border/50 pr-4">
+                    <span className="text-lg font-bold">{format(new Date(ev.datetime), "HH:mm")}</span>
+                  </div>
+                  <div
+                    className="w-1.5 rounded-full shrink-0"
+                    style={{ backgroundColor: subject?.color || 'hsl(var(--primary))' }}
+                  />
+                  <div className="flex-1 py-1 min-w-0">
+                    <h3 className={`font-semibold text-lg ${isDone ? 'line-through' : ''}`}>{ev.title}</h3>
+                    <p className="text-sm text-muted-foreground mt-0.5">{subject?.name}</p>
+                    {ev.note && (
+                      <p className="text-sm mt-2 text-muted-foreground/80 bg-secondary/50 p-2 rounded-lg">{ev.note}</p>
+                    )}
+                    {ev.checklistItemId && (
+                      <span className="inline-flex items-center gap-1 text-xs text-primary/70 mt-2">
+                        <Link2 className="w-3 h-3" /> Linked to checklist
+                      </span>
+                    )}
+                  </div>
+                  {/* Edit + Delete — hover-only (desktop/mouse fallback for swipe) */}
+                  <div className="flex flex-col gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity self-start mt-1">
+                    <button
+                      onClick={() => openEdit(ev.id)}
+                      className="p-2 text-muted-foreground hover:bg-secondary hover:text-foreground rounded-full transition-all"
+                      title="Edit event"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setDeletingId(ev.id)}
+                      className="p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive rounded-full transition-all"
+                      title="Delete event"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                   {ev.checklistItemId && (
-                    <span className="inline-flex items-center gap-1 text-xs text-primary/70 mt-2">
-                      <Link2 className="w-3 h-3" /> Linked to checklist
-                    </span>
+                    <button
+                      onClick={() => toggleChecklistItem(ev.checklistItemId!)}
+                      className="p-2 h-max shrink-0 mt-1 hover:scale-110 transition-transform"
+                      data-testid={`btn-toggle-event-${ev.id}`}
+                    >
+                      <CheckCircle className={`w-6 h-6 ${isDone ? 'text-primary' : 'text-muted-foreground'}`} />
+                    </button>
                   )}
-                </div>
-                {/* Edit + Delete — hover-only */}
-                <div className="flex flex-col gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity self-start mt-1">
-                  <button
-                    onClick={() => openEdit(ev.id)}
-                    className="p-2 text-muted-foreground hover:bg-secondary hover:text-foreground rounded-full transition-all"
-                    title="Edit event"
-                  >
-                    <Pencil className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setDeletingId(ev.id)}
-                    className="p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive rounded-full transition-all"
-                    title="Delete event"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-                {ev.checklistItemId && (
-                  <button
-                    onClick={() => toggleChecklistItem(ev.checklistItemId!)}
-                    className="p-2 h-max shrink-0 mt-1 hover:scale-110 transition-transform"
-                    data-testid={`btn-toggle-event-${ev.id}`}
-                  >
-                    <CheckCircle className={`w-6 h-6 ${isDone ? 'text-primary' : 'text-muted-foreground'}`} />
-                  </button>
-                )}
-              </GlassCard>
+                </GlassCard>
+              </SwipeableRow>
             );
           });
         })()}
@@ -331,7 +337,8 @@ export function Schedule() {
         onClose={() => setDeletingId(null)}
         onConfirm={() => { if (deletingId) { deleteScheduleEvent(deletingId); setDeletingId(null); } }}
         title="Delete event?"
-        message="This schedule event will be permanently removed."
+        message="This event will be moved to the Archive. You can restore it later from Settings."
+        confirmLabel="Move to Archive"
       />
     </div>
   );

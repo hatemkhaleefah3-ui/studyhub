@@ -3,6 +3,7 @@ import { useStudyData } from "@/hooks/useStudyData";
 import { GlassCard } from "@/components/shared/GlassCard";
 import { BottomSheet } from "@/components/shared/BottomSheet";
 import { FabPortal } from "@/components/shared/FabPortal";
+import { SwipeableRow } from "@/components/shared/SwipeableRow";
 import {
   Plus, Trash2, CheckCircle2, Circle,
   List, ListChecks, ChevronDown, ChevronRight, X, Pencil
@@ -172,6 +173,10 @@ export function Checklist() {
                           exit={{ opacity: 0, scale: 0.95 }}
                           transition={{ type: "spring", stiffness: 300, damping: 28 }}
                         >
+                          <SwipeableRow
+                            onEdit={() => openEditItem(item.id, item.text)}
+                            onDelete={() => deleteChecklistItem(item.id)}
+                          >
                           <GlassCard
                             className={`transition-opacity duration-300 overflow-hidden ${
                               item.done ? 'opacity-50' : 'opacity-100'
@@ -372,6 +377,7 @@ export function Checklist() {
                               )}
                             </AnimatePresence>
                           </GlassCard>
+                          </SwipeableRow>
                         </motion.div>
                       );
                     })}

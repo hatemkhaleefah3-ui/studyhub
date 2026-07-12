@@ -4,6 +4,7 @@ import { GlassCard } from "@/components/shared/GlassCard";
 import { BottomSheet } from "@/components/shared/BottomSheet";
 import { ConfirmSheet } from "@/components/shared/ConfirmSheet";
 import { FabPortal } from "@/components/shared/FabPortal";
+import { SwipeableRow } from "@/components/shared/SwipeableRow";
 import { Plus, ChevronRight, BookOpen, Pencil, Trash2 } from "lucide-react";
 import { Link } from "wouter";
 import { useForm } from "react-hook-form";
@@ -77,48 +78,55 @@ export function Subjects() {
             const avg = gradedExams.length ? Math.round(gradedExams.reduce((acc, curr) => acc + (parseFloat(curr.grade!) || 0), 0) / gradedExams.length) : null;
 
             return (
-              <Link key={subject.id} href={`/subjects/${subject.id}`}>
-                <GlassCard className="p-6 hover:scale-[1.02] transition-transform cursor-pointer relative overflow-hidden group h-full flex flex-col justify-between">
-                  <div className="absolute top-0 left-0 w-full h-1.5" style={{ backgroundColor: subject.color }} />
+              <SwipeableRow
+                key={subject.id}
+                onEdit={() => { const sub = subjects.find(s => s.id === subject.id); if (sub) { resetEdit({ name: sub.name, color: sub.color }); setEditingId(subject.id); } }}
+                onDelete={() => setDeletingId(subject.id)}
+                className="h-full"
+              >
+                <Link href={`/subjects/${subject.id}`}>
+                  <GlassCard className="p-6 hover:scale-[1.02] transition-transform cursor-pointer relative overflow-hidden group h-full flex flex-col justify-between">
+                    <div className="absolute top-0 left-0 w-full h-1.5" style={{ backgroundColor: subject.color }} />
 
-                  {/* Edit / Delete — hover-only, top-right */}
-                  <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                    <button
-                      onClick={(e) => openEdit(e, subject.id)}
-                      className="w-8 h-8 rounded-full bg-background/80 backdrop-blur flex items-center justify-center hover:bg-secondary transition-colors"
-                      title="Edit subject"
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={(e) => openDelete(e, subject.id)}
-                      className="w-8 h-8 rounded-full bg-background/80 backdrop-blur flex items-center justify-center hover:bg-destructive/10 hover:text-destructive transition-colors"
-                      title="Delete subject"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+                    {/* Edit / Delete — hover-only, top-right (desktop/mouse fallback for swipe) */}
+                    <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                      <button
+                        onClick={(e) => openEdit(e, subject.id)}
+                        className="w-8 h-8 rounded-full bg-background/80 backdrop-blur flex items-center justify-center hover:bg-secondary transition-colors"
+                        title="Edit subject"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={(e) => openDelete(e, subject.id)}
+                        className="w-8 h-8 rounded-full bg-background/80 backdrop-blur flex items-center justify-center hover:bg-destructive/10 hover:text-destructive transition-colors"
+                        title="Delete subject"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
 
-                  <div>
-                    <h3 className="text-2xl font-bold mb-4 mt-2">{subject.name}</h3>
-                    <div className="flex gap-4">
-                      <div className="bg-secondary/50 rounded-xl p-3 flex-1">
-                        <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider mb-1">Tasks</p>
-                        <p className="text-xl font-semibold">{openTasks}</p>
-                      </div>
-                      <div className="bg-secondary/50 rounded-xl p-3 flex-1">
-                        <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider mb-1">Avg Grade</p>
-                        <p className="text-xl font-semibold">{avg !== null ? `${avg}%` : '—'}</p>
+                    <div>
+                      <h3 className="text-2xl font-bold mb-4 mt-2">{subject.name}</h3>
+                      <div className="flex gap-4">
+                        <div className="bg-secondary/50 rounded-xl p-3 flex-1">
+                          <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider mb-1">Tasks</p>
+                          <p className="text-xl font-semibold">{openTasks}</p>
+                        </div>
+                        <div className="bg-secondary/50 rounded-xl p-3 flex-1">
+                          <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider mb-1">Avg Grade</p>
+                          <p className="text-xl font-semibold">{avg !== null ? `${avg}%` : '—'}</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="mt-6 flex justify-end">
-                    <div className="w-8 h-8 rounded-full bg-background flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <ChevronRight className="w-5 h-5" />
+                    <div className="mt-6 flex justify-end">
+                      <div className="w-8 h-8 rounded-full bg-background flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <ChevronRight className="w-5 h-5" />
+                      </div>
                     </div>
-                  </div>
-                </GlassCard>
-              </Link>
+                  </GlassCard>
+                </Link>
+              </SwipeableRow>
             );
           })}
         </div>
@@ -211,7 +219,8 @@ export function Subjects() {
         onClose={() => setDeletingId(null)}
         onConfirm={() => { if (deletingId) { deleteSubject(deletingId); setDeletingId(null); } }}
         title="Delete subject?"
-        message="This will permanently delete the subject along with all its lectures, exams, and linked tasks."
+        message="This will move the subject, along with its lectures, exams, and linked tasks, to the Archive. You can restore it later from Settings."
+        confirmLabel="Move to Archive"
       />
     </div>
   );

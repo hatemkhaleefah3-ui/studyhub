@@ -11,6 +11,7 @@
  *   study_schedule   (id TEXT PRIMARY KEY, data TEXT)
  *   study_checklist  (id TEXT PRIMARY KEY, data TEXT)
  *   study_settings   (key TEXT PRIMARY KEY, value TEXT)
+ *   study_archive    (id TEXT PRIMARY KEY, category TEXT, original_id TEXT, data TEXT, deleted_at TEXT)
  */
 
 interface Env {
@@ -53,6 +54,26 @@ function parseSegments(url: URL) {
   // Strip "/api/study" prefix and split remaining path
   const path = url.pathname.replace(/^\/api\/study\/?/, "");
   return path.split("/").filter(Boolean);
+}
+
+type ArchiveCategory = "subject" | "schedule" | "checklist";
+
+const TABLE_BY_CATEGORY: Record<ArchiveCategory, string> = {
+  subject: "study_subjects",
+  schedule: "study_schedule",
+  checklist: "study_checklist",
+};
+
+// Moves a row from its live table into study_archive (soft delete).
+// No-op if the row no longer exists.
+async function archiveRow(db: D1Database, category: ArchiveCategory, id: string) {
+  const table = TABLE_BY_CATEGORY[category];
+  const row = await db.prepare(`SELECT data FROM ${table} WHERE id=?`).bind(id).first() as any;
+  if (!row) return;
+  await db.prepare(
+    "INSERT INTO study_archive (id, category, original_id, data, deleted_at) VALUES (?, ?, ?, ?, ?)"
+  ).bind(crypto.randomUUID(), category, id, row.data, new Date().toISOString()).run();
+  await db.prepare(`DELETE FROM ${table} WHERE id=?`).bind(id).run();
 }
 
 // ─── main handler ─────────────────────────────────────────────────────────────
@@ -98,6 +119,7 @@ export const onRequest: PagesFunction<Env> = async ({ request, env }) => {
         db.prepare("DELETE FROM study_schedule").run(),
         db.prepare("DELETE FROM study_checklist").run(),
         db.prepare("DELETE FROM study_settings").run(),
+        db.prepare("DELETE FROM study_archive").run(),
       ]);
       return json({ ok: true });
     }
@@ -110,6 +132,7 @@ export const onRequest: PagesFunction<Env> = async ({ request, env }) => {
         db.prepare("DELETE FROM study_schedule").run(),
         db.prepare("DELETE FROM study_checklist").run(),
         db.prepare("DELETE FROM study_settings").run(),
+        db.prepare("DELETE FROM study_archive").run(),
       ]);
       for (const s of subjects) await db.prepare("INSERT INTO study_subjects (id, data) VALUES (?, ?)").bind(s.id, JSON.stringify(s)).run();
       for (const e of schedule) await db.prepare("INSERT INTO study_schedule (id, data) VALUES (?, ?)").bind(e.id, JSON.stringify(e)).run();
@@ -142,17 +165,17 @@ export const onRequest: PagesFunction<Env> = async ({ request, env }) => {
           return json(updated);
         }
         if (method === "DELETE") {
-          await db.prepare("DELETE FROM study_subjects WHERE id=?").bind(subjectId).run();
-          // Cascade delete schedule + checklist with this subjectId (best-effort)
+          // Archive the subject, then cascade-archive linked schedule + checklist rows
+          await archiveRow(db, "subject", subjectId);
           const schedRows = await db.prepare("SELECT id, data FROM study_schedule").all();
           for (const r of schedRows.results as any[]) {
             const ev = JSON.parse(r.data);
-            if (ev.subjectId === subjectId) await db.prepare("DELETE FROM study_schedule WHERE id=?").bind(r.id).run();
+            if (ev.subjectId === subjectId) await archiveRow(db, "schedule", r.id);
           }
           const clRows = await db.prepare("SELECT id, data FROM study_checklist").all();
           for (const r of clRows.results as any[]) {
             const item = JSON.parse(r.data);
-            if (item.subjectId === subjectId) await db.prepare("DELETE FROM study_checklist WHERE id=?").bind(r.id).run();
+            if (item.subjectId === subjectId) await archiveRow(db, "checklist", r.id);
           }
           return json({ ok: true });
         }
@@ -228,7 +251,7 @@ export const onRequest: PagesFunction<Env> = async ({ request, env }) => {
         return json({ ok: true });
       }
       if (eventId && method === "DELETE") {
-        await db.prepare("DELETE FROM study_schedule WHERE id=?").bind(eventId).run();
+        await archiveRow(db, "schedule", eventId);
         return json({ ok: true });
       }
     }
@@ -249,7 +272,7 @@ export const onRequest: PagesFunction<Env> = async ({ request, env }) => {
           return json({ ok: true });
         }
         if (method === "DELETE") {
-          await db.prepare("DELETE FROM study_checklist WHERE id=?").bind(itemId).run();
+          await archiveRow(db, "checklist", itemId);
           return json({ ok: true });
         }
       }
@@ -275,6 +298,42 @@ export const onRequest: PagesFunction<Env> = async ({ request, env }) => {
           await db.prepare("UPDATE study_checklist SET data=? WHERE id=?").bind(JSON.stringify(item), itemId).run();
           return json({ ok: true });
         }
+      }
+    }
+
+    // ── Archive ───────────────────────────────────────────────────────────────
+    if (segs[0] === "archive") {
+      const archiveId = segs[1];
+
+      if (!archiveId && method === "GET") {
+        const rows = await db.prepare(
+          "SELECT id, category, original_id, data, deleted_at FROM study_archive ORDER BY deleted_at DESC"
+        ).all();
+        return json((rows.results as any[]).map((r) => ({
+          id: r.id,
+          category: r.category,
+          originalId: r.original_id,
+          deletedAt: r.deleted_at,
+          data: JSON.parse(r.data),
+        })));
+      }
+
+      if (archiveId && segs[2] === "restore" && method === "POST") {
+        const row = await db.prepare(
+          "SELECT category, original_id, data FROM study_archive WHERE id=?"
+        ).bind(archiveId).first() as any;
+        if (!row) return json({ error: "Not found" }, 404);
+        const category = row.category as ArchiveCategory;
+        const table = TABLE_BY_CATEGORY[category];
+        if (!table) return json({ error: "Unknown category" }, 400);
+        await db.prepare(`INSERT INTO ${table} (id, data) VALUES (?, ?)`).bind(row.original_id, row.data).run();
+        await db.prepare("DELETE FROM study_archive WHERE id=?").bind(archiveId).run();
+        return json({ ok: true, category, item: JSON.parse(row.data) });
+      }
+
+      if (archiveId && !segs[2] && method === "DELETE") {
+        await db.prepare("DELETE FROM study_archive WHERE id=?").bind(archiveId).run();
+        return json({ ok: true });
       }
     }
 
