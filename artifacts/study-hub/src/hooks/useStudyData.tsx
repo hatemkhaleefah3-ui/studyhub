@@ -8,8 +8,26 @@ export interface Subject {
   id: string;
   name: string;
   color: string;
+  wallpaper?: string;
+  driveLink?: string;
+  lectureCount?: number;
+  examCount?: number;
+  attachments?: Attachment[];
   lectures: Lecture[];
   exams: Exam[];
+}
+
+export type AttachmentType = 'Study Sheet' | 'Exam' | 'Degree';
+export type AttachmentFormat = 'File' | 'Image';
+export type AttachmentPriority = 'Important' | 'Not Important';
+
+export interface Attachment {
+  id: string;
+  url: string;
+  name?: string;
+  type: AttachmentType;
+  format: AttachmentFormat;
+  priority: AttachmentPriority;
 }
 
 export interface Lecture {
@@ -66,9 +84,12 @@ interface StudyDataContextType {
   settings: Settings;
   isLoaded: boolean;
 
-  addSubject: (s: Omit<Subject, 'id' | 'lectures' | 'exams'>) => void;
+  addSubject: (s: Omit<Subject, 'id' | 'lectures' | 'exams' | 'color' | 'wallpaper' | 'attachments'>) => void;
   updateSubject: (id: string, s: Partial<Subject>) => void;
   deleteSubject: (id: string) => void;
+  addAttachment: (subjectId: string, a: Omit<Attachment, 'id'>) => void;
+  updateAttachment: (subjectId: string, attachmentId: string, data: Partial<Attachment>) => void;
+  deleteAttachment: (subjectId: string, attachmentId: string) => void;
 
   addLecture: (subjectId: string, l: Omit<Lecture, 'id'>) => void;
   updateLecture: (subjectId: string, lectureId: string, l: Partial<Lecture>) => void;
@@ -124,6 +145,17 @@ export const ACCENT_HEX: Record<AccentColor, string> = {
   purple: '#af52de',
   teal: '#5ac8fa',
 };
+
+export const SUBJECT_WALLPAPERS: string[] = [
+  'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+  'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+  'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+  'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+  'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+  'linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)',
+  'linear-gradient(135deg, #fccb90 0%, #d57eeb 100%)',
+  'linear-gradient(135deg, #30cfd0 0%, #330867 100%)',
+];
 
 export function StudyDataProvider({ children }: { children: ReactNode }) {
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -192,8 +224,19 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
   }, [settings.accentColor]);
 
   // ─── Subjects ──────────────────────────────────────────────────────────────
-  const addSubject = useCallback((s: Omit<Subject, 'id' | 'lectures' | 'exams'>) => {
-    const newSubject: Subject = { ...s, id: crypto.randomUUID(), lectures: [], exams: [] };
+  const addSubject = useCallback((s: Omit<Subject, 'id' | 'lectures' | 'exams' | 'color' | 'wallpaper' | 'attachments'>) => {
+    const colors = Object.values(ACCENT_HEX);
+    const autoColor = colors[Math.floor(Math.random() * colors.length)];
+    const autoWallpaper = SUBJECT_WALLPAPERS[Math.floor(Math.random() * SUBJECT_WALLPAPERS.length)];
+    const newSubject: Subject = {
+      ...s,
+      id: crypto.randomUUID(),
+      color: autoColor,
+      wallpaper: autoWallpaper,
+      attachments: [],
+      lectures: [],
+      exams: [],
+    };
     setSubjects((prev) => [...prev, newSubject]);
     api.createSubject(newSubject).catch(console.error);
   }, []);
@@ -210,6 +253,55 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
     setSchedule((prev) => prev.filter((e) => e.subjectId !== id));
     setChecklist((prev) => prev.filter((c) => c.subjectId !== id));
     api.deleteSubject(id).catch(console.error);
+  }, []);
+
+  // ─── Attachments ──────────────────────────────────────────────────────────
+  const addAttachment = useCallback((subjectId: string, a: Omit<Attachment, 'id'>) => {
+    const newAttachment: Attachment = { ...a, id: crypto.randomUUID() };
+    setSubjects((prev) => {
+      const updated = prev.map((s) =>
+        s.id === subjectId
+          ? { ...s, attachments: [...(s.attachments || []), newAttachment] }
+          : s
+      );
+      const subject = updated.find((s) => s.id === subjectId);
+      if (subject) api.updateSubject(subjectId, { attachments: subject.attachments }).catch(console.error);
+      return updated;
+    });
+  }, []);
+
+  const updateAttachment = useCallback(
+    (subjectId: string, attachmentId: string, data: Partial<Attachment>) => {
+      setSubjects((prev) => {
+        const updated = prev.map((s) =>
+          s.id === subjectId
+            ? {
+                ...s,
+                attachments: (s.attachments || []).map((a) =>
+                  a.id === attachmentId ? { ...a, ...data } : a
+                ),
+              }
+            : s
+        );
+        const subject = updated.find((s) => s.id === subjectId);
+        if (subject) api.updateSubject(subjectId, { attachments: subject.attachments }).catch(console.error);
+        return updated;
+      });
+    },
+    []
+  );
+
+  const deleteAttachment = useCallback((subjectId: string, attachmentId: string) => {
+    setSubjects((prev) => {
+      const updated = prev.map((s) =>
+        s.id === subjectId
+          ? { ...s, attachments: (s.attachments || []).filter((a) => a.id !== attachmentId) }
+          : s
+      );
+      const subject = updated.find((s) => s.id === subjectId);
+      if (subject) api.updateSubject(subjectId, { attachments: subject.attachments }).catch(console.error);
+      return updated;
+    });
   }, []);
 
   // ─── Lectures ──────────────────────────────────────────────────────────────
@@ -456,6 +548,9 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
         addSubject,
         updateSubject,
         deleteSubject,
+        addAttachment,
+        updateAttachment,
+        deleteAttachment,
         addLecture,
         updateLecture,
         deleteLecture,
