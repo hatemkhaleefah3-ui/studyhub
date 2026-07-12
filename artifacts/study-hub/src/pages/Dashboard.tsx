@@ -66,7 +66,7 @@ export function Dashboard() {
     <div className="space-y-8 pb-10">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h1 className="text-4xl font-bold tracking-tight mb-2">Hello.</h1>
+          <h1 className="text-4xl font-bold tracking-tight mb-2">Hello! 👋</h1>
           <p className="text-muted-foreground text-lg">{format(new Date(), "EEEE, MMMM do")}</p>
         </div>
         
