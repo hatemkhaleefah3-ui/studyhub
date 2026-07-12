@@ -14,6 +14,7 @@ import { Schedule } from '@/pages/Schedule';
 import { Checklist } from '@/pages/Checklist';
 import { Progress } from '@/pages/Progress';
 import { Settings } from '@/pages/Settings';
+import { Archive } from '@/pages/Archive';
 
 const queryClient = new QueryClient();
 
@@ -27,6 +28,7 @@ function Router() {
       <Route path="/checklist" component={Checklist} />
       <Route path="/progress" component={Progress} />
       <Route path="/settings" component={Settings} />
+      <Route path="/archive" component={Archive} />
       <Route component={NotFound} />
     </Switch>
   );

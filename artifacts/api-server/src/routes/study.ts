@@ -5,12 +5,37 @@ import {
   studySchedule,
   studyChecklist,
   studySettings,
+  studyArchive,
 } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 
 const router = Router();
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+type ArchiveCategory = "subject" | "schedule" | "checklist";
+
+const TABLES: Record<ArchiveCategory, typeof studySubjects | typeof studySchedule | typeof studyChecklist> = {
+  subject: studySubjects,
+  schedule: studySchedule,
+  checklist: studyChecklist,
+};
+
+// Moves a row from its live table into the archive (soft delete).
+// No-op (resolves silently) if the row no longer exists.
+async function archiveRow(category: ArchiveCategory, id: string) {
+  const table = TABLES[category];
+  const existing = await db.select().from(table as any).where(eq((table as any).id, id)).limit(1);
+  if (!existing.length) return;
+  await db.insert(studyArchive).values({
+    id: crypto.randomUUID(),
+    category,
+    originalId: id,
+    data: existing[0].data,
+    deletedAt: new Date().toISOString(),
+  });
+  await db.delete(table as any).where(eq((table as any).id, id));
+}
 
 async function getAllData() {
   const [subjects, schedule, checklist, settingsRows] = await Promise.all([
@@ -96,17 +121,17 @@ router.put("/subjects/:id", async (req, res) => {
 router.delete("/subjects/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    await db.delete(studySubjects).where(eq(studySubjects.id, id));
-    // Cascade: delete linked schedule + checklist items
+    // Archive the subject, then cascade-archive linked schedule + checklist items
+    await archiveRow("subject", id);
     const scheduleRows = await db.select().from(studySchedule);
     for (const row of scheduleRows) {
       const ev = row.data as any;
-      if (ev.subjectId === id) await db.delete(studySchedule).where(eq(studySchedule.id, row.id));
+      if (ev.subjectId === id) await archiveRow("schedule", row.id);
     }
     const checklistRows = await db.select().from(studyChecklist);
     for (const row of checklistRows) {
       const item = row.data as any;
-      if (item.subjectId === id) await db.delete(studyChecklist).where(eq(studyChecklist.id, row.id));
+      if (item.subjectId === id) await archiveRow("checklist", row.id);
     }
     res.json({ ok: true });
   } catch (err) {
@@ -247,7 +272,7 @@ router.put("/schedule/:id", async (req, res) => {
 
 router.delete("/schedule/:id", async (req, res) => {
   try {
-    await db.delete(studySchedule).where(eq(studySchedule.id, req.params.id));
+    await archiveRow("schedule", req.params.id);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: String(err) });
@@ -280,7 +305,49 @@ router.put("/checklist/:id", async (req, res) => {
 
 router.delete("/checklist/:id", async (req, res) => {
   try {
-    await db.delete(studyChecklist).where(eq(studyChecklist.id, req.params.id));
+    await archiveRow("checklist", req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// ─── Archive ──────────────────────────────────────────────────────────────────
+router.get("/archive", async (_req, res) => {
+  try {
+    const rows = await db.select().from(studyArchive).orderBy(desc(studyArchive.deletedAt));
+    res.json(rows.map((r) => ({
+      id: r.id,
+      category: r.category,
+      originalId: r.originalId,
+      deletedAt: r.deletedAt,
+      data: r.data,
+    })));
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+router.post("/archive/:id/restore", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const existing = await db.select().from(studyArchive).where(eq(studyArchive.id, id)).limit(1);
+    if (!existing.length) return res.status(404).json({ error: "Not found" });
+    const row = existing[0];
+    const category = row.category as ArchiveCategory;
+    const table = TABLES[category];
+    if (!table) return res.status(400).json({ error: "Unknown category" });
+    await db.insert(table as any).values({ id: row.originalId, data: row.data });
+    await db.delete(studyArchive).where(eq(studyArchive.id, id));
+    res.json({ ok: true, category, item: row.data });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+router.delete("/archive/:id", async (req, res) => {
+  try {
+    await db.delete(studyArchive).where(eq(studyArchive.id, req.params.id));
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: String(err) });
@@ -352,6 +419,7 @@ router.post("/import", async (req, res) => {
       db.delete(studySchedule),
       db.delete(studyChecklist),
       db.delete(studySettings),
+      db.delete(studyArchive),
     ]);
 
     // Insert imported data
@@ -376,6 +444,7 @@ router.delete("/reset", async (_req, res) => {
       db.delete(studySchedule),
       db.delete(studyChecklist),
       db.delete(studySettings),
+      db.delete(studyArchive),
     ]);
     res.json({ ok: true });
   } catch (err) {

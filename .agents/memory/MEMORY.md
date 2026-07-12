@@ -1,0 +1,1 @@
+- [Study Hub dual backend](study-hub-dual-backend.md) — every /api/study/* change must be mirrored in both the Express server (dev) and Cloudflare Pages Functions (prod, D1) or they diverge.

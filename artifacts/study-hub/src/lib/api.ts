@@ -82,4 +82,22 @@ export const api = {
 
   // ─── Reset ────────────────────────────────────────────────────────────────
   resetData: () => request('/reset', { method: 'DELETE' }),
+
+  // ─── Archive ──────────────────────────────────────────────────────────────
+  getArchive: () =>
+    request<ArchiveEntry[]>('/archive'),
+  restoreArchiveItem: (id: string) =>
+    request<{ ok: true; category: ArchiveCategory; item: any }>(`/archive/${id}/restore`, { method: 'POST' }),
+  permanentlyDeleteArchiveItem: (id: string) =>
+    request(`/archive/${id}`, { method: 'DELETE' }),
 };
+
+export type ArchiveCategory = 'subject' | 'schedule' | 'checklist';
+
+export interface ArchiveEntry {
+  id: string;
+  category: ArchiveCategory;
+  originalId: string;
+  deletedAt: string;
+  data: any;
+}

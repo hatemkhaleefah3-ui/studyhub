@@ -1,0 +1,35 @@
+PROJECT: Student Study Tracker Website — Feature Fixes & Redesign
+CONTEXT: This is a live, production website (deployed via GitHub → Cloudflare) 
+used by a student to manage subjects, schedules, checklists, and study 
+materials. Reliability and data integrity are the top priority — this is 
+an active daily-use tool, not a prototype.
+
+ENTITY TYPES IN THIS APP (for clarity throughout this prompt):
+- SUBJECT: an academic subject (e.g., "Math", "Physics"). Has lectures, 
+  exams, and study materials.
+- FOLDER: a general-purpose container the user creates (not academic-specific).
+- TASK: a single checklist or schedule item.
+Rules below apply to a specific entity type unless stated as "all items."
+
+════════════════════════════════════════
+GLOBAL RULES (APPLY TO EVERYTHING BELOW)
+════════════════════════════════════════
+1. Do NOT change the site's overall theme, color palette, fonts, spacing 
+   system, or navigation structure unless a task explicitly says so.
+2. Do NOT refactor, rename, or restructure files/routes/components unrelated 
+   to the specific task at hand.
+3. Do NOT modify build config, dependencies, or deployment settings.
+4. This site is LIVE — every change must be backward-compatible with 
+   existing saved data. No data loss on deploy.
+5. Maintain full mobile responsiveness for every change — this is used 
+   primarily on mobile.
+6. Build in this order to minimize risk: 
+   Phase 1 (low-risk UI fixes) → Phase 2 (interaction model changes) → 
+   Phase 3 (new features/redesigns) → Phase 4 (calendar system, built 
+   and tested in complete isolation from the rest).
+7. If any requirement conflicts with the current architecture, flag it 
+   before implementing rather than making a unilateral structural change.
+8. If a requirement is ambiguous, use a sensible default and clearly note 
+   the assumption rather than blocking on it.
+9. Prioritize not breaking existing live functionality over speed of delivery.
+10. Confirm each phase works before starting the next.
