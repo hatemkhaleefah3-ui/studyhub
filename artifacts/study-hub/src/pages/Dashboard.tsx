@@ -64,19 +64,20 @@ export function Dashboard() {
 
   return (
     <div className="space-y-8 pb-10">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-4xl font-bold tracking-tight mb-2">Hello! 👋</h1>
-          <p className="text-muted-foreground text-lg">{format(new Date(), "EEEE, MMMM do")}</p>
+      {/* Header — greeting + streak in same row on all screen sizes */}
+      <div className="flex flex-row items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-1 md:mb-2">Hello! 👋</h1>
+          <p className="text-muted-foreground text-sm md:text-lg truncate">{format(new Date(), "EEEE, MMMM do")}</p>
         </div>
         
-        <GlassCard className="flex items-center px-6 py-4 gap-4 w-max">
-          <div className="w-12 h-12 rounded-2xl bg-orange-500/10 flex items-center justify-center">
-            <Flame className="w-6 h-6 text-orange-500" />
+        <GlassCard className="flex items-center px-4 py-3 md:px-6 md:py-4 gap-3 md:gap-4 w-max shrink-0">
+          <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-orange-500/10 flex items-center justify-center">
+            <Flame className="w-5 h-5 md:w-6 md:h-6 text-orange-500" />
           </div>
           <div>
-            <p className="text-3xl font-bold">{currentStreak}</p>
-            <p className="text-sm text-muted-foreground uppercase tracking-wider font-semibold">Day Streak</p>
+            <p className="text-2xl md:text-3xl font-bold">{currentStreak}</p>
+            <p className="text-[10px] md:text-sm text-muted-foreground uppercase tracking-wider font-semibold">Day Streak</p>
           </div>
         </GlassCard>
       </div>
