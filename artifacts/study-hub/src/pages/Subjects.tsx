@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useStudyData, ACCENT_HEX, AccentColor } from "@/hooks/useStudyData";
+import { useStudyData, SUBJECT_WALLPAPERS } from "@/hooks/useStudyData";
 import { GlassCard } from "@/components/shared/GlassCard";
 import { BottomSheet } from "@/components/shared/BottomSheet";
 import { ConfirmSheet } from "@/components/shared/ConfirmSheet";
@@ -15,16 +15,16 @@ export function Subjects() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const { register, handleSubmit, watch, setValue, reset } = useForm({
-    defaultValues: { name: "", color: "#007aff" }
+  const { register, handleSubmit, reset } = useForm({
+    defaultValues: { name: "" }
   });
 
-  const { register: regEdit, handleSubmit: handleEditSubmit, watch: watchEdit, setValue: setEditValue, reset: resetEdit } = useForm({
-    defaultValues: { name: "", color: "#007aff" }
+  const { register: regEdit, handleSubmit: handleEditSubmit, reset: resetEdit } = useForm({
+    defaultValues: { name: "" }
   });
 
   const onSubmit = (data: any) => {
-    addSubject(data);
+    addSubject({ name: data.name });
     reset();
     setIsAddOpen(false);
   };
@@ -34,7 +34,7 @@ export function Subjects() {
     e.stopPropagation();
     const sub = subjects.find(s => s.id === id);
     if (!sub) return;
-    resetEdit({ name: sub.name, color: sub.color });
+    resetEdit({ name: sub.name });
     setEditingId(id);
   };
 
@@ -46,12 +46,9 @@ export function Subjects() {
 
   const onEditSubmit = (data: any) => {
     if (!editingId) return;
-    updateSubject(editingId, data);
+    updateSubject(editingId, { name: data.name });
     setEditingId(null);
   };
-
-  const selectedColor = watch("color");
-  const selectedEditColor = watchEdit("color");
 
   return (
     <div className="space-y-8 pb-20">
@@ -80,13 +77,13 @@ export function Subjects() {
             return (
               <SwipeableRow
                 key={subject.id}
-                onEdit={() => { const sub = subjects.find(s => s.id === subject.id); if (sub) { resetEdit({ name: sub.name, color: sub.color }); setEditingId(subject.id); } }}
+                onEdit={() => { const sub = subjects.find(s => s.id === subject.id); if (sub) { resetEdit({ name: sub.name }); setEditingId(subject.id); } }}
                 onDelete={() => setDeletingId(subject.id)}
                 className="h-full"
               >
                 <Link href={`/subjects/${subject.id}`}>
                   <GlassCard className="p-6 hover:scale-[1.02] transition-transform cursor-pointer relative overflow-hidden group h-full flex flex-col justify-between">
-                    <div className="absolute top-0 left-0 w-full h-1.5" style={{ backgroundColor: subject.color }} />
+                    <div className="absolute top-0 left-0 w-full h-1.5 rounded-t-[inherit]" style={{ background: subject.wallpaper ?? subject.color }} />
 
                     {/* Edit / Delete — hover-only, top-right (desktop/mouse fallback for swipe) */}
                     <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
@@ -155,22 +152,9 @@ export function Subjects() {
             />
           </div>
           
-          <div>
-            <label className="block text-sm font-medium mb-3">Color Label</label>
-            <div className="flex flex-wrap gap-4">
-              {Object.entries(ACCENT_HEX).map(([name, hex]) => (
-                <button
-                  key={name}
-                  type="button"
-                  onClick={() => setValue("color", hex)}
-                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${selectedColor === hex ? 'ring-2 ring-offset-2 ring-foreground ring-offset-background scale-110' : 'hover:scale-105'}`}
-                  style={{ backgroundColor: hex }}
-                />
-              ))}
-            </div>
-          </div>
+          <p className="text-sm text-muted-foreground -mt-2">A color and style will be auto-assigned.</p>
 
-          <div className="pt-4">
+          <div className="pt-2">
             <button type="submit" className="w-full bg-primary text-primary-foreground font-semibold rounded-xl py-3.5 hover:opacity-90 transition-opacity">
               Create Subject
             </button>
@@ -190,22 +174,7 @@ export function Subjects() {
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-3">Color Label</label>
-            <div className="flex flex-wrap gap-4">
-              {Object.entries(ACCENT_HEX).map(([name, hex]) => (
-                <button
-                  key={name}
-                  type="button"
-                  onClick={() => setEditValue("color", hex)}
-                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${selectedEditColor === hex ? 'ring-2 ring-offset-2 ring-foreground ring-offset-background scale-110' : 'hover:scale-105'}`}
-                  style={{ backgroundColor: hex }}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div className="pt-4">
+          <div className="pt-2">
             <button type="submit" className="w-full bg-primary text-primary-foreground font-semibold rounded-xl py-3.5 hover:opacity-90 transition-opacity">
               Save Changes
             </button>
