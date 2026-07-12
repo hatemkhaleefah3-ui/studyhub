@@ -105,7 +105,7 @@ export function Schedule() {
       {/* Day selector — fixed shape, no scale transform that causes overflow */}
       <div
         ref={scrollAreaRef}
-        className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory"
+        className="flex gap-2 overflow-x-auto py-2 scrollbar-hide snap-x snap-mandatory"
       >
         {weekDays.map((date, i) => {
           const isToday = isSameDay(date, new Date());
