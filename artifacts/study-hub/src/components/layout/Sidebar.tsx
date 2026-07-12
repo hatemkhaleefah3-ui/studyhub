@@ -1,7 +1,6 @@
 import { Home, BookOpen, Calendar, CheckSquare, BarChart2, Settings } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { motion } from 'framer-motion';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 export const NAV_ITEMS = [
   { href: '/', icon: Home, label: 'Dashboard' },
@@ -21,53 +20,85 @@ export function Sidebar() {
   };
 
   return (
-    <div className="hidden md:flex flex-col w-20 fixed left-0 top-0 bottom-0 bg-card/60 backdrop-blur-xl border-r border-border py-8 items-center z-50">
-      <div className="w-10 h-10 bg-primary/20 rounded-2xl flex items-center justify-center mb-10 shrink-0">
-        <BookOpen className="w-6 h-6 text-primary" />
+    <div
+      className="hidden md:flex fixed top-4 left-4 right-4 h-14 z-50 items-center"
+      style={{
+        background: 'rgba(20,20,20,0.75)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        borderRadius: 9999,
+        boxShadow:
+          '0 8px 32px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08)',
+      }}
+    >
+      {/* Logo — pinned left */}
+      <div className="flex items-center gap-2 pl-5 pr-6 shrink-0">
+        <div className="w-8 h-8 bg-blue-500/20 rounded-xl flex items-center justify-center">
+          <BookOpen className="w-4 h-4 text-blue-400" />
+        </div>
+        <span
+          className="font-semibold text-sm hidden lg:block"
+          style={{ color: 'rgba(255,255,255,0.85)' }}
+        >
+          StudyHub
+        </span>
       </div>
 
-      <div className="flex flex-col gap-4 w-full px-4">
+      {/* Nav items — centered */}
+      <div className="flex-1 flex items-center justify-center gap-1">
         {NAV_ITEMS.map((item) => {
           const isActive = getIsActive(item.href);
           const Icon = item.icon;
 
           return (
-            <Tooltip key={item.href} delayDuration={0}>
-              <TooltipTrigger asChild>
-                <div className="relative w-full aspect-square flex items-center justify-center cursor-pointer group">
-                  {isActive && (
-                    <motion.div
-                      layoutId="sidebar-active"
-                      className="absolute inset-0 rounded-2xl overflow-hidden border border-primary/30"
-                      style={{
-                        background: 'hsl(var(--primary) / 0.15)',
-                        backdropFilter: 'blur(8px)',
-                        boxShadow: '0 2px 10px hsl(var(--primary) / 0.18)',
-                      }}
-                      transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
-                    >
-                      <div className="absolute inset-x-1 top-0.5 h-[44%] rounded-t-xl bg-gradient-to-b from-white/45 to-transparent pointer-events-none" />
-                    </motion.div>
-                  )}
-                  <Link
-                    href={item.href}
-                    className="absolute inset-0 flex items-center justify-center z-10"
-                    data-testid={`nav-${item.label.toLowerCase()}`}
-                  >
-                    <Icon
-                      className={`w-6 h-6 transition-colors duration-300 ${
-                        isActive
-                          ? 'text-primary'
-                          : 'text-muted-foreground group-hover:text-foreground'
-                      }`}
-                    />
-                  </Link>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="right" className="ml-2">
-                <p>{item.label}</p>
-              </TooltipContent>
-            </Tooltip>
+            <div key={item.href} className="relative">
+              {/* Sliding radial glow — shared layout animation */}
+              {isActive && (
+                <motion.div
+                  layoutId="topnav-glow"
+                  className="absolute inset-0 pointer-events-none"
+                  style={{
+                    borderRadius: 9999,
+                    background:
+                      'radial-gradient(circle at center, rgba(59,130,246,0.22) 0%, transparent 72%)',
+                    boxShadow:
+                      '0 0 16px rgba(59,130,246,0.45), 0 0 36px rgba(59,130,246,0.18)',
+                  }}
+                  transition={{ type: 'spring', bounce: 0.15, duration: 0.5 }}
+                />
+              )}
+
+              <Link
+                href={item.href}
+                className="relative flex items-center gap-2 px-3 py-2 z-10"
+                style={{ borderRadius: 9999 }}
+                data-testid={`nav-${item.label.toLowerCase()}`}
+              >
+                <motion.div
+                  animate={{ scale: isActive ? 1.08 : 1 }}
+                  transition={{ type: 'spring', stiffness: 380, damping: 22 }}
+                >
+                  <Icon
+                    className="w-5 h-5"
+                    style={{
+                      color: isActive ? '#3b82f6' : 'rgba(255,255,255,0.45)',
+                      transition: 'color 0.25s ease',
+                    }}
+                  />
+                </motion.div>
+
+                {/* Label — visible on desktop only */}
+                <span
+                  className="text-sm font-medium hidden lg:block"
+                  style={{
+                    color: isActive ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.45)',
+                    transition: 'color 0.25s ease',
+                  }}
+                >
+                  {item.label}
+                </span>
+              </Link>
+            </div>
           );
         })}
       </div>
