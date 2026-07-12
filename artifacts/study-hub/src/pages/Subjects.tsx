@@ -3,6 +3,7 @@ import { useStudyData, ACCENT_HEX, AccentColor } from "@/hooks/useStudyData";
 import { GlassCard } from "@/components/shared/GlassCard";
 import { BottomSheet } from "@/components/shared/BottomSheet";
 import { ConfirmSheet } from "@/components/shared/ConfirmSheet";
+import { FabPortal } from "@/components/shared/FabPortal";
 import { Plus, ChevronRight, BookOpen, Pencil, Trash2 } from "lucide-react";
 import { Link } from "wouter";
 import { useForm } from "react-hook-form";
@@ -124,12 +125,14 @@ export function Subjects() {
       )}
 
       {/* FAB */}
-      <button 
-        onClick={() => setIsAddOpen(true)}
-        className="fixed bottom-24 md:bottom-10 right-6 md:right-10 w-14 h-14 bg-primary text-primary-foreground rounded-full shadow-lg shadow-primary/30 flex items-center justify-center hover:scale-105 transition-transform z-40"
-      >
-        <Plus className="w-6 h-6" />
-      </button>
+      <FabPortal>
+        <button
+          onClick={() => setIsAddOpen(true)}
+          className="fixed bottom-24 md:bottom-10 right-6 md:right-10 w-14 h-14 bg-primary text-primary-foreground rounded-full shadow-lg shadow-primary/30 flex items-center justify-center hover:scale-105 transition-transform z-40"
+        >
+          <Plus className="w-6 h-6" />
+        </button>
+      </FabPortal>
 
       {/* Add Subject sheet */}
       <BottomSheet isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} title="New Subject">

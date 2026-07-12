@@ -1,7 +1,7 @@
 import { useStudyData } from "@/hooks/useStudyData";
 import { GlassCard } from "@/components/shared/GlassCard";
 import { format, isToday, isTomorrow, parseISO, differenceInDays } from "date-fns";
-import { Flame, Calendar as CalendarIcon, CheckCircle2, Circle } from "lucide-react";
+import { Flame, Calendar as CalendarIcon, CheckCircle2, Circle, Settings as SettingsIcon } from "lucide-react";
 import { Link } from "wouter";
 
 export function Dashboard() {
@@ -64,21 +64,32 @@ export function Dashboard() {
 
   return (
     <div className="space-y-8 pb-10">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-4xl font-bold tracking-tight mb-2">Hello! 👋</h1>
-          <p className="text-muted-foreground text-lg">{format(new Date(), "EEEE, MMMM do")}</p>
+      <div className="flex flex-row items-center md:items-end justify-between gap-3 md:gap-4">
+        <div className="min-w-0">
+          <h1 className="text-2xl md:text-4xl font-bold tracking-tight mb-1 md:mb-2">Hello! 👋</h1>
+          <p className="text-muted-foreground text-sm md:text-lg truncate">{format(new Date(), "EEEE, MMMM do")}</p>
         </div>
-        
-        <GlassCard className="flex items-center px-6 py-4 gap-4 w-max">
-          <div className="w-12 h-12 rounded-2xl bg-orange-500/10 flex items-center justify-center">
-            <Flame className="w-6 h-6 text-orange-500" />
-          </div>
-          <div>
-            <p className="text-3xl font-bold">{currentStreak}</p>
-            <p className="text-sm text-muted-foreground uppercase tracking-wider font-semibold">Day Streak</p>
-          </div>
-        </GlassCard>
+
+        <div className="flex items-center gap-2 md:gap-4 shrink-0">
+          <GlassCard className="flex items-center px-3 py-2 md:px-6 md:py-4 gap-2 md:gap-4 w-max">
+            <div className="w-9 h-9 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-orange-500/10 flex items-center justify-center shrink-0">
+              <Flame className="w-4 h-4 md:w-6 md:h-6 text-orange-500" />
+            </div>
+            <div>
+              <p className="text-xl md:text-3xl font-bold leading-none">{currentStreak}</p>
+              <p className="text-[10px] md:text-sm text-muted-foreground uppercase tracking-wider font-semibold whitespace-nowrap">Day Streak</p>
+            </div>
+          </GlassCard>
+
+          <Link
+            href="/settings"
+            className="w-9 h-9 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-secondary/60 hover:bg-secondary flex items-center justify-center transition-colors shrink-0"
+            title="Settings"
+            data-testid="link-dashboard-settings"
+          >
+            <SettingsIcon className="w-4 h-4 md:w-5 md:h-5 text-muted-foreground" />
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

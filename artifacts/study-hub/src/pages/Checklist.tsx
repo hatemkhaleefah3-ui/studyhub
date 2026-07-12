@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useStudyData } from "@/hooks/useStudyData";
 import { GlassCard } from "@/components/shared/GlassCard";
 import { BottomSheet } from "@/components/shared/BottomSheet";
+import { FabPortal } from "@/components/shared/FabPortal";
 import {
   Plus, Trash2, CheckCircle2, Circle,
   List, ListChecks, ChevronDown, ChevronRight, X, Pencil
@@ -382,64 +383,67 @@ export function Checklist() {
         </div>
       )}
 
-      {/* Action menu overlay */}
-      <AnimatePresence>
-        {showActionMenu && (
-          <>
-            {/* Dismiss backdrop */}
-            <motion.div
-              key="backdrop"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-30"
-              onClick={() => setShowActionMenu(false)}
-            />
-            {/* Menu */}
-            <motion.div
-              key="menu"
-              initial={{ opacity: 0, scale: 0.9, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 8 }}
-              transition={{ type: "spring", stiffness: 350, damping: 28 }}
-              className="fixed bottom-40 md:bottom-28 right-6 md:right-10 z-50 bg-card/95 backdrop-blur-xl border border-border rounded-2xl shadow-2xl overflow-hidden min-w-[180px]"
-            >
-              <button
-                onClick={() => { setShowActionMenu(false); setIsAddTaskOpen(true); }}
-                className="flex items-center gap-3 px-5 py-4 hover:bg-secondary/60 transition-colors w-full text-left"
-                data-testid="btn-add-single-task"
+      {/* Action menu overlay + FAB — portaled to body so the fixed positioning
+          isn't affected by the page-transition transform on the content wrapper */}
+      <FabPortal>
+        <AnimatePresence>
+          {showActionMenu && (
+            <>
+              {/* Dismiss backdrop */}
+              <motion.div
+                key="backdrop"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-30"
+                onClick={() => setShowActionMenu(false)}
+              />
+              {/* Menu */}
+              <motion.div
+                key="menu"
+                initial={{ opacity: 0, scale: 0.9, y: 8 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 8 }}
+                transition={{ type: "spring", stiffness: 350, damping: 28 }}
+                className="fixed bottom-40 md:bottom-28 right-6 md:right-10 z-50 bg-card/95 backdrop-blur-xl border border-border rounded-2xl shadow-2xl overflow-hidden min-w-[180px]"
               >
-                <List className="w-5 h-5 text-primary shrink-0" />
-                <span className="font-medium">Single Task</span>
-              </button>
-              <div className="h-px bg-border/60 mx-3" />
-              <button
-                onClick={() => { setShowActionMenu(false); setIsAddListOpen(true); }}
-                className="flex items-center gap-3 px-5 py-4 hover:bg-secondary/60 transition-colors w-full text-left"
-                data-testid="btn-add-task-list"
-              >
-                <ListChecks className="w-5 h-5 text-primary shrink-0" />
-                <span className="font-medium">Task List</span>
-              </button>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+                <button
+                  onClick={() => { setShowActionMenu(false); setIsAddTaskOpen(true); }}
+                  className="flex items-center gap-3 px-5 py-4 hover:bg-secondary/60 transition-colors w-full text-left"
+                  data-testid="btn-add-single-task"
+                >
+                  <List className="w-5 h-5 text-primary shrink-0" />
+                  <span className="font-medium">Single Task</span>
+                </button>
+                <div className="h-px bg-border/60 mx-3" />
+                <button
+                  onClick={() => { setShowActionMenu(false); setIsAddListOpen(true); }}
+                  className="flex items-center gap-3 px-5 py-4 hover:bg-secondary/60 transition-colors w-full text-left"
+                  data-testid="btn-add-task-list"
+                >
+                  <ListChecks className="w-5 h-5 text-primary shrink-0" />
+                  <span className="font-medium">Task List</span>
+                </button>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
 
-      {/* FAB — rotates to X when menu is open */}
-      <motion.button
-        onClick={() => setShowActionMenu(!showActionMenu)}
-        whileTap={{ scale: 0.88 }}
-        className="fixed bottom-24 md:bottom-10 right-6 md:right-10 w-14 h-14 bg-primary text-primary-foreground rounded-full shadow-lg shadow-primary/30 flex items-center justify-center z-40"
-        data-testid="btn-open-add-menu"
-      >
-        <motion.div
-          animate={{ rotate: showActionMenu ? 45 : 0 }}
-          transition={{ type: "spring", stiffness: 320, damping: 24 }}
+        {/* FAB — rotates to X when menu is open */}
+        <motion.button
+          onClick={() => setShowActionMenu(!showActionMenu)}
+          whileTap={{ scale: 0.88 }}
+          className="fixed bottom-24 md:bottom-10 right-6 md:right-10 w-14 h-14 bg-primary text-primary-foreground rounded-full shadow-lg shadow-primary/30 flex items-center justify-center z-40"
+          data-testid="btn-open-add-menu"
         >
-          <Plus className="w-6 h-6" />
-        </motion.div>
-      </motion.button>
+          <motion.div
+            animate={{ rotate: showActionMenu ? 45 : 0 }}
+            transition={{ type: "spring", stiffness: 320, damping: 24 }}
+          >
+            <Plus className="w-6 h-6" />
+          </motion.div>
+        </motion.button>
+      </FabPortal>
 
       {/* Add Single Task sheet */}
       <BottomSheet isOpen={isAddTaskOpen} onClose={() => setIsAddTaskOpen(false)} title="New Task">

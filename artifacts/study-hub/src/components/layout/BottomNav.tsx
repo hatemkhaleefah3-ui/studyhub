@@ -11,13 +11,14 @@ export function BottomNav() {
   };
 
   return (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-card/85 backdrop-blur-2xl border-t border-border px-6 flex items-center justify-between z-50">
+    <div className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-card/85 backdrop-blur-2xl border-t border-border z-50">
+      <div className="max-w-sm mx-auto h-full px-8 flex items-center justify-between">
       {NAV_ITEMS.map((item) => {
         const isActive = getIsActive(item.href);
         const Icon = item.icon;
 
         return (
-          <div key={item.href} className="relative flex items-center justify-center w-12 h-12">
+          <div key={item.href} className="relative flex items-center justify-center w-14 h-14">
             {isActive && (
               <motion.div
                 layoutId="bottomnav-active"
@@ -46,6 +47,7 @@ export function BottomNav() {
           </div>
         );
       })}
+      </div>
     </div>
   );
 }
