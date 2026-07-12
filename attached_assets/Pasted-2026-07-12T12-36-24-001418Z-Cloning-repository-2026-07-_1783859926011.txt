@@ -1,0 +1,63 @@
+2026-07-12T12:36:24.001418Z	Cloning repository...
+2026-07-12T12:36:24.725283Z	From https://github.com/hatemkhaleefah3-ui/studyhub
+2026-07-12T12:36:24.725543Z	 * branch            5ca276fa7222b0a865cfb87619d67d459f717aa7 -> FETCH_HEAD
+2026-07-12T12:36:24.725656Z	
+2026-07-12T12:36:38.112985Z	HEAD is now at 5ca276f Add study data synchronization and checklist functionality to study hub application
+2026-07-12T12:36:38.113389Z	
+2026-07-12T12:36:38.153172Z	
+2026-07-12T12:36:38.153447Z	Using v2 root directory strategy
+2026-07-12T12:36:38.164506Z	Success: Finished cloning repository files
+2026-07-12T12:36:39.823422Z	Checking for configuration in a Wrangler configuration file (BETA)
+2026-07-12T12:36:39.823868Z	
+2026-07-12T12:36:39.82471Z	Found wrangler.toml file. Reading build configuration...
+2026-07-12T12:36:39.830937Z	pages_build_output_dir: artifacts/study-hub/dist/public
+2026-07-12T12:36:39.831088Z	Build environment variables: (none found)
+2026-07-12T12:36:39.951499Z	Successfully read the Wrangler configuration file.
+2026-07-12T12:36:40.285851Z	Detected the following tools from environment: pnpm@10.26.1, nodejs@22.16.0
+2026-07-12T12:36:40.898864Z	Preparing pnpm@10.26.1 for immediate activation...
+2026-07-12T12:36:42.638253Z	Installing project dependencies: pnpm install
+2026-07-12T12:36:43.057065Z	Scope: all 9 workspace projects
+2026-07-12T12:36:43.130484Z	Lockfile is up to date, resolution step is skipped
+2026-07-12T12:36:43.169076Z	Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-07-12T12:36:43.222497Z	Packages: +473
+2026-07-12T12:36:43.222776Z	++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+2026-07-12T12:36:44.169631Z	Progress: resolved 473, reused 0, downloaded 220, added 170
+2026-07-12T12:36:45.174454Z	Progress: resolved 473, reused 0, downloaded 308, added 226
+2026-07-12T12:36:46.1702Z	Progress: resolved 473, reused 0, downloaded 468, added 311
+2026-07-12T12:36:47.169448Z	Progress: resolved 473, reused 0, downloaded 473, added 473, done
+2026-07-12T12:36:47.331282Z	.../esbuild@0.27.3/node_modules/esbuild postinstall$ node install.js
+2026-07-12T12:36:47.410382Z	.../esbuild@0.27.3/node_modules/esbuild postinstall: Done
+2026-07-12T12:36:47.832565Z	
+2026-07-12T12:36:47.832832Z	dependencies:
+2026-07-12T12:36:47.832909Z	+ @replit/connectors-sdk 0.4.1
+2026-07-12T12:36:47.832956Z	
+2026-07-12T12:36:47.832989Z	devDependencies:
+2026-07-12T12:36:47.833042Z	+ prettier 3.9.4
+2026-07-12T12:36:47.833097Z	+ typescript 5.9.3
+2026-07-12T12:36:47.833148Z	
+2026-07-12T12:36:47.885286Z	. preinstall$ sh -c 'rm -f package-lock.json yarn.lock; case "$npm_config_user_agent" in pnpm/*) ;; *) echo "Use pnpm instead" >&2; exit 1 ;; esac'
+2026-07-12T12:36:47.900792Z	. preinstall: Done
+2026-07-12T12:36:48.029453Z	Done in 5.2s using pnpm v10.26.1
+2026-07-12T12:36:48.066231Z	Executing user command: pnpm --filter @workspace/study-hub run build
+2026-07-12T12:36:48.48821Z	
+2026-07-12T12:36:48.488527Z	> @workspace/study-hub@0.0.0 build /opt/buildhome/repo/artifacts/study-hub
+2026-07-12T12:36:48.488592Z	> vite build --config vite.config.ts
+2026-07-12T12:36:48.488654Z	
+2026-07-12T12:36:48.814807Z	[31mfailed to load config from /opt/buildhome/repo/artifacts/study-hub/vite.config.ts[39m
+2026-07-12T12:36:48.815906Z	[31merror during build:
+2026-07-12T12:36:48.816145Z	Error: PORT environment variable is required but was not provided.
+2026-07-12T12:36:48.816248Z	    at file:///opt/buildhome/repo/artifacts/study-hub/node_modules/.vite-temp/vite.config.ts.timestamp-1783859808711-c7e981b978e69.mjs:10:9
+2026-07-12T12:36:48.816338Z	    at ModuleJob.run (node:internal/modules/esm/module_job:274:25)
+2026-07-12T12:36:48.816416Z	    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:644:26)
+2026-07-12T12:36:48.816508Z	    at async loadConfigFromBundledFile (file:///opt/buildhome/repo/node_modules/.pnpm/vite@7.3.6_@types+node@25.9.4_jiti@2.7.0_lightningcss@1.32.0_tsx@4.23.0_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:35996:12)
+2026-07-12T12:36:48.816618Z	    at async bundleAndLoadConfigFile (file:///opt/buildhome/repo/node_modules/.pnpm/vite@7.3.6_@types+node@25.9.4_jiti@2.7.0_lightningcss@1.32.0_tsx@4.23.0_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:35884:17)
+2026-07-12T12:36:48.816737Z	    at async loadConfigFromFile (file:///opt/buildhome/repo/node_modules/.pnpm/vite@7.3.6_@types+node@25.9.4_jiti@2.7.0_lightningcss@1.32.0_tsx@4.23.0_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:35851:42)
+2026-07-12T12:36:48.816824Z	    at async resolveConfig (file:///opt/buildhome/repo/node_modules/.pnpm/vite@7.3.6_@types+node@25.9.4_jiti@2.7.0_lightningcss@1.32.0_tsx@4.23.0_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:35500:22)
+2026-07-12T12:36:48.816985Z	    at async createBuilder (file:///opt/buildhome/repo/node_modules/.pnpm/vite@7.3.6_@types+node@25.9.4_jiti@2.7.0_lightningcss@1.32.0_tsx@4.23.0_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:33955:19)
+2026-07-12T12:36:48.817082Z	    at async CAC.<anonymous> (file:///opt/buildhome/repo/node_modules/.pnpm/vite@7.3.6_@types+node@25.9.4_jiti@2.7.0_lightningcss@1.32.0_tsx@4.23.0_yaml@2.9.0/node_modules/vite/dist/node/cli.js:629:10)[39m
+2026-07-12T12:36:48.84199Z	/opt/buildhome/repo/artifacts/study-hub:
+2026-07-12T12:36:48.842348Z	 ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @workspace/study-hub@0.0.0 build: `vite build --config vite.config.ts`
+2026-07-12T12:36:48.842527Z	Exit status 1
+2026-07-12T12:36:48.875519Z	Failed: Error while executing user command. Exited with error code: 1
+2026-07-12T12:36:48.882242Z	Failed: build command exited with code: 1
+2026-07-12T12:36:49.484111Z	Failed: error occurred while running build command
