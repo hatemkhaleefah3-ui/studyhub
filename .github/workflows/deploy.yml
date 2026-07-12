@@ -27,7 +27,7 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - name: Install dependencies    
+      - name: Install dependencies
         run: pnpm install --no-frozen-lockfile --config.minimumReleaseAge=0
 
       - name: Build
@@ -35,9 +35,11 @@ jobs:
         env:
           NODE_ENV: production
 
+      - name: Install Wrangler
+        run: npm install -g wrangler@3.90.0
+
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: 881729b081362dc409baddcd144086a9
-          command: pages deploy artifacts/study-hub/dist/public --project-name=studyhub
+        run: wrangler pages deploy artifacts/study-hub/dist/public --project-name=studyhub
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: 881729b081362dc409baddcd144086a9
