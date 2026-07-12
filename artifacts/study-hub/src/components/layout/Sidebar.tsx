@@ -1,15 +1,16 @@
-import { Home, BookOpen, Calendar, CheckSquare, BarChart2, Settings } from 'lucide-react';
+import { Home, BookOpen, Calendar, CheckSquare, BarChart2 } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
+// Settings is intentionally not a nav item — it's accessible via the gear
+// icon on the Dashboard header instead. The route itself still exists.
 export const NAV_ITEMS = [
   { href: '/', icon: Home, label: 'Dashboard' },
   { href: '/subjects', icon: BookOpen, label: 'Subjects' },
   { href: '/schedule', icon: Calendar, label: 'Schedule' },
   { href: '/checklist', icon: CheckSquare, label: 'Checklist' },
   { href: '/progress', icon: BarChart2, label: 'Progress' },
-  { href: '/settings', icon: Settings, label: 'Settings' },
 ];
 
 export function Sidebar() {

@@ -3,6 +3,7 @@ import { useStudyData } from "@/hooks/useStudyData";
 import { GlassCard } from "@/components/shared/GlassCard";
 import { BottomSheet } from "@/components/shared/BottomSheet";
 import { ConfirmSheet } from "@/components/shared/ConfirmSheet";
+import { FabPortal } from "@/components/shared/FabPortal";
 import { format, startOfWeek, addDays, isSameDay } from "date-fns";
 import { Plus, CheckCircle, Link2, Pencil, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -102,10 +103,12 @@ export function Schedule() {
         </div>
       </div>
 
-      {/* Day selector — fixed shape, no scale transform that causes overflow */}
+      {/* Day selector — fixed shape, no scale transform that causes overflow.
+          overflow-y-visible + vertical padding keep the selected-day ring/shadow
+          fully contained in its own row instead of clipping into content above. */}
       <div
         ref={scrollAreaRef}
-        className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory"
+        className="relative z-10 flex gap-2 overflow-x-auto overflow-y-visible py-2 -my-2 scrollbar-hide snap-x snap-mandatory"
       >
         {weekDays.map((date, i) => {
           const isToday = isSameDay(date, new Date());
@@ -218,13 +221,15 @@ export function Schedule() {
         })()}
       </div>
 
-      <button
-        onClick={() => setIsAddOpen(true)}
-        className="fixed bottom-24 md:bottom-10 right-6 md:right-10 w-14 h-14 bg-primary text-primary-foreground rounded-full shadow-lg shadow-primary/30 flex items-center justify-center hover:scale-105 transition-transform z-40"
-        data-testid="btn-add-event"
-      >
-        <Plus className="w-6 h-6" />
-      </button>
+      <FabPortal>
+        <button
+          onClick={() => setIsAddOpen(true)}
+          className="fixed bottom-24 md:bottom-10 right-6 md:right-10 w-14 h-14 bg-primary text-primary-foreground rounded-full shadow-lg shadow-primary/30 flex items-center justify-center hover:scale-105 transition-transform z-40"
+          data-testid="btn-add-event"
+        >
+          <Plus className="w-6 h-6" />
+        </button>
+      </FabPortal>
 
       {/* Add Event sheet */}
       <BottomSheet isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} title="New Event">
