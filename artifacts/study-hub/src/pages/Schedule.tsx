@@ -10,11 +10,11 @@ import {
   isPast, isToday as dateFnsIsToday,
 } from "date-fns";
 import {
-  CheckCircle2, Circle, XCircle, Link2, Pencil, Trash2,
+  CheckCircle2, Check, X, Link2, Pencil, Trash2,
   Clock, Repeat, CheckSquare,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
-import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -214,7 +214,6 @@ export function Schedule() {
                   checklist={checklist}
                   subjects={subjects}
                   onCycle={() => cycleTaskStatus(entry.id)}
-                  onDelete={() => deleteChecklistItem(entry.id)}
                 />
               );
             })}
@@ -345,21 +344,16 @@ function EventCard({
   );
 }
 
-// ── Task card (checklist items with dueDate) — swipeable ─────────────────────
-//
-//  ← swipe right-to-left : cycle undone → done → skipped → undone
-//  → swipe left-to-right  : delete
-
-const SWIPE_THRESHOLD = 64; // px before action fires
+// ── Task card (checklist items with dueDate) ─────────────────────────────────
+//  Tap the status button (right side) to cycle: undone → done → skipped → undone
 
 function TaskCard({
-  taskId, checklist, subjects, onCycle, onDelete,
+  taskId, checklist, subjects, onCycle,
 }: {
   taskId: string;
   checklist: any[];
   subjects: any[];
-  onCycle:  () => void;
-  onDelete: () => void;
+  onCycle: () => void;
 }) {
   const item = checklist.find((c: any) => c.id === taskId);
   if (!item) return null;
@@ -369,33 +363,17 @@ function TaskCard({
   const isOverdue = !item.done && !item.didNotDo && item.dueDate
     && isPast(parseISO(item.dueDate)) && !dateFnsIsToday(parseISO(item.dueDate));
 
-  // ── Drag motion value ────────────────────────────────────────────────────
-  const x = useMotionValue(0);
-
-  // Right-to-left (negative x) → cycle action hint colour
-  // undone → will become done   → green
-  // done   → will become skip   → amber
-  // skip   → will become undone → muted
-  const cycleColor =
-    item.done      ? "rgba(245,158,11,0.9)"  :  // amber  (→ skip)
-    item.didNotDo  ? "rgba(100,116,139,0.8)" :  // slate  (→ undone)
-                     "rgba(34,197,94,0.9)";      // green  (→ done)
-
-  const CycleIcon =
-    item.done     ? XCircle      :
-    item.didNotDo ? Circle       :
-                    CheckCircle2;
-
-  // Left-to-right (positive x) → delete hint (red)
-  // Reveal opacity for each side
-  const deleteBgOpacity = useTransform(x, [0, SWIPE_THRESHOLD], [0, 1]);
-  const cycleBgOpacity  = useTransform(x, [-SWIPE_THRESHOLD, 0], [1, 0]);
-
-  const handleDragEnd = (_: any, info: { offset: { x: number } }) => {
-    if (info.offset.x > SWIPE_THRESHOLD)       onDelete();
-    else if (info.offset.x < -SWIPE_THRESHOLD) onCycle();
-    // snap back either way — framer resets because dragElastic snaps
-  };
+  // ── Status button visual state ───────────────────────────────────────────
+  // undone  → empty ring
+  // done    → solid primary fill + white check
+  // skipped → solid muted fill + white x
+  const btnBase = "w-9 h-9 rounded-full shrink-0 flex items-center justify-center transition-all duration-200 active:scale-90";
+  const btnStyle =
+    item.done
+      ? `${btnBase} bg-primary shadow-lg shadow-primary/40`
+      : item.didNotDo
+      ? `${btnBase} bg-muted-foreground/25`
+      : `${btnBase} border-2 border-muted-foreground/35 bg-card/50 hover:border-primary/60 hover:bg-primary/5`;
 
   return (
     <motion.div
@@ -404,94 +382,79 @@ function TaskCard({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.97 }}
       transition={{ type: "spring", stiffness: 300, damping: 28 }}
-      className="relative overflow-hidden rounded-2xl"
     >
-      {/* ── Left-to-right backdrop: delete (red) ── */}
-      <motion.div
-        className="absolute inset-0 flex items-center pl-5 rounded-2xl"
-        style={{ backgroundColor: "rgba(239,68,68,0.9)", opacity: deleteBgOpacity }}
-      >
-        <Trash2 className="w-6 h-6 text-white" />
-        <span className="ml-2 text-sm font-bold text-white">Delete</span>
-      </motion.div>
+      <GlassCard className={`p-4 flex gap-4 transition-opacity duration-300 ${item.done || item.didNotDo ? "opacity-55" : ""}`}>
 
-      {/* ── Right-to-left backdrop: cycle action ── */}
-      <motion.div
-        className="absolute inset-0 flex items-center justify-end pr-5 rounded-2xl"
-        style={{ backgroundColor: cycleColor, opacity: cycleBgOpacity }}
-      >
-        <span className="mr-2 text-sm font-bold text-white">
-          {item.done ? "Skip" : item.didNotDo ? "Undo" : "Done"}
-        </span>
-        <CycleIcon className="w-6 h-6 text-white" />
-      </motion.div>
+        {/* Time column */}
+        <div className="w-14 shrink-0 flex flex-col items-center justify-center text-center border-r border-border/50 pr-3 gap-0.5">
+          {item.dueTime ? (
+            <>
+              <span className="text-base font-bold leading-none tabular-nums">{item.dueTime.split(":")[0]}</span>
+              <span className="text-[10px] text-muted-foreground font-medium leading-none">{item.dueTime.split(":")[1]}</span>
+            </>
+          ) : (
+            <CheckSquare className="w-4 h-4 text-muted-foreground/50" />
+          )}
+        </div>
 
-      {/* ── Draggable card ── */}
-      <motion.div
-        drag="x"
-        dragConstraints={{ left: -160, right: 160 }}
-        dragElastic={{ left: 0.15, right: 0.15 }}
-        style={{ x }}
-        onDragEnd={handleDragEnd}
-        whileTap={{ cursor: "grabbing" }}
-        className="touch-pan-y"
-      >
-        <GlassCard className={`p-4 flex gap-4 transition-all ${item.done || item.didNotDo ? "opacity-50" : ""}`}>
-          {/* Time column */}
-          <div className="w-14 shrink-0 text-center flex flex-col items-center justify-center border-r border-border/50 pr-3">
-            {item.dueTime ? (
-              <span className="text-base font-bold leading-tight">{item.dueTime}</span>
-            ) : (
-              <CheckSquare className="w-4 h-4 text-muted-foreground/60" />
+        {/* Subject colour bar */}
+        <div
+          className="w-1 rounded-full shrink-0 self-stretch"
+          style={{ backgroundColor: subject?.color || "hsl(var(--muted-foreground) / 0.3)" }}
+        />
+
+        {/* Content */}
+        <div className="flex-1 py-0.5 min-w-0">
+          <p className={`font-semibold leading-snug ${
+            item.done      ? "line-through text-muted-foreground" :
+            item.didNotDo  ? "line-through text-muted-foreground/50" : ""
+          }`}>
+            {item.text}
+          </p>
+
+          <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+            {subject && (
+              <span className="text-xs text-muted-foreground font-medium">{subject.name}</span>
+            )}
+            {imp && (
+              <span className={`inline-flex items-center gap-1 text-xs font-medium ${imp.color}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${imp.dot}`} />
+                {imp.label}
+              </span>
+            )}
+            {item.repeat && item.repeat !== "none" && (
+              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                <Repeat className="w-3 h-3" />
+                {REPEAT_LABEL[item.repeat as RepeatInterval]}
+              </span>
+            )}
+            {isOverdue && (
+              <span className="text-xs font-semibold text-rose-500 bg-rose-500/10 px-1.5 py-0.5 rounded-full">Overdue</span>
+            )}
+            {item.didNotDo && (
+              <span className="text-xs font-medium bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">Skipped</span>
             )}
           </div>
 
-          {/* Subject colour bar */}
-          <div
-            className="w-1.5 rounded-full shrink-0 self-stretch"
-            style={{ backgroundColor: subject?.color || "hsl(var(--muted-foreground))" }}
-          />
+          {item.description && (
+            <p className="text-xs mt-1.5 text-muted-foreground/70 line-clamp-2 leading-relaxed">{item.description}</p>
+          )}
+        </div>
 
-          {/* Content */}
-          <div className="flex-1 py-0.5 min-w-0">
-            <h3 className={`font-semibold ${item.done ? "line-through text-muted-foreground" : item.didNotDo ? "line-through text-muted-foreground/60" : ""}`}>
-              {item.text}
-            </h3>
-            <div className="flex items-center gap-1 flex-wrap mt-1">
-              {subject && <span className="text-xs text-muted-foreground">{subject.name}</span>}
-              {imp && (
-                <span className={`inline-flex items-center gap-1 text-xs ${imp.color}`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${imp.dot}`} />
-                  {imp.label}
-                </span>
-              )}
-              {item.repeat && item.repeat !== "none" && (
-                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                  <Repeat className="w-3 h-3" />
-                  {REPEAT_LABEL[item.repeat as RepeatInterval]}
-                </span>
-              )}
-              {isOverdue && <span className="text-xs text-rose-500 font-medium">Overdue</span>}
-              {item.didNotDo && (
-                <span className="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">Skipped</span>
-              )}
-            </div>
-            {item.description && (
-              <p className="text-xs mt-1 text-muted-foreground/80 line-clamp-2">{item.description}</p>
-            )}
-          </div>
+        {/* Status button — tap to cycle */}
+        <div className="flex items-center shrink-0 self-center">
+          <motion.button
+            onClick={onCycle}
+            className={btnStyle}
+            whileTap={{ scale: 0.82 }}
+            title={item.done ? "Mark skipped" : item.didNotDo ? "Mark undone" : "Mark done"}
+          >
+            {item.done && <Check className="w-4 h-4 text-primary-foreground stroke-[3]" />}
+            {item.didNotDo && <X className="w-3.5 h-3.5 text-muted-foreground stroke-[2.5]" />}
+          </motion.button>
+        </div>
 
-          {/* Status icon (read-only visual — tap the card to swipe) */}
-          <div className="p-2 h-max shrink-0 mt-0.5 pointer-events-none">
-            {item.done
-              ? <CheckCircle2 className="w-6 h-6 text-primary" />
-              : item.didNotDo
-              ? <XCircle className="w-6 h-6 text-muted-foreground" />
-              : <Circle className="w-6 h-6 text-muted-foreground" />
-            }
-          </div>
-        </GlassCard>
-      </motion.div>
+      </GlassCard>
     </motion.div>
   );
 }
