@@ -413,8 +413,7 @@ export function TaskListDetail() {
           onSubmit={onAddSubTask}
           onClose={() => setIsAddOpen(false)}
           submitLabel="Add Sub-task"
-          hideSubject
-          hideRepeat
+          minimal
         />
       )}
 
@@ -427,8 +426,7 @@ export function TaskListDetail() {
           onSubmit={onEditSubTask}
           onClose={() => setEditingSubTaskId(null)}
           submitLabel="Save Changes"
-          hideSubject
-          hideRepeat
+          minimal
         />
       )}
     </div>

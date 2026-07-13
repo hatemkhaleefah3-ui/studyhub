@@ -61,6 +61,7 @@ export function TaskForm({
   submitLabel,
   hideSubject = false,
   hideRepeat = false,
+  minimal = false,
 }: {
   title: string;
   defaultValues: TaskFormValues;
@@ -70,6 +71,8 @@ export function TaskForm({
   submitLabel: string;
   hideSubject?: boolean;
   hideRepeat?: boolean;
+  /** Sub-tasks only need a name and a link — skip description, subject, importance, due date/time and repeat entirely. */
+  minimal?: boolean;
 }) {
   const hasAdvancedValues = !!(
     defaultValues.importance ||
@@ -90,7 +93,47 @@ export function TaskForm({
     }
   }, [repeatValue, dueDateValue, setValue]);
 
-  const submit = (data: TaskFormValues) => { onSubmit(data); reset(); };
+  const submit = (data: TaskFormValues) => {
+    // Repeated tasks default to 12:00 AM when no time was chosen, so the
+    // repeat occurs at a well-defined time on its scheduled day.
+    const finalData: TaskFormValues =
+      data.repeat && data.repeat !== "none" && !data.dueTime
+        ? { ...data, dueTime: "00:00" }
+        : data;
+    onSubmit(finalData);
+    reset();
+  };
+
+  if (minimal) {
+    return (
+      <BottomSheet isOpen title={title} onClose={onClose}>
+        <form onSubmit={handleSubmit(submit)} className="space-y-5 pb-2">
+          <Section label="Name">
+            <input
+              {...register("text", { required: true })}
+              className={fieldCls}
+              placeholder="Sub-task name…"
+              autoFocus
+            />
+          </Section>
+          <Section label="Link (optional)">
+            <input
+              {...register("link")}
+              type="url"
+              className={fieldCls}
+              placeholder="https://…"
+            />
+          </Section>
+          <button
+            type="submit"
+            className="w-full bg-primary text-primary-foreground font-semibold rounded-xl py-3.5"
+          >
+            {submitLabel}
+          </button>
+        </form>
+      </BottomSheet>
+    );
+  }
 
   return (
     <BottomSheet isOpen title={title} onClose={onClose}>

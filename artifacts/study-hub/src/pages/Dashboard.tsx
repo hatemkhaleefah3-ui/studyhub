@@ -1,5 +1,6 @@
 import { useStudyData } from "@/hooks/useStudyData";
 import { GlassCard } from "@/components/shared/GlassCard";
+import { MiniCalendar } from "@/components/dashboard/MiniCalendar";
 import { format, isToday, isTomorrow, parseISO, differenceInDays } from "date-fns";
 import { Flame, Calendar as CalendarIcon, CheckCircle2, Circle, Settings as SettingsIcon } from "lucide-react";
 import { Link } from "wouter";
@@ -133,6 +134,8 @@ export function Dashboard() {
 
         {/* Schedule & Tasks */}
         <div className="space-y-6">
+          <MiniCalendar schedule={schedule} checklist={checklist} />
+
           <div className="space-y-4">
             <h2 className="text-xl font-semibold">Today's Schedule</h2>
             {todaySchedule.length === 0 ? (
