@@ -10,7 +10,7 @@ import { Link } from "wouter";
 import { useForm } from "react-hook-form";
 
 export function Subjects() {
-  const { subjects, addSubject, updateSubject, deleteSubject, checklist } = useStudyData();
+  const { subjects, addSubject, updateSubject, deleteSubject } = useStudyData();
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -70,7 +70,6 @@ export function Subjects() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {subjects.map(subject => {
-            const openTasks = checklist.filter(c => c.subjectId === subject.id && !c.done).length;
             const gradedExams = subject.exams.filter(e => e.grade);
             const avg = gradedExams.length ? Math.round(gradedExams.reduce((acc, curr) => acc + (parseFloat(curr.grade!) || 0), 0) / gradedExams.length) : null;
 
@@ -107,12 +106,12 @@ export function Subjects() {
                       <h3 className="text-2xl font-bold mb-4 mt-2">{subject.name}</h3>
                       <div className="flex gap-4">
                         <div className="bg-secondary/50 rounded-xl p-3 flex-1">
-                          <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider mb-1">Tasks</p>
-                          <p className="text-xl font-semibold">{openTasks}</p>
-                        </div>
-                        <div className="bg-secondary/50 rounded-xl p-3 flex-1">
                           <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider mb-1">Avg Grade</p>
                           <p className="text-xl font-semibold">{avg !== null ? `${avg}%` : '—'}</p>
+                        </div>
+                        <div className="bg-secondary/50 rounded-xl p-3 flex-1">
+                          <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider mb-1">Exams</p>
+                          <p className="text-xl font-semibold">{subject.exams.length}</p>
                         </div>
                       </div>
                     </div>

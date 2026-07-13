@@ -220,20 +220,11 @@ export function Checklist() {
     });
   }, [checklist, filters]);
 
-  // ── Grouping ───────────────────────────────────────────────────────────────
+  // ── Flat sorted list ────────────────────────────────────────────────────────
 
-  const groups: Record<string, typeof filteredChecklist> = {};
-  filteredChecklist.forEach(item => {
-    const key = item.subjectId || "uncategorized";
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(item);
-  });
-
-  const sortedKeys = Object.keys(groups).sort((a, b) => {
-    if (a === "uncategorized") return 1;
-    if (b === "uncategorized") return -1;
-    return (subjects.find(s => s.id === a)?.name || "").localeCompare(subjects.find(s => s.id === b)?.name || "");
-  });
+  const sortedItems = [...filteredChecklist].sort(
+    (a, b) => Number(a.done || a.didNotDo) - Number(b.done || b.didNotDo)
+  );
 
   // ── Due date badge ─────────────────────────────────────────────────────────
 
@@ -307,23 +298,9 @@ export function Checklist() {
           )}
         </GlassCard>
       ) : (
-        <div className="space-y-8">
-          {sortedKeys.map(key => {
-            const items   = groups[key];
-            const subject = subjects.find(s => s.id === key);
-            const sorted  = [...items].sort((a, b) => Number(a.done || a.didNotDo) - Number(b.done || b.didNotDo));
-
-            return (
-              <div key={key} className="space-y-3">
-                <h2 className="text-sm font-bold uppercase tracking-wider flex items-center gap-2 px-1 text-muted-foreground">
-                  {subject && <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: subject.color }} />}
-                  {subject ? subject.name : "Other Tasks"}
-                  <span className="font-normal">({items.length})</span>
-                </h2>
-
-                <div className="space-y-2">
-                  <AnimatePresence initial={false}>
-                    {sorted.map(item => {
+        <div className="space-y-2">
+          <AnimatePresence initial={false}>
+            {sortedItems.map(item => {
                       const subTasks = item.subTasks || [];
                       const imp      = item.importance ? IMPORTANCE_META[item.importance] : null;
                       const isListTask = item.isTaskList;
@@ -433,12 +410,8 @@ export function Checklist() {
                           </SwipeableRow>
                         </motion.div>
                       );
-                    })}
-                  </AnimatePresence>
-                </div>
-              </div>
-            );
-          })}
+            })}
+          </AnimatePresence>
         </div>
       )}
 

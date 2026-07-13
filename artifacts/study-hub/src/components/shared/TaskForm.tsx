@@ -56,23 +56,25 @@ function Section({ label, children }: { label: string; children: React.ReactNode
 export function TaskForm({
   title,
   defaultValues,
-  subjects,
+  subjects: _subjects,
   onSubmit,
   onClose,
   submitLabel,
-  hideSubject = false,
+  hideSubject: _hideSubject,
   hideRepeat = false,
   minimal = false,
 }: {
   title: string;
   defaultValues: TaskFormValues;
-  subjects: { id: string; name: string }[];
+  /** @deprecated subject linking is removed; prop accepted but ignored */
+  subjects?: { id: string; name: string }[];
   onSubmit: (data: TaskFormValues) => void;
   onClose: () => void;
   submitLabel: string;
+  /** @deprecated subject linking is removed; prop accepted but ignored */
   hideSubject?: boolean;
   hideRepeat?: boolean;
-  /** Sub-tasks only need a name and a link — skip description, subject, importance, due date/time and repeat entirely. */
+  /** Sub-tasks only need a name and a link — skip description, importance, due date/time and repeat entirely. */
   minimal?: boolean;
 }) {
   const hasAdvancedValues = !!(
@@ -154,15 +156,6 @@ export function TaskForm({
             placeholder="Description (optional)"
           />
         </Section>
-
-        {!hideSubject && (
-          <Section label="Category / Subject">
-            <select {...register("subjectId")} className={fieldCls}>
-              <option value="">No subject</option>
-              {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          </Section>
-        )}
 
         {/* Advanced Settings toggle */}
         <button
