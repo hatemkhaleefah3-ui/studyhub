@@ -31,10 +31,42 @@ export interface Attachment {
   priority: AttachmentPriority;
 }
 
+export type StudyType = 'theoretical' | 'practical';
+
+export interface Flashcard {
+  id: string;
+  front: string;
+  back: string;
+}
+
 export interface Lecture {
   id: string;
   name: string;
   link: string;
+  type: StudyType;
+  checked?: boolean;
+  flashcards?: Flashcard[];
+  /** Percentage from the most recent Flashcards Reader session. Overwritten each session. */
+  readerLastPercentage?: number | null;
+}
+
+export type QuestionType = 'MCQ' | 'Medical Case MCQ';
+
+export interface ExamQuestion {
+  id: string;
+  questionType: QuestionType;
+  text: string;
+  choices: [string, string, string, string];
+  correctAnswer: number; // 1-4
+  labs?: string;
+  histo?: string;
+}
+
+export interface ExamScore {
+  correct: number;
+  total: number;
+  percentage: number;
+  takenAt: string;
 }
 
 export interface Exam {
@@ -44,6 +76,11 @@ export interface Exam {
   grade: string | null;
   date: string | null;
   weight?: number;
+  type: StudyType;
+  checked?: boolean;
+  linkedLectureIds?: string[];
+  questions?: ExamQuestion[];
+  lastScore?: ExamScore | null;
 }
 
 export interface ScheduleEvent {
@@ -96,6 +133,32 @@ export interface Settings {
   accentColor: AccentColor;
 }
 
+// ── Backfill helper ────────────────────────────────────────────────────────────
+// Records created before the Theoretical/Practical split have no `type` field.
+// Silently default them to "theoretical" on load rather than forcing
+// reclassification (see study-hub feature spec, section 1.8).
+function normalizeSubject(s: Subject): Subject {
+  return {
+    ...s,
+    lectures: (s.lectures || []).map((l) => ({ ...l, type: l.type ?? 'theoretical' })),
+    exams: (s.exams || []).map((e) => ({ ...e, type: e.type ?? 'theoretical' })),
+  };
+}
+
+// ── Score bands for the Flashcards Reader cover badge ──────────────────────────
+export interface ScoreBand {
+  label: string;
+  color: string;
+}
+
+export function getScoreBand(percentage: number): ScoreBand {
+  if (percentage >= 100) return { label: 'Excellent', color: '#a855f7' }; // purple
+  if (percentage >= 90) return { label: 'Very Good', color: '#22c55e' }; // green
+  if (percentage >= 80) return { label: 'Good', color: '#3b82f6' }; // blue
+  if (percentage >= 70) return { label: 'Okay', color: '#f97316' }; // orange
+  return { label: 'Bad', color: '#eab308' }; // yellow
+}
+
 // ── Repeat date helper ────────────────────────────────────────────────────────
 function getNextDueDate(currentDate: string, repeat: RepeatInterval): string {
   const date = parseISO(currentDate);
@@ -129,6 +192,12 @@ interface StudyDataContextType {
   addExam: (subjectId: string, e: Omit<Exam, 'id'>) => void;
   updateExam: (subjectId: string, id: string, e: Partial<Exam>) => void;
   deleteExam: (subjectId: string, id: string) => void;
+  submitExamAttempt: (subjectId: string, examId: string, answers: number[]) => ExamScore;
+
+  addFlashcard: (subjectId: string, lectureId: string, f: Omit<Flashcard, 'id'>) => Flashcard;
+  updateFlashcard: (subjectId: string, lectureId: string, flashcardId: string, f: Partial<Flashcard>) => void;
+  deleteFlashcard: (subjectId: string, lectureId: string, flashcardId: string) => void;
+  recordReaderSession: (subjectId: string, lectureId: string, percentage: number) => void;
 
   addScheduleEvent: (e: Omit<ScheduleEvent, 'id'>, createChecklist?: boolean) => void;
   updateScheduleEvent: (id: string, e: Partial<ScheduleEvent>) => void;
@@ -204,7 +273,7 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     api.getData()
       .then((data) => {
-        if (data.subjects)  setSubjects(data.subjects);
+        if (data.subjects)  setSubjects(data.subjects.map(normalizeSubject));
         if (data.schedule)  setSchedule(data.schedule);
         if (data.checklist) setChecklist(data.checklist);
         if (data.settings)  setSettings(data.settings);
@@ -404,6 +473,128 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
       prev.map((s) => s.id === subjectId ? { ...s, exams: s.exams.filter((e) => e.id !== id) } : s)
     );
     api.deleteExam(subjectId, id).catch(console.error);
+  }, []);
+
+  // Score an exam attempt, apply the result to the exam's `grade`/`lastScore`
+  // (same field the Progress page reads), and — if >=70% — check the exam
+  // and cascade-check every lecture linked to it. Returns the computed score
+  // synchronously so the exam-taking UI can show the result immediately.
+  const submitExamAttempt = useCallback((subjectId: string, examId: string, answers: number[]): ExamScore => {
+    let score: ExamScore = { correct: 0, total: 0, percentage: 0, takenAt: new Date().toISOString() };
+
+    setSubjects((prev) => {
+      const updated = prev.map((s) => {
+        if (s.id !== subjectId) return s;
+        const exam = s.exams.find((e) => e.id === examId);
+        if (!exam) return s;
+
+        const questions = exam.questions || [];
+        const correct = questions.reduce(
+          (acc, q, i) => acc + (answers[i] === q.correctAnswer ? 1 : 0),
+          0
+        );
+        const total = questions.length;
+        const percentage = total > 0 ? Math.round((correct / total) * 1000) / 10 : 0;
+        const checked = percentage >= 70;
+        score = { correct, total, percentage, takenAt: new Date().toISOString() };
+
+        const linkedIds = new Set(exam.linkedLectureIds || []);
+        const newLectures = checked
+          ? s.lectures.map((l) => (linkedIds.has(l.id) ? { ...l, checked: true } : l))
+          : s.lectures;
+
+        const newExams = s.exams.map((e) =>
+          e.id === examId ? { ...e, checked, lastScore: score, grade: String(percentage) } : e
+        );
+
+        return { ...s, exams: newExams, lectures: newLectures };
+      });
+
+      const subject = updated.find((s) => s.id === subjectId);
+      if (subject) {
+        const exam = subject.exams.find((e) => e.id === examId);
+        if (exam) {
+          api.updateExam(subjectId, examId, { checked: exam.checked, lastScore: exam.lastScore, grade: exam.grade }).catch(console.error);
+          if (exam.checked) {
+            for (const l of subject.lectures) {
+              if ((exam.linkedLectureIds || []).includes(l.id) && l.checked) {
+                api.updateLecture(subjectId, l.id, { checked: true }).catch(console.error);
+              }
+            }
+          }
+        }
+      }
+      return updated;
+    });
+
+    return score;
+  }, []);
+
+  // ─── Flashcards (nested in lecture) ────────────────────────────────────────
+  const addFlashcard = useCallback((subjectId: string, lectureId: string, f: Omit<Flashcard, 'id'>): Flashcard => {
+    const newCard: Flashcard = { ...f, id: crypto.randomUUID() };
+    setSubjects((prev) => {
+      const updated = prev.map((s) =>
+        s.id === subjectId
+          ? { ...s, lectures: s.lectures.map((l) => l.id === lectureId ? { ...l, flashcards: [...(l.flashcards || []), newCard] } : l) }
+          : s
+      );
+      const lecture = updated.find((s) => s.id === subjectId)?.lectures.find((l) => l.id === lectureId);
+      if (lecture) api.updateLecture(subjectId, lectureId, { flashcards: lecture.flashcards }).catch(console.error);
+      return updated;
+    });
+    return newCard;
+  }, []);
+
+  const updateFlashcard = useCallback((subjectId: string, lectureId: string, flashcardId: string, f: Partial<Flashcard>) => {
+    setSubjects((prev) => {
+      const updated = prev.map((s) =>
+        s.id === subjectId
+          ? {
+              ...s,
+              lectures: s.lectures.map((l) =>
+                l.id === lectureId
+                  ? { ...l, flashcards: (l.flashcards || []).map((c) => c.id === flashcardId ? { ...c, ...f } : c) }
+                  : l
+              ),
+            }
+          : s
+      );
+      const lecture = updated.find((s) => s.id === subjectId)?.lectures.find((l) => l.id === lectureId);
+      if (lecture) api.updateLecture(subjectId, lectureId, { flashcards: lecture.flashcards }).catch(console.error);
+      return updated;
+    });
+  }, []);
+
+  const deleteFlashcard = useCallback((subjectId: string, lectureId: string, flashcardId: string) => {
+    setSubjects((prev) => {
+      const updated = prev.map((s) =>
+        s.id === subjectId
+          ? {
+              ...s,
+              lectures: s.lectures.map((l) =>
+                l.id === lectureId ? { ...l, flashcards: (l.flashcards || []).filter((c) => c.id !== flashcardId) } : l
+              ),
+            }
+          : s
+      );
+      const lecture = updated.find((s) => s.id === subjectId)?.lectures.find((l) => l.id === lectureId);
+      if (lecture) api.updateLecture(subjectId, lectureId, { flashcards: lecture.flashcards }).catch(console.error);
+      return updated;
+    });
+  }, []);
+
+  // Store only the most recent Flashcards Reader percentage per lecture —
+  // informational only, never written to exam/checklist records (spec 1.3).
+  const recordReaderSession = useCallback((subjectId: string, lectureId: string, percentage: number) => {
+    setSubjects((prev) =>
+      prev.map((s) =>
+        s.id === subjectId
+          ? { ...s, lectures: s.lectures.map((l) => l.id === lectureId ? { ...l, readerLastPercentage: percentage } : l) }
+          : s
+      )
+    );
+    api.updateLecture(subjectId, lectureId, { readerLastPercentage: percentage }).catch(console.error);
   }, []);
 
   // ─── Schedule ──────────────────────────────────────────────────────────────
@@ -622,7 +813,7 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const importData = useCallback((data: any) => {
-    if (data.subjects)  setSubjects(data.subjects);
+    if (data.subjects)  setSubjects(data.subjects.map(normalizeSubject));
     if (data.schedule)  setSchedule(data.schedule);
     if (data.checklist) setChecklist(data.checklist);
     if (data.settings)  setSettings(data.settings);
@@ -636,7 +827,8 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
         addSubject, updateSubject, deleteSubject,
         addAttachment, updateAttachment, deleteAttachment,
         addLecture, updateLecture, deleteLecture,
-        addExam, updateExam, deleteExam,
+        addExam, updateExam, deleteExam, submitExamAttempt,
+        addFlashcard, updateFlashcard, deleteFlashcard, recordReaderSession,
         addScheduleEvent, updateScheduleEvent, deleteScheduleEvent,
         addChecklistItem, updateChecklistItem, toggleChecklistItem, deleteChecklistItem,
         skipChecklistItem, setCascadeChecklistStatus,

@@ -1,17 +1,27 @@
-import { useStudyData } from "@/hooks/useStudyData";
+import { useState } from "react";
+import { useStudyData, StudyType } from "@/hooks/useStudyData";
 import { GlassCard } from "@/components/shared/GlassCard";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+
+type TypeFilter = "all" | StudyType;
 
 export function Progress() {
   const { subjects } = useStudyData();
 
+  // View-only filter — the score itself always stays a single combined
+  // weighted average; this only changes which exams are included in the
+  // view (spec: "combined score with a view-only filter").
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
+
+  const examMatchesFilter = (type: StudyType) => typeFilter === "all" || type === typeFilter;
+
   // Calculate overall GPA
   let totalWeightedGrade = 0;
   let totalWeight = 0;
-  
+
   subjects.forEach(subject => {
     subject.exams.forEach(exam => {
-      if (exam.grade) {
+      if (exam.grade && examMatchesFilter(exam.type)) {
         const num = parseFloat(exam.grade);
         if (!isNaN(num)) {
           const w = exam.weight || 1;
@@ -24,12 +34,31 @@ export function Progress() {
 
   const overallAvg = totalWeight > 0 ? (totalWeightedGrade / totalWeight).toFixed(1) : null;
 
+  const filterOptions: { value: TypeFilter; label: string }[] = [
+    { value: "all", label: "All" },
+    { value: "theoretical", label: "Theoretical" },
+    { value: "practical", label: "Practical" },
+  ];
+
   return (
     <div className="space-y-8 pb-20">
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-4xl font-bold tracking-tight mb-2">Progress</h1>
           <p className="text-muted-foreground text-lg">Academic overview</p>
+        </div>
+        <div className="bg-secondary/50 p-1 rounded-xl flex gap-1 w-fit">
+          {filterOptions.map(opt => (
+            <button
+              key={opt.value}
+              onClick={() => setTypeFilter(opt.value)}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                typeFilter === opt.value ? "bg-background shadow-sm text-primary" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -45,7 +74,7 @@ export function Progress() {
 
       <div className="space-y-8 mt-12">
         {subjects.map(subject => {
-          const gradedExams = subject.exams.filter(e => e.grade).map(e => ({
+          const gradedExams = subject.exams.filter(e => e.grade && examMatchesFilter(e.type)).map(e => ({
             name: e.name,
             grade: parseFloat(e.grade!),
             weight: e.weight || 1
