@@ -19,6 +19,7 @@ const glassStyle: React.CSSProperties = {
   WebkitBackdropFilter: 'blur(22px)',
 };
 
+// Water-gel capsule — uses CSS variables so it adapts to light & dark mode
 const GEL_STYLE: React.CSSProperties = {
   background:
     'linear-gradient(148deg, var(--gel-hi) 0%, rgba(128,128,128,0.03) 38%, rgba(0,0,0,0.04) 56%, var(--gel-lo) 100%)',
@@ -27,7 +28,10 @@ const GEL_STYLE: React.CSSProperties = {
 };
 
 const ACTIVE_COLOR = '#3b82f6';
+// CSS variable so inactive icons respect light / dark mode
+const INACTIVE_COLOR = 'var(--nav-icon-inactive)';
 
+// ── Sidebar drag-to-select (vertical) ───────────────────────────────────────
 function useSidebarDrag(onNavigate: (idx: number) => void) {
   const [scope, animateNav] = useAnimate();
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -48,7 +52,8 @@ function useSidebarDrag(onNavigate: (idx: number) => void) {
   };
 
   const fireNavPulse = () => {
-    animateNav(scope.current, { opacity: [1, 0.65, 1] }, { duration: 0.16, ease: 'easeOut' });
+    // Quick flash on the sidebar itself — NOT on the gel or item
+    animateNav(scope.current, { opacity: [1, 0.7, 1] }, { duration: 0.16, ease: 'easeOut' });
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
@@ -91,11 +96,22 @@ function useSidebarDrag(onNavigate: (idx: number) => void) {
     if (preventNext.current) e.preventDefault();
   };
 
-  return { scope, itemRefs, hoverIdx, handlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel }, preventClick };
+  return {
+    scope,
+    itemRefs,
+    hoverIdx,
+    handlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel },
+    preventClick,
+  };
 }
 
+// ── Shared icon-only nav items (used by both sidebar variants) ───────────────
 function NavItems({
-  hoverIdx, itemRefs, getIsActive, preventClick, layoutId,
+  hoverIdx,
+  itemRefs,
+  getIsActive,
+  preventClick,
+  layoutId,
 }: {
   hoverIdx: number | null;
   itemRefs: React.MutableRefObject<(HTMLDivElement | null)[]>;
@@ -108,6 +124,7 @@ function NavItems({
       {NAV_ITEMS.map((item, i) => {
         const isActive = hoverIdx !== null ? hoverIdx === i : getIsActive(item.href);
         const Icon = item.icon;
+
         return (
           <Tooltip key={item.href} delayDuration={0}>
             <TooltipTrigger asChild>
@@ -123,6 +140,7 @@ function NavItems({
                     transition={{ type: 'spring', bounce: 0.22, duration: 0.45 }}
                   />
                 )}
+                {/* Link is passive during drag — pointer-events disabled in drag state */}
                 <Link
                   href={item.href}
                   className="absolute inset-0 z-10 flex items-center justify-center"
@@ -133,14 +151,16 @@ function NavItems({
                   <Icon
                     className="w-5 h-5"
                     style={{
-                      color: isActive ? ACTIVE_COLOR : 'var(--nav-icon-inactive)',
+                      color: isActive ? ACTIVE_COLOR : INACTIVE_COLOR,
                       transition: 'color 0.22s ease',
                     }}
                   />
                 </Link>
               </div>
             </TooltipTrigger>
-            <TooltipContent side="right" className="ml-2"><p>{item.label}</p></TooltipContent>
+            <TooltipContent side="right" className="ml-2">
+              <p>{item.label}</p>
+            </TooltipContent>
           </Tooltip>
         );
       })}
@@ -151,46 +171,69 @@ function NavItems({
 export function Sidebar() {
   const [location, setLocation] = useLocation();
   const navigate = (idx: number) => setLocation(NAV_ITEMS[idx].href);
-  const getIsActive = (href: string) => href === '/' ? location === '/' : location.startsWith(href);
+
+  const getIsActive = (href: string) => {
+    if (href === '/') return location === '/';
+    return location.startsWith(href);
+  };
 
   const ipad = useSidebarDrag(navigate);
   const desktop = useSidebarDrag(navigate);
 
-  const sidebarBox = (side: 'ipad' | 'desktop') =>
-    side === 'ipad'
-      ? `1px 0 0 var(--nav-edge), 4px 0 20px var(--nav-shadow-color)`
-      : `1px 0 0 var(--nav-edge), 4px 0 20px var(--nav-shadow-color)`;
-
   const logo = (
     <div
       className="w-10 h-10 rounded-2xl flex items-center justify-center mb-10 shrink-0"
-      style={{ background: 'rgba(59,130,246,0.12)' }}
+      style={{ background: 'rgba(255,255,255,0.12)' }}
     >
-      <BookOpen className="w-5 h-5" style={{ color: ACTIVE_COLOR }} />
+      <BookOpen className="w-5 h-5 text-white" />
     </div>
   );
 
+  const sidebarShadow = '1px 0 0 var(--nav-edge), 4px 0 20px var(--nav-shadow-color)';
+
   return (
     <>
-      {/* iPad (md → lg) */}
+      {/* ── iPad sidebar (md → lg) ────────────────────────────────────────── */}
       <aside
         className="hidden md:flex lg:hidden fixed left-0 top-0 bottom-0 w-20 z-50 flex-col items-center py-8"
-        style={{ ...glassStyle, boxShadow: sidebarBox('ipad') }}
+        style={{ ...glassStyle, boxShadow: sidebarShadow }}
       >
         {logo}
-        <div ref={ipad.scope} className="flex flex-col gap-3 w-full px-3 touch-none select-none" {...ipad.handlers}>
-          <NavItems hoverIdx={ipad.hoverIdx} itemRefs={ipad.itemRefs} getIsActive={getIsActive} preventClick={ipad.preventClick} layoutId="sidebar-gel" />
+        {/* Nav container — this is what pulses on long-press */}
+        <div
+          ref={ipad.scope}
+          className="flex flex-col gap-3 w-full px-3 touch-none select-none"
+          {...ipad.handlers}
+        >
+          <NavItems
+            hoverIdx={ipad.hoverIdx}
+            itemRefs={ipad.itemRefs}
+            getIsActive={getIsActive}
+            preventClick={ipad.preventClick}
+            layoutId="sidebar-gel"
+          />
         </div>
       </aside>
 
-      {/* Desktop (lg+) — icon-only, same width */}
+      {/* ── Desktop sidebar (lg+) — icon-only, same width as iPad ───────── */}
       <aside
         className="hidden lg:flex fixed left-0 top-0 bottom-0 w-20 z-50 flex-col items-center py-8"
-        style={{ ...glassStyle, boxShadow: sidebarBox('desktop') }}
+        style={{ ...glassStyle, boxShadow: sidebarShadow }}
       >
         {logo}
-        <div ref={desktop.scope} className="flex flex-col gap-3 w-full px-3 touch-none select-none" {...desktop.handlers}>
-          <NavItems hoverIdx={desktop.hoverIdx} itemRefs={desktop.itemRefs} getIsActive={getIsActive} preventClick={desktop.preventClick} layoutId="desktop-gel" />
+        {/* Nav container — this is what pulses on long-press */}
+        <div
+          ref={desktop.scope}
+          className="flex flex-col gap-3 w-full px-3 touch-none select-none"
+          {...desktop.handlers}
+        >
+          <NavItems
+            hoverIdx={desktop.hoverIdx}
+            itemRefs={desktop.itemRefs}
+            getIsActive={getIsActive}
+            preventClick={desktop.preventClick}
+            layoutId="desktop-gel"
+          />
         </div>
       </aside>
     </>
