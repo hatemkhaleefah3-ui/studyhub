@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { motion, AnimatePresence } from "framer-motion";
-import { format, isToday, isPast, parseISO } from "date-fns";
+import { format, isToday, isPast, parseISO, isSameDay, subDays, addDays } from "date-fns";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -29,21 +29,23 @@ const REPEAT_META: Record<RepeatInterval, string> = {
 
 // ── Filter types ─────────────────────────────────────────────────────────────
 
+type DateFilter = "today" | "yesterday" | "tomorrow" | "nodate" | null;
+
 interface Filters {
   importance: ImportanceLevel[];
   status: ("done" | "undone" | "didNotDo")[];
   repeat: ("repeating" | "oneTime")[];
-  hasDueDate: boolean | null;
+  dateFilter: DateFilter;
 }
 
-const EMPTY_FILTERS: Filters = { importance: [], status: [], repeat: [], hasDueDate: null };
+const EMPTY_FILTERS: Filters = { importance: [], status: [], repeat: [], dateFilter: null };
 
 function toggleArr<T>(arr: T[], val: T): T[] {
   return arr.includes(val) ? arr.filter(v => v !== val) : [...arr, val];
 }
 
 function activeFilterCount(f: Filters) {
-  return f.importance.length + f.status.length + f.repeat.length + (f.hasDueDate !== null ? 1 : 0);
+  return f.importance.length + f.status.length + f.repeat.length + (f.dateFilter !== null ? 1 : 0);
 }
 
 // ── Form value types ──────────────────────────────────────────────────────────
@@ -405,9 +407,20 @@ export function Checklist() {
         if (filters.repeat.includes("repeating") && !isRepeating) return false;
         if (filters.repeat.includes("oneTime") && isRepeating) return false;
       }
-      // hasDueDate
-      if (filters.hasDueDate === true && !item.dueDate) return false;
-      if (filters.hasDueDate === false && !!item.dueDate) return false;
+      // dateFilter
+      if (filters.dateFilter !== null) {
+        const today = new Date();
+        if (filters.dateFilter === "nodate") {
+          if (item.dueDate) return false;
+        } else {
+          if (!item.dueDate) return false;
+          const target =
+            filters.dateFilter === "yesterday" ? subDays(today, 1) :
+            filters.dateFilter === "tomorrow"  ? addDays(today, 1) :
+            today;
+          if (!isSameDay(parseISO(item.dueDate), target)) return false;
+        }
+      }
       return true;
     });
   }, [checklist, filters]);
@@ -950,12 +963,15 @@ export function Checklist() {
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Due Date</p>
             <div className="flex flex-wrap gap-2">
-              <Chip active={filters.hasDueDate === true} onClick={() => setFilters(f => ({ ...f, hasDueDate: f.hasDueDate === true ? null : true }))}>
-                Has due date
-              </Chip>
-              <Chip active={filters.hasDueDate === false} onClick={() => setFilters(f => ({ ...f, hasDueDate: f.hasDueDate === false ? null : false }))}>
-                No due date
-              </Chip>
+              {(["today", "yesterday", "tomorrow", "nodate"] as const).map(key => (
+                <Chip
+                  key={key}
+                  active={filters.dateFilter === key}
+                  onClick={() => setFilters(f => ({ ...f, dateFilter: f.dateFilter === key ? null : key }))}
+                >
+                  {key === "today" ? "Today" : key === "yesterday" ? "Yesterday" : key === "tomorrow" ? "Tomorrow" : "No date"}
+                </Chip>
+              ))}
             </div>
           </div>
 
