@@ -1,4 +1,6 @@
-import type { ReactNode } from 'react';
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { SlidersHorizontal, ChevronDown } from 'lucide-react';
 import { Importance } from '@/hooks/useStudyData';
 import { cn } from '@/lib/utils';
 
@@ -94,7 +96,15 @@ function FilterRow<T extends string>({
   );
 }
 
-/** Combinable filters — every row narrows the list independently (AND across rows, OR within a row). */
+function countActive(filters: ChecklistFilterState): number {
+  return filters.importance.length + filters.time.length + filters.status.length + filters.repeat.length;
+}
+
+/**
+ * Combinable filters — every row narrows the list independently (AND across
+ * rows, OR within a row). Collapsed behind a "Filters" button by default;
+ * clicking it toggles the options panel open/closed.
+ */
 export function ChecklistFilters({
   filters,
   onChange,
@@ -102,46 +112,61 @@ export function ChecklistFilters({
   filters: ChecklistFilterState;
   onChange: (next: ChecklistFilterState) => void;
 }) {
-  const isActive =
-    filters.importance.length > 0 ||
-    filters.time.length > 0 ||
-    filters.status.length > 0 ||
-    filters.repeat.length > 0;
+  const [isOpen, setIsOpen] = useState(false);
+  const activeCount = countActive(filters);
 
   return (
-    <GlassFilterCard isActive={isActive} onReset={() => onChange(DEFAULT_CHECKLIST_FILTERS)}>
-      <FilterRow label="Importance" groups={IMPORTANCE_GROUPS} values={filters.importance} onChange={(v) => onChange({ ...filters, importance: v })} />
-      <FilterRow label="Time" groups={TIME_GROUPS} values={filters.time} onChange={(v) => onChange({ ...filters, time: v })} />
-      <FilterRow label="Status" groups={STATUS_GROUPS} values={filters.status} onChange={(v) => onChange({ ...filters, status: v })} />
-      <FilterRow label="Type" groups={REPEAT_GROUPS} values={filters.repeat} onChange={(v) => onChange({ ...filters, repeat: v })} />
-    </GlassFilterCard>
-  );
-}
+    <div className="bg-card/50 backdrop-blur-xl border border-border rounded-2xl overflow-hidden">
+      <button
+        onClick={() => setIsOpen((v) => !v)}
+        className="w-full flex items-center justify-between px-4 py-3.5"
+        aria-expanded={isOpen}
+        data-testid="btn-toggle-filters"
+      >
+        <span className="flex items-center gap-2 text-sm font-semibold">
+          <SlidersHorizontal className="w-4 h-4 text-muted-foreground" />
+          Filters
+          {activeCount > 0 && (
+            <span className="text-[11px] font-semibold bg-primary text-primary-foreground rounded-full w-5 h-5 flex items-center justify-center">
+              {activeCount}
+            </span>
+          )}
+        </span>
+        <motion.div animate={{ rotate: isOpen ? 180 : 0 }} transition={{ type: 'spring', stiffness: 320, damping: 26 }}>
+          <ChevronDown className="w-4 h-4 text-muted-foreground" />
+        </motion.div>
+      </button>
 
-function GlassFilterCard({
-  children,
-  isActive,
-  onReset,
-}: {
-  children: ReactNode;
-  isActive: boolean;
-  onReset: () => void;
-}) {
-  return (
-    <div className="bg-card/50 backdrop-blur-xl border border-border rounded-2xl p-4 space-y-2.5">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-semibold">Filters</span>
-        {isActive && (
-          <button
-            onClick={onReset}
-            className="text-xs font-medium text-primary hover:underline"
-            data-testid="btn-reset-filters"
+      <AnimatePresence initial={false}>
+        {isOpen && (
+          <motion.div
+            key="filter-body"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ type: 'spring', damping: 26, stiffness: 280 }}
+            className="overflow-hidden"
           >
-            Reset
-          </button>
+            <div className="px-4 pb-4 pt-0 space-y-2.5 border-t border-border/60">
+              <div className="flex justify-end pt-3 -mb-1">
+                {activeCount > 0 && (
+                  <button
+                    onClick={() => onChange(DEFAULT_CHECKLIST_FILTERS)}
+                    className="text-xs font-medium text-primary hover:underline"
+                    data-testid="btn-reset-filters"
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
+              <FilterRow label="Importance" groups={IMPORTANCE_GROUPS} values={filters.importance} onChange={(v) => onChange({ ...filters, importance: v })} />
+              <FilterRow label="Time" groups={TIME_GROUPS} values={filters.time} onChange={(v) => onChange({ ...filters, time: v })} />
+              <FilterRow label="Status" groups={STATUS_GROUPS} values={filters.status} onChange={(v) => onChange({ ...filters, status: v })} />
+              <FilterRow label="Type" groups={REPEAT_GROUPS} values={filters.repeat} onChange={(v) => onChange({ ...filters, repeat: v })} />
+            </div>
+          </motion.div>
         )}
-      </div>
-      {children}
+      </AnimatePresence>
     </div>
   );
 }
