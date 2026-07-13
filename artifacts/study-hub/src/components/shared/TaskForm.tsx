@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { focusNext } from "@/lib/focusNext";
 import { BottomSheet } from "@/components/shared/BottomSheet";
 import { useForm } from "react-hook-form";
 import { ChevronDown, Settings2 } from "lucide-react";
@@ -113,7 +114,7 @@ export function TaskForm({
               {...register("text", { required: true })}
               className={fieldCls}
               placeholder="Sub-task name…"
-              autoFocus
+              onKeyDown={focusNext}
             />
           </Section>
           <Section label="Link (optional)">
@@ -145,7 +146,7 @@ export function TaskForm({
             {...register("text", { required: true })}
             className={fieldCls}
             placeholder="Task name…"
-            autoFocus
+            onKeyDown={focusNext}
           />
           <textarea
             {...register("description")}

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { focusNext } from "@/lib/focusNext";
 import { useStudyData, Attachment, AttachmentFormat, AttachmentPriority, AttachmentType, StudyType } from "@/hooks/useStudyData";
 import { GlassCard } from "@/components/shared/GlassCard";
 import { BottomSheet } from "@/components/shared/BottomSheet";
@@ -167,6 +168,7 @@ export function SubjectDetail() {
   const inputCls =
     "w-full bg-background border border-border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 text-foreground";
 
+
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: "details", label: "Details", icon: <Info className="w-3.5 h-3.5" /> },
     { id: "lectures", label: "Lectures", icon: <BookOpen className="w-3.5 h-3.5" /> },
@@ -277,8 +279,12 @@ export function SubjectDetail() {
           {/* ── DETAILS TAB ─────────────────────────────────────────────────── */}
           {activeTab === "details" && (
             <div className="space-y-4">
-              {/* Drive Link card — swipe only, no Edit/Open buttons (spec 1.2) */}
+              {/* Drive Link card — tap or swipe left to open, swipe right to edit */}
               <SwipeRow
+                onTap={() => {
+                  if (subject.driveLink) window.open(subject.driveLink, "_blank", "noreferrer");
+                  else openEditDriveLink();
+                }}
                 onSwipeLeft={() => subject.driveLink && window.open(subject.driveLink, "_blank", "noreferrer")}
                 leftLabel="Open"
                 leftIcon={ExternalLink}
@@ -579,7 +585,7 @@ export function SubjectDetail() {
               {...lecForm.register("name", { required: true })}
               className={inputCls}
               placeholder="e.g. Chapter 3 — Neural Networks"
-              autoFocus
+              onKeyDown={focusNext}
             />
           </div>
           <div>
@@ -607,7 +613,7 @@ export function SubjectDetail() {
               {...examForm.register("name", { required: true })}
               className={inputCls}
               placeholder="e.g. Midterm Exam"
-              autoFocus
+              onKeyDown={focusNext}
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -648,7 +654,7 @@ export function SubjectDetail() {
               {...attachForm.register("url", { required: true })}
               className={inputCls}
               placeholder="https://t.me/..."
-              autoFocus
+              onKeyDown={focusNext}
             />
           </div>
           <div>
@@ -710,7 +716,7 @@ export function SubjectDetail() {
         <form onSubmit={editAttachForm.handleSubmit(onEditAttachment)} className="space-y-5">
           <div>
             <label className="block text-sm font-medium mb-2">Telegram Link</label>
-            <input {...editAttachForm.register("url", { required: true })} className={inputCls} autoFocus />
+            <input {...editAttachForm.register("url", { required: true })} className={inputCls} onKeyDown={focusNext} />
           </div>
           <div>
             <label className="block text-sm font-medium mb-2">
@@ -805,7 +811,7 @@ export function SubjectDetail() {
               {...driveLinkForm.register("driveLink")}
               className={inputCls}
               placeholder="https://drive.google.com/..."
-              autoFocus
+
             />
           </div>
           <button
