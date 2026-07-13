@@ -233,7 +233,7 @@ export function SubjectDetail() {
               <SwipeRow
                 onSwipeRight={openEditDriveLink}
                 rightLabel="Edit" rightIcon={Pencil} rightColor="#6366f1"
-                onSwipeLeft={subject.driveLink ? () => window.open(subject.driveLink, "_blank", "noopener,noreferrer") : undefined}
+                onSwipeLeft={subject.driveLink ? () => { window.location.href = subject.driveLink!; } : undefined}
                 leftLabel="Open" leftIcon={ExternalLink} leftColor="#0ea5e9"
               >
                 {subject.driveLink ? (
