@@ -1,20 +1,46 @@
-import { useState } from "react";
-import { useStudyData } from "@/hooks/useStudyData";
-import { GlassCard } from "@/components/shared/GlassCard";
+import { useMemo, useState } from "react";
+import { useStudyData, ChecklistItem, RepeatRule, getChecklistItemStatus } from "@/hooks/useStudyData";
 import { BottomSheet } from "@/components/shared/BottomSheet";
+import { GlassCard } from "@/components/shared/GlassCard";
 import { FabPortal } from "@/components/shared/FabPortal";
-import { SwipeableRow } from "@/components/shared/SwipeableRow";
+import { ChecklistItemRow } from "@/components/checklist/ChecklistItemRow";
+import { DeleteSeriesSheet } from "@/components/checklist/DeleteSeriesSheet";
 import {
-  Plus, Trash2, CheckCircle2, Circle,
-  List, ListChecks, ChevronDown, ChevronRight, X, Pencil
-} from "lucide-react";
+  ChecklistFilters, ChecklistFilterState, DEFAULT_CHECKLIST_FILTERS,
+} from "@/components/checklist/ChecklistFilters";
+import {
+  TaskDetailFields, TaskDetailValues, DEFAULT_TASK_DETAIL_VALUES,
+} from "@/components/checklist/TaskDetailFields";
+import { Plus, List, ListChecks, X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { motion, AnimatePresence } from "framer-motion";
+
+function toRepeatRule(v: TaskDetailValues): RepeatRule | undefined {
+  if (v.repeatFrequency === 'none') return undefined;
+  if (v.repeatFrequency === 'weekly') return { frequency: 'weekly', weekdays: v.weekdays };
+  if (v.repeatFrequency === 'monthly') return { frequency: 'monthly', dayOfMonth: v.dayOfMonth };
+  return { frequency: 'daily' };
+}
+
+function matchesTimeFilter(item: ChecklistItem, filter: ChecklistFilterState['time'][number]): boolean {
+  if (filter === 'no-date') return !item.dueAt;
+  if (!item.dueAt) return false;
+  const due = new Date(item.dueAt);
+  const now = new Date();
+  if (filter === 'overdue') return due.getTime() < now.getTime();
+  if (filter === 'today') return due.toDateString() === now.toDateString();
+  if (filter === 'this-week') {
+    const weekAhead = new Date(now);
+    weekAhead.setDate(weekAhead.getDate() + 7);
+    return due.getTime() >= now.getTime() && due.getTime() <= weekAhead.getTime();
+  }
+  return true;
+}
 
 export function Checklist() {
   const {
     checklist, subjects,
-    toggleChecklistItem, deleteChecklistItem, addChecklistItem, updateChecklistItem,
+    toggleChecklistItem, deleteChecklistItem, deleteChecklistSeries, addChecklistItem, updateChecklistItem,
     toggleSubTask, addSubTask, deleteSubTask, updateSubTask,
   } = useStudyData();
 
@@ -25,6 +51,11 @@ export function Checklist() {
   const [newSubTaskInputs, setNewSubTaskInputs] = useState<string[]>(['']);
   const [addingSubTaskFor, setAddingSubTaskFor] = useState<string | null>(null);
   const [newSubTaskText, setNewSubTaskText] = useState('');
+  const [filters, setFilters] = useState<ChecklistFilterState>(DEFAULT_CHECKLIST_FILTERS);
+
+  // Shared importance / due date / repeat fields for both add forms.
+  const [taskDetails, setTaskDetails] = useState<TaskDetailValues>(DEFAULT_TASK_DETAIL_VALUES);
+  const [listDetails, setListDetails] = useState<TaskDetailValues>(DEFAULT_TASK_DETAIL_VALUES);
 
   // Edit state for items / lists
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -33,6 +64,10 @@ export function Checklist() {
   // Inline edit state for sub-tasks
   const [editingSubTask, setEditingSubTask] = useState<{ itemId: string; subTaskId: string } | null>(null);
   const [editSubTaskText, setEditSubTaskText] = useState('');
+  const [editSubTaskLink, setEditSubTaskLink] = useState('');
+
+  // Delete confirmation for repeating tasks
+  const [pendingDeleteItem, setPendingDeleteItem] = useState<ChecklistItem | null>(null);
 
   const { register: registerTask, handleSubmit: handleTaskSubmit, reset: resetTask } = useForm({
     defaultValues: { text: "", subjectId: "" }
@@ -49,8 +84,12 @@ export function Checklist() {
       done: false,
       linkedScheduleId: null,
       isTaskList: false,
+      importance: taskDetails.importance,
+      dueAt: taskDetails.dueAt ? new Date(taskDetails.dueAt).toISOString() : null,
+      repeat: toRepeatRule(taskDetails),
     });
     resetTask();
+    setTaskDetails(DEFAULT_TASK_DETAIL_VALUES);
     setIsAddTaskOpen(false);
   };
 
@@ -65,9 +104,13 @@ export function Checklist() {
       linkedScheduleId: null,
       isTaskList: true,
       subTasks: validSubTasks,
+      importance: listDetails.importance,
+      dueAt: listDetails.dueAt ? new Date(listDetails.dueAt).toISOString() : null,
+      repeat: toRepeatRule(listDetails),
     });
     resetList();
     setNewSubTaskInputs(['']);
+    setListDetails(DEFAULT_TASK_DETAIL_VALUES);
     setIsAddListOpen(false);
   };
 
@@ -99,20 +142,58 @@ export function Checklist() {
     setEditingItemId(null);
   };
 
-  const openEditSubTask = (itemId: string, subTaskId: string, text: string) => {
+  const openEditSubTask = (itemId: string, subTaskId: string, text: string, link: string) => {
     setEditingSubTask({ itemId, subTaskId });
     setEditSubTaskText(text);
+    setEditSubTaskLink(link);
   };
 
   const saveEditSubTask = () => {
     if (!editingSubTask || !editSubTaskText.trim()) return;
-    updateSubTask(editingSubTask.itemId, editingSubTask.subTaskId, { text: editSubTaskText.trim() });
+    updateSubTask(editingSubTask.itemId, editingSubTask.subTaskId, {
+      text: editSubTaskText.trim(),
+      link: editSubTaskLink.trim() || undefined,
+    });
     setEditingSubTask(null);
   };
 
+  const requestDelete = (item: ChecklistItem) => {
+    if (item.seriesId) {
+      setPendingDeleteItem(item);
+    } else {
+      deleteChecklistItem(item.id);
+    }
+  };
+
+  const confirmDeleteOccurrence = () => {
+    if (pendingDeleteItem) deleteChecklistItem(pendingDeleteItem.id);
+    setPendingDeleteItem(null);
+  };
+
+  const confirmDeleteSeries = () => {
+    if (pendingDeleteItem?.seriesId) deleteChecklistSeries(pendingDeleteItem.seriesId);
+    setPendingDeleteItem(null);
+  };
+
+  // Apply combinable filters (Phase 3.2)
+  const filteredChecklist = useMemo(() => {
+    return checklist.filter((item) => {
+      if (filters.importance.length > 0 && !filters.importance.includes(item.importance || 'medium')) return false;
+      if (filters.time.length > 0 && !filters.time.some((t) => matchesTimeFilter(item, t))) return false;
+      if (filters.status.length > 0 && !filters.status.includes(getChecklistItemStatus(item))) return false;
+      if (filters.repeat.length > 0) {
+        const isRepeated = !!item.seriesId;
+        const matchesRepeat = filters.repeat.includes('repeated') && isRepeated;
+        const matchesOneOff = filters.repeat.includes('one-off') && !isRepeated;
+        if (!matchesRepeat && !matchesOneOff) return false;
+      }
+      return true;
+    });
+  }, [checklist, filters]);
+
   // Group items by subject
   const groups: Record<string, typeof checklist> = {};
-  checklist.forEach(item => {
+  filteredChecklist.forEach(item => {
     const key = item.subjectId || 'uncategorized';
     if (!groups[key]) groups[key] = [];
     groups[key].push(item);
@@ -137,10 +218,17 @@ export function Checklist() {
         </div>
       </div>
 
+      <ChecklistFilters filters={filters} onChange={setFilters} />
+
       {checklist.length === 0 ? (
         <GlassCard className="p-12 text-center border-dashed border-2 bg-transparent mt-12">
           <h2 className="text-2xl font-semibold mb-2">All clear!</h2>
           <p className="text-muted-foreground">Add some tasks to get started.</p>
+        </GlassCard>
+      ) : filteredChecklist.length === 0 ? (
+        <GlassCard className="p-12 text-center border-dashed border-2 bg-transparent mt-4">
+          <h2 className="text-xl font-semibold mb-2">No tasks match these filters</h2>
+          <p className="text-muted-foreground">Try adjusting or resetting the filters above.</p>
         </GlassCard>
       ) : (
         <div className="space-y-8">
@@ -160,227 +248,41 @@ export function Checklist() {
 
                 <div className="space-y-2">
                   <AnimatePresence initial={false}>
-                    {sortedItems.map(item => {
-                      const isExpanded = expandedItems.has(item.id);
-                      const subTasks = item.subTasks || [];
-
-                      return (
-                        <motion.div
-                          key={item.id}
-                          layout
-                          initial={{ opacity: 0, y: 8 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, scale: 0.95 }}
-                          transition={{ type: "spring", stiffness: 300, damping: 28 }}
-                        >
-                          <SwipeableRow
-                            onEdit={() => openEditItem(item.id, item.text)}
-                            onDelete={() => deleteChecklistItem(item.id)}
-                          >
-                          <GlassCard
-                            className={`transition-opacity duration-300 overflow-hidden ${
-                              item.done ? 'opacity-50' : 'opacity-100'
-                            }`}
-                          >
-                            {/* Main row */}
-                            <div className="p-4 flex items-center gap-4 group">
-                              {/* Checkbox */}
-                              <button
-                                onClick={() => toggleChecklistItem(item.id)}
-                                className="shrink-0 focus:outline-none"
-                                data-testid={`checkbox-item-${item.id}`}
-                              >
-                                <motion.div whileTap={{ scale: 0.75 }}>
-                                  {item.done ? (
-                                    <CheckCircle2 className="w-7 h-7 text-primary" />
-                                  ) : (
-                                    <Circle className="w-7 h-7 text-muted-foreground hover:text-primary transition-colors" />
-                                  )}
-                                </motion.div>
-                              </button>
-
-                              {/* Label */}
-                              <div
-                                className={`flex-1 flex items-center gap-2 min-w-0 ${
-                                  item.isTaskList ? 'cursor-pointer select-none' : ''
-                                }`}
-                                onClick={() => item.isTaskList && toggleExpanded(item.id)}
-                              >
-                                <span className={`text-lg font-medium truncate transition-all ${
-                                  item.done ? 'line-through text-muted-foreground' : ''
-                                }`}>
-                                  {item.text}
-                                </span>
-                                {item.isTaskList && (
-                                  <span className="text-xs text-muted-foreground bg-secondary px-2 py-0.5 rounded-full shrink-0">
-                                    {subTasks.filter(st => st.done).length}/{subTasks.length}
-                                  </span>
-                                )}
-                              </div>
-
-                              {/* Expand chevron for task lists */}
-                              {item.isTaskList && (
-                                <button
-                                  onClick={() => toggleExpanded(item.id)}
-                                  className="p-1 text-muted-foreground hover:text-foreground transition-colors shrink-0"
-                                  data-testid={`btn-expand-${item.id}`}
-                                >
-                                  {isExpanded
-                                    ? <ChevronDown className="w-5 h-5" />
-                                    : <ChevronRight className="w-5 h-5" />}
-                                </button>
-                              )}
-
-                              {/* Edit — hover-only */}
-                              <button
-                                onClick={() => openEditItem(item.id, item.text)}
-                                className={`p-2 text-muted-foreground hover:text-foreground transition-opacity shrink-0 ${
-                                  item.done ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                                }`}
-                                title="Edit"
-                                data-testid={`btn-edit-item-${item.id}`}
-                              >
-                                <Pencil className="w-4 h-4" />
-                              </button>
-
-                              {/* Trash — always visible when done, hover-only otherwise */}
-                              <button
-                                onClick={() => deleteChecklistItem(item.id)}
-                                className={`p-2 text-muted-foreground hover:text-destructive transition-opacity shrink-0 ${
-                                  item.done ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                                }`}
-                                data-testid={`btn-delete-item-${item.id}`}
-                              >
-                                <Trash2 className="w-5 h-5" />
-                              </button>
-                            </div>
-
-                            {/* Sub-tasks (expanded) */}
-                            <AnimatePresence initial={false}>
-                              {item.isTaskList && isExpanded && (
-                                <motion.div
-                                  key="subtasks"
-                                  initial={{ height: 0, opacity: 0 }}
-                                  animate={{ height: "auto", opacity: 1 }}
-                                  exit={{ height: 0, opacity: 0 }}
-                                  transition={{ type: "spring", damping: 26, stiffness: 280 }}
-                                  className="overflow-hidden"
-                                >
-                                  <div className="px-4 pb-4 pt-0 ml-11 border-t border-border/40 space-y-2">
-                                    <div className="pt-3 space-y-2">
-                                      {subTasks.map(st => (
-                                        <div
-                                          key={st.id}
-                                          className="flex items-center gap-3 group/sub"
-                                        >
-                                          <button
-                                            onClick={() => toggleSubTask(item.id, st.id)}
-                                            className="shrink-0"
-                                            data-testid={`checkbox-subtask-${st.id}`}
-                                          >
-                                            <motion.div whileTap={{ scale: 0.75 }}>
-                                              {st.done ? (
-                                                <CheckCircle2 className="w-5 h-5 text-primary" />
-                                              ) : (
-                                                <Circle className="w-5 h-5 text-muted-foreground hover:text-primary transition-colors" />
-                                              )}
-                                            </motion.div>
-                                          </button>
-
-                                          {/* Inline edit for sub-task */}
-                                          {editingSubTask?.subTaskId === st.id ? (
-                                            <form
-                                              onSubmit={e => { e.preventDefault(); saveEditSubTask(); }}
-                                              className="flex-1 flex gap-2"
-                                            >
-                                              <input
-                                                autoFocus
-                                                value={editSubTaskText}
-                                                onChange={e => setEditSubTaskText(e.target.value)}
-                                                onKeyDown={e => e.key === 'Escape' && setEditingSubTask(null)}
-                                                className="flex-1 text-sm bg-background border border-border rounded-lg px-3 py-1 focus:outline-none focus:ring-1 focus:ring-primary/50"
-                                              />
-                                              <button type="submit" className="text-xs text-primary font-semibold px-2">Save</button>
-                                              <button type="button" onClick={() => setEditingSubTask(null)} className="text-xs text-muted-foreground px-1">✕</button>
-                                            </form>
-                                          ) : (
-                                            <span className={`flex-1 text-sm ${
-                                              st.done ? 'line-through text-muted-foreground' : ''
-                                            }`}>
-                                              {st.text}
-                                            </span>
-                                          )}
-
-                                          {/* Edit subtask — hover-only */}
-                                          {editingSubTask?.subTaskId !== st.id && (
-                                            <button
-                                              onClick={() => openEditSubTask(item.id, st.id, st.text)}
-                                              className="p-1 text-muted-foreground hover:text-foreground opacity-0 group-hover/sub:opacity-100 transition-opacity shrink-0"
-                                              title="Edit sub-task"
-                                            >
-                                              <Pencil className="w-3.5 h-3.5" />
-                                            </button>
-                                          )}
-
-                                          <button
-                                            onClick={() => deleteSubTask(item.id, st.id)}
-                                            className="p-1 text-muted-foreground hover:text-destructive opacity-0 group-hover/sub:opacity-100 transition-opacity shrink-0"
-                                            data-testid={`btn-delete-subtask-${st.id}`}
-                                          >
-                                            <X className="w-4 h-4" />
-                                          </button>
-                                        </div>
-                                      ))}
-                                    </div>
-
-                                    {/* Inline add sub-task */}
-                                    {addingSubTaskFor === item.id ? (
-                                      <form
-                                        onSubmit={e => {
-                                          e.preventDefault();
-                                          handleAddSubTaskInline(item.id);
-                                        }}
-                                        className="flex gap-2 pt-1"
-                                      >
-                                        <input
-                                          autoFocus
-                                          value={newSubTaskText}
-                                          onChange={e => setNewSubTaskText(e.target.value)}
-                                          onKeyDown={e => e.key === 'Escape' && setAddingSubTaskFor(null)}
-                                          className="flex-1 text-sm bg-background border border-border rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary/50"
-                                          placeholder="New sub-task..."
-                                        />
-                                        <button
-                                          type="submit"
-                                          className="text-xs text-primary font-semibold px-2"
-                                        >
-                                          Add
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => setAddingSubTaskFor(null)}
-                                          className="text-xs text-muted-foreground"
-                                        >
-                                          ✕
-                                        </button>
-                                      </form>
-                                    ) : (
-                                      <button
-                                        onClick={() => setAddingSubTaskFor(item.id)}
-                                        className="flex items-center gap-1 text-xs text-primary/70 hover:text-primary transition-colors pt-1"
-                                      >
-                                        <Plus className="w-3.5 h-3.5" /> Add sub-task
-                                      </button>
-                                    )}
-                                  </div>
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
-                          </GlassCard>
-                          </SwipeableRow>
-                        </motion.div>
-                      );
-                    })}
+                    {sortedItems.map(item => (
+                      <motion.div
+                        key={item.id}
+                        layout
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        transition={{ type: "spring", stiffness: 300, damping: 28 }}
+                      >
+                        <ChecklistItemRow
+                          item={item}
+                          isExpanded={expandedItems.has(item.id)}
+                          onToggleExpanded={() => toggleExpanded(item.id)}
+                          onToggleDone={() => toggleChecklistItem(item.id)}
+                          onEdit={() => openEditItem(item.id, item.text)}
+                          onDeleteRequest={() => requestDelete(item)}
+                          onToggleSubTask={(sid) => toggleSubTask(item.id, sid)}
+                          onDeleteSubTask={(sid) => deleteSubTask(item.id, sid)}
+                          onEditSubTaskRequest={(sid, text, link) => openEditSubTask(item.id, sid, text, link)}
+                          editingSubTask={editingSubTask}
+                          editSubTaskText={editSubTaskText}
+                          editSubTaskLink={editSubTaskLink}
+                          onEditSubTaskTextChange={setEditSubTaskText}
+                          onEditSubTaskLinkChange={setEditSubTaskLink}
+                          onSaveEditSubTask={saveEditSubTask}
+                          onCancelEditSubTask={() => setEditingSubTask(null)}
+                          addingSubTaskFor={addingSubTaskFor}
+                          newSubTaskText={newSubTaskText}
+                          onNewSubTaskTextChange={setNewSubTaskText}
+                          onStartAddSubTask={() => setAddingSubTaskFor(item.id)}
+                          onCancelAddSubTask={() => setAddingSubTaskFor(null)}
+                          onSubmitAddSubTask={() => handleAddSubTaskInline(item.id)}
+                        />
+                      </motion.div>
+                    ))}
                   </AnimatePresence>
                 </div>
               </div>
@@ -452,7 +354,11 @@ export function Checklist() {
       </FabPortal>
 
       {/* Add Single Task sheet */}
-      <BottomSheet isOpen={isAddTaskOpen} onClose={() => setIsAddTaskOpen(false)} title="New Task">
+      <BottomSheet
+        isOpen={isAddTaskOpen}
+        onClose={() => { setIsAddTaskOpen(false); setTaskDetails(DEFAULT_TASK_DETAIL_VALUES); }}
+        title="New Task"
+      >
         <form onSubmit={handleTaskSubmit(onAddTask)} className="space-y-6">
           <div>
             <label className="block text-sm font-medium mb-2">Task Description</label>
@@ -475,6 +381,7 @@ export function Checklist() {
               ))}
             </select>
           </div>
+          <TaskDetailFields value={taskDetails} onChange={setTaskDetails} />
           <button
             type="submit"
             className="w-full bg-primary text-primary-foreground font-semibold rounded-xl py-3.5"
@@ -487,7 +394,7 @@ export function Checklist() {
       {/* Add Task List sheet */}
       <BottomSheet
         isOpen={isAddListOpen}
-        onClose={() => { setIsAddListOpen(false); setNewSubTaskInputs(['']); }}
+        onClose={() => { setIsAddListOpen(false); setNewSubTaskInputs(['']); setListDetails(DEFAULT_TASK_DETAIL_VALUES); }}
         title="New Task List"
       >
         <form onSubmit={handleListSubmit(onAddList)} className="space-y-6">
@@ -547,6 +454,7 @@ export function Checklist() {
               <Plus className="w-4 h-4" /> Add another sub-task
             </button>
           </div>
+          <TaskDetailFields value={listDetails} onChange={setListDetails} />
           <button
             type="submit"
             className="w-full bg-primary text-primary-foreground font-semibold rounded-xl py-3.5"
@@ -577,6 +485,13 @@ export function Checklist() {
           </button>
         </div>
       </BottomSheet>
+
+      <DeleteSeriesSheet
+        isOpen={!!pendingDeleteItem}
+        onClose={() => setPendingDeleteItem(null)}
+        onDeleteOccurrence={confirmDeleteOccurrence}
+        onDeleteSeries={confirmDeleteSeries}
+      />
     </div>
   );
 }

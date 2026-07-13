@@ -1,0 +1,306 @@
+════════════════════════════════════════
+GLOBAL RULES (APPLY TO EVERYTHING BELOW)
+════════════════════════════════════════
+1. Do NOT change the site's overall theme, color palette, fonts, spacing
+   system, or navigation structure unless a task explicitly says so.
+2. Do NOT refactor, rename, or restructure files/routes/components unrelated
+   to the specific task at hand.
+3. Do NOT modify build config, dependencies, or deployment settings.
+4. This site is LIVE — every change must be backward-compatible with
+   existing saved data. No data loss on deploy.
+5. Maintain full mobile responsiveness for every change — this is used
+   primarily on mobile.
+6. Build in this order to minimize risk:
+   Phase 1 (low-risk UI fixes) → Phase 2 (interaction model changes) →
+   Phase 3 (new features/redesigns, incl. Exams sub-page) → Phase 4
+   (calendar system, built and tested in complete isolation).
+7. If any requirement conflicts with the current architecture, flag it
+   before implementing rather than making a unilateral structural change.
+8. If a requirement is ambiguous, use a sensible default and clearly note
+   the assumption rather than blocking on it.
+9. Prioritize not breaking existing live functionality over speed of delivery.
+10. Confirm each phase works before starting the next.
+11. After every deploy, check the Cloudflare Pages build/deployment logs
+    for errors or warnings (build failures, type errors, lint failures,
+    missing env vars, broken asset paths, etc.) before considering the
+    task complete. Proactively avoid common Cloudflare Pages build pitfalls
+    (case-sensitive imports, unsupported Node APIs, missing environment
+    variables, incorrect output directory, edge runtime incompatibilities).
+    Fix any build error before moving on.
+
+════════════════════════════════════════
+PHASE 3 — CHECKLIST & EXAMS
+════════════════════════════════════════
+Do the critical bug fix (3.1) first, since it affects live data integrity
+and everything else in this phase writes to the same tables. Then 3.2
+(checklist redesign), 3.4–3.6 (subject page: Details/Pages/Exams), 3.7
+(exam Excel import), and 3.8 (progress page) can proceed — they share
+the underlying checklist/subject data model, so keep them consistent
+with each other.
+
+3.1 CRITICAL BUG — deletes don't persist, archive is empty
+   - Symptom: deleting an item from the site appears to work, but on
+     reload the item reappears; the Archive view never shows anything
+     that was deleted.
+   - Before writing new UI, find the root cause: likely deletes are only
+     removing the item from client-side state (not persisted to the
+     database), or a fetch/cache is re-seeding stale data on load, or
+     deletes aren't being flagged in a way the Archive query reads.
+   - Fix so that delete = soft delete: persist a real flag (e.g.
+     `deleted_at` / `archived_at`) on the row in study_checklist /
+     study_schedule, exclude soft-deleted rows from normal list queries,
+     and include them in the Archive view.
+   - Confirm with a real test: delete an item, hard-reload the page,
+     confirm it's gone from the list and present in Archive.
+   - This must not delete or corrupt any existing live data — assumption
+     per Global Rule 8: existing rows with no delete flag are treated as
+     active/not-deleted.
+
+3.2 CHECKLIST PAGE REDESIGN
+   Filters (combinable, not mutually exclusive):
+   - Importance (however importance is currently modeled on a task; flag
+     if no importance field exists yet and note the default you add).
+   - Time (e.g. due date / time window).
+   - Status: checked / unchecked / "did not do". Assumption: "did not do"
+     = task whose due date/time has passed and it was never checked —
+     shown as a distinct third state, separate from unchecked-but-still-
+     upcoming.
+   - Repeated vs. one-off tasks.
+
+   Add-task repeat option:
+   - None (default, current behavior).
+   - Daily.
+   - Weekly — user selects one or more specific weekdays.
+   - Monthly — user selects one specific day of the month.
+   - Repeated tasks generate individual occurrences that can each be
+     checked/unchecked/deleted independently. When deleting a repeating
+     task, ask whether to delete just this occurrence or the whole
+     series (default: this occurrence only, per Global Rule 8) — and
+     route through the soft-delete fix in 3.1 either way.
+
+   Task list visual redesign:
+   - Redesign the list/task rows to be visually polished and consistent
+     with the existing site design (no new color palette per Global
+     Rule 1).
+   - Each sub-task gets an optional "info link" button — if a link URL
+     is set on that sub-task, show a small button/icon that opens it;
+     if no link is set, the button is simply not shown (not shown
+     disabled).
+
+3.3 SUBJECT PAGE — OVERVIEW
+   Note/assumption: the subject page is described as having 4 sub-pages;
+   this spec covers 3 of them (Details, Pages, Exams — 3.4–3.6 below).
+   The 4th sub-page is out of scope here and stays as-is. Flag which one
+   that is if it turns out to share components with any of the below.
+
+3.4 SUBJECT PAGE — DETAILS SUB-PAGE
+   - Remove the existing "Edit" and "Open" buttons for the Google Drive
+     folder entry.
+   - Swipe right-to-left on the Google Drive folder entry → open the
+     folder (external link).
+   - Swipe left-to-right on the Google Drive folder entry → edit the
+     folder link.
+   - Exam count and lecture count shown on this page must be computed
+     values, not manually stored/edited fields:
+     - Exam count = live count of exams belonging to this subject in
+       the Exams sub-page (3.6).
+     - Lecture count = live count of lectures belonging to this subject
+       in the Pages sub-page (3.5).
+   - These counts must update automatically whenever an exam or lecture
+     is added/deleted — no separate "edit count" control.
+
+3.5 SUBJECT PAGE — PAGES SUB-PAGE (Lectures) & Flashcards
+   List interaction (per lecture row) — flashcards, not delete, now own
+   both swipe directions on this row:
+   - Click/tap → opens the lecture edit page. Both "edit fields" and a
+     "remove/delete lecture" action live inside that page (route delete
+     through the soft-delete fix in 3.1, with confirmation). Deleting a
+     lecture no longer happens via swipe on this list.
+   - Swipe left-to-right → opens Flashcards Maker (create/edit cards)
+     for that lecture.
+   - Swipe right-to-left → opens Flashcards Reader (study/review mode)
+     for that lecture.
+   - Add a "Settings" option to the lecture edit flow (replaces the
+     "add link" field being removed from Exams per 3.6 — assumption:
+     lecture-level settings is the right home for lecture metadata like
+     an optional info link; flag if you intend something else here).
+
+   Flashcards Maker (swipe left-to-right):
+   - Simple, well-designed, text-only cards — one flashcard at a time,
+     full-face view.
+   - Starting state: an empty card front. Click the middle of the face
+     to type/edit its text.
+   - Double-click the card → flips to the back, with a smooth animated
+     flip transition and a sound effect on flip.
+   - Back starts empty too; click the middle to type/edit its text.
+     Double-click the back → advances to the next flashcard (creating a
+     new empty one if there isn't a next one yet).
+   - Two buttons below the card:
+     - Edit — edits whichever face (front or back) is currently showing.
+     - Delete — deletes the current flashcard (with confirmation).
+   - Flashcards are NOT exams: creating/editing them must not create,
+     update, or sync any record in the Exams sub-page (3.6). They are
+     lecture-only content.
+
+   Flashcards Reader (swipe right-to-left) — study mode, ungraded:
+   - Goes through the lecture's existing flashcards one at a time using
+     the same flip interaction (click to reveal, double-click/tap to
+     flip and to advance) — no MCQ, no scoring rubric, just recall
+     practice.
+   - After viewing each card's back, the user self-marks it "I knew it"
+     / "I didn't know it."
+   - On finishing the deck, show a results screen with: time taken for
+     the session, number of cards marked "knew it" out of total, and
+     the percentage known. This is NOT a grade and must NOT be written
+     to study_checklist exam records or factored into the subject's
+     Progress-page strong/weak calculation (3.8) — it's informational
+     only, scoped to this lecture.
+   - Store only the percentage from the most recent Reader session per
+     lecture (overwrite on each new session) — this is what feeds the
+     lecture cover badge below.
+
+   Lecture cover badge (list item for the lecture, e.g. on the Pages
+   sub-page):
+   - Show a small colored status badge reflecting the lecture's most
+     recent Flashcards Reader percentage (not shown until at least one
+     Reader session has been completed for that lecture).
+   - Show only the color + label — never the raw percentage number — on
+     the cover.
+   - Bands (assumption on boundary edges, flag if you want different
+     cutoffs): 0–69% "Bad" (yellow), 70–79% "Okay" (color not specified
+     in the request — defaulting to orange, change if you'd prefer
+     something else), 80–89% "Good" (blue), 90–99% "Very Good" (green),
+     100% "Excellent" (purple).
+
+3.6 SUBJECT PAGE — EXAMS SUB-PAGE (replaces the old grade-popup flow)
+   List interaction (per exam row) — this fully replaces the previous
+   "swipe left-to-right to enter a grade" behavior:
+   - Remove the grade-entry popup entirely.
+   - Swipe right-to-left → edit the exam (settings: title, question
+     source, etc.).
+   - Swipe left-to-right → remove/delete the exam (soft delete per 3.1,
+     with confirmation).
+   - Click/tap → opens the exam-taking page (below).
+   - Remove any "add link" field from the exam add/edit form (see 3.5
+     for where that capability moves to instead).
+   - Exams are only ever created manually or via the Excel import in
+     3.7 — nothing here is auto-generated from flashcards (see 3.5).
+
+   Exam-taking page — question types:
+   1. MCQ — question text + up to 4 choices, single correct answer.
+   2. Medical Case MCQ — same as MCQ, plus two extra display fields
+      shown as case context: a "labs" section and a "histo" (histology
+      findings) section.
+
+   Scoring, on finishing any exam:
+   - Show the result as a raw score (e.g. "20/30") and a percentage
+     (e.g. "66.6%").
+   - Apply that percentage to the subject's progress data used by the
+     Progress page (3.8) — same data source, so strong/weak stays
+     consistent between the Exams flow and the Progress page.
+   - ≥ 70% → exam becomes checked, and per the existing Exam–Lecture
+     rule (below) its linked lectures become checked too.
+   - < 70% → exam stays not checked, and the user can retake it
+     ("re-exam") — retaking updates the score to the latest attempt.
+
+   Exam–Lecture interconnection (unchanged data model):
+   - Exams and lectures are many-to-many linkable (one exam can link to
+     multiple lectures, and vice versa).
+   - Checking a lecture has no effect on any exam it's linked to.
+   - An exam becoming checked (≥70%, above) automatically checks every
+     lecture linked to it.
+   - This link data must live in a backward-compatible way in
+     study_checklist / study_schedule — do not lose or overwrite
+     existing checklist state for records that have no links yet.
+
+3.7 EXAM QUESTIONS — EXCEL IMPORT (Add Exam settings)
+   Upload a single Excel file in the exam's add/edit settings to
+   populate its questions. One header row, one question per row after
+   that:
+   - Col 1: Question type — "MCQ" or "Medical Case MCQ".
+   - Col 2: Question text.
+   - Col 3–6: Choice 1–4.
+   - Col 7: Correct answer — assumption on format (flag if you meant
+     something else): a number 1–4 identifying which of Col 3–6 is
+     correct for that row.
+   - Col 8: Labs configuration — Medical Case MCQ rows only, blank for
+     plain MCQ rows.
+   - Col 9: Histo discovery — Medical Case MCQ rows only, blank for
+     plain MCQ rows.
+
+   Parsing this is plain deterministic spreadsheet parsing (fixed
+   columns, no free-form interpretation needed) — implement with a
+   standard spreadsheet-parsing library server- or client-side. No AI/
+   LLM API call is needed anywhere in this import flow.
+
+3.8 PROGRESS PAGE REDESIGN
+   Goal: make the Progress page show more detail, and surface which
+   subjects are strong vs. weak.
+
+   Strong/weak subject indicator:
+   - Shown on the default (overview) list of subjects.
+   - Assumption (flag before implementing if a different source of truth
+     already exists): compute per subject from available data — average
+     exam grade for that subject's exams (3.6) and/or checklist
+     completion rate for that subject's tasks/lectures. Subjects above a
+     threshold are "strong," below are "weak." Use a sensible default
+     threshold (e.g. ≥70 average = strong) and state it explicitly in
+     the PR description.
+   - This is a read-only indicator — it must not write to or alter
+     study_subjects / study_checklist data, only read from it.
+
+   Two views per subject, switched by swipe (page-local gesture, distinct
+   from the Exams page gestures in 3.6 — same directions, different
+   meaning, scoped to this page only):
+   - Default state: the normal subject page as it exists today, including
+     its subpages (lectures, exams, etc.) — unchanged.
+   - Swipe left-to-right on a subject → reveals that subject's detailed
+     progress view (strong/weak breakdown, grade trend, completion rate,
+     whatever detail is available from existing data — no new tracking
+     tables unless explicitly needed, per Global Rule 2/3).
+   - Swipe right-to-left → returns to the normal subject page with its
+     subpages.
+   - The detailed progress view is not shown by default and not reachable
+     by tap — only by the left-to-right swipe — so it doesn't collide
+     with any existing tap behavior on subject cards.
+
+════════════════════════════════════════
+PHASE 4 — CALENDAR SYSTEM (BUILD & TEST IN ISOLATION)
+════════════════════════════════════════
+Highest-risk feature. Build and test this only after Phases 1–3 are
+confirmed stable on the live site.
+
+4.1 Day / Month / Year view toggle (Schedule page)
+   - Day View (existing behavior): horizontal day strip, tap a day to see
+     its tasks.
+   - Month View: full calendar grid for the selected month, weekday
+     headers (Sun–Sat), correct blank cells for days outside the month.
+     Tapping a date opens Day View for that date.
+   - Year View: grid of 12 months for the selected year. Tapping a month
+     opens Month View for that month.
+
+4.2 Shared slider selector (reuses existing day-strip slider design)
+   - Year selector: 50 entries starting from 1990 (1990–2039).
+   - Month selector: 12 entries starting from January.
+   - Day selector (within a specific month): dynamic count matching that
+     month's actual days (28–31), correctly handling leap years.
+
+4.3 Current date highlighting rules
+   - Year Grid: current year gets a distinct highlight.
+   - Month Grid: current month gets a distinct highlight, only when
+     viewing its actual year.
+   - Day Grid: current day gets a distinct highlight, only when viewing
+     the actual current month of the actual current year.
+
+4.4 Navigation flow
+   - Year → tap month → Month View. Month → tap day → Day View (shows
+     that day's tasks).
+   - Provide a clear way back up a level (breadcrumb, back arrow, or
+     tapping the current view's label).
+
+Acceptance criteria:
+- Accurate calendar math (correct days/month, leap years).
+- Smooth transitions with no lost state.
+- Correct highlighting per 4.3.
+- Visually consistent with existing site design.
+- Does not interfere with Exams/Lecture checklist logic from Phase 3.
