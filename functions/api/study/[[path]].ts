@@ -337,6 +337,41 @@ export const onRequest: PagesFunction<Env> = async ({ request, env }) => {
       }
     }
 
+    // ── Schedule Plans ─────────────────────────────────────────────────────────
+    if (segs[0] === "schedule-plans") {
+      const planId = segs[1];
+
+      async function getCFPlans(): Promise<any[]> {
+        const row = await db.prepare("SELECT value FROM study_settings WHERE key='schedule_plans'").first() as any;
+        if (!row) return [];
+        try { return JSON.parse(row.value); } catch { return []; }
+      }
+
+      async function saveCFPlans(plans: any[]) {
+        await db.prepare(
+          "INSERT INTO study_settings (key, value) VALUES ('schedule_plans', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value"
+        ).bind(JSON.stringify(plans)).run();
+      }
+
+      if (!planId && method === "GET") return json(await getCFPlans());
+      if (!planId && method === "POST") {
+        const plans = await getCFPlans();
+        const newPlan = { ...body, id: body.id || crypto.randomUUID() };
+        await saveCFPlans([...plans, newPlan]);
+        return json(newPlan);
+      }
+      if (planId && method === "PUT") {
+        const plans = await getCFPlans();
+        await saveCFPlans(plans.map((p: any) => p.id === planId ? { ...p, ...body } : p));
+        return json({ ok: true });
+      }
+      if (planId && method === "DELETE") {
+        const plans = await getCFPlans();
+        await saveCFPlans(plans.filter((p: any) => p.id !== planId));
+        return json({ ok: true });
+      }
+    }
+
     return json({ error: "Not found" }, 404);
   } catch (err) {
     return json({ error: String(err) }, 500);

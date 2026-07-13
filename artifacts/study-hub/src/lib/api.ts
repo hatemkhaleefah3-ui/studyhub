@@ -83,6 +83,16 @@ export const api = {
   // ─── Reset ────────────────────────────────────────────────────────────────
   resetData: () => request('/reset', { method: 'DELETE' }),
 
+  // ─── Schedule Plans ───────────────────────────────────────────────────────
+  getSchedulePlans: () =>
+    request<any[]>('/schedule-plans'),
+  createSchedulePlan: (plan: object) =>
+    request('/schedule-plans', { method: 'POST', body: JSON.stringify(plan) }),
+  updateSchedulePlan: (id: string, data: object) =>
+    request(`/schedule-plans/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteSchedulePlan: (id: string) =>
+    request(`/schedule-plans/${id}`, { method: 'DELETE' }),
+
   // ─── Archive ──────────────────────────────────────────────────────────────
   getArchive: () =>
     request<ArchiveEntry[]>('/archive'),
