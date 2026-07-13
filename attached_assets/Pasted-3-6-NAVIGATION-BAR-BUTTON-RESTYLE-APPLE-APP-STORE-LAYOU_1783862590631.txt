@@ -1,0 +1,63 @@
+3.6 NAVIGATION BAR & BUTTON RESTYLE: APPLE APP STORE LAYOUT, 
+    LIQUID-MORPH MOTION, NO GLOW
+
+Edit the existing navigation in place — do not rebuild from scratch. 
+Keep all existing icons, routes, and click handlers exactly as they are 
+(home, book, calendar, checkmark, chart). Settings is no longer in the 
+nav per 1.5.
+
+CONTAINER & RESPONSIVE LAYOUT (Apple App Store conventions):
+- Mobile (≤768px): Frosted-glass dark pill, floating bottom nav — 
+  background: rgba(20,20,20,0.75), backdrop-filter: blur(20px) 
+  (+ -webkit-backdrop-filter), fully rounded (border-radius: 9999px), 
+  subtle box-shadow for elevation, floats with margin from screen edges 
+  (not flush/full-width).
+- Tablet (768–1024px): Same frosted-glass styling, converted to a top 
+  horizontal bar (centered or full-width, rounded), icons side-by-side 
+  with labels beside or below.
+- Desktop (1024px+): Full-width frosted-glass bar fixed to the top, 
+  items laid out left-to-right (logo left / nav center or right, 
+  matching existing header pattern if one exists). Icons can shrink or 
+  become text-only labels if that better fits desktop convention — use 
+  judgment based on existing site header style.
+- Use CSS media queries or the existing breakpoint system (e.g. 
+  Tailwind md:/lg:) to switch layouts.
+
+ACTIVE-STATE INDICATOR — NO GLOW, ANYWHERE, EVER:
+- No blur, no radial shine, no glow effect of any kind on the active 
+  item, at any breakpoint.
+- No perfect circle or blob shape behind the icon.
+- Indicate the active item instead through liquid/morphing motion (see 
+  below) combined with a static resting state that fits the existing 
+  design language: e.g. active icon full white or accent color 
+  (#3b82f6) at rest, inactive icons at rgba(255,255,255,0.5), plus a 
+  non-circular background shape (pill/rounded-rect tint) that 
+  liquid-morphs into position — not a glow.
+
+LIQUID/MORPH MOTION (applies to nav AND all buttons sitewide):
+- The nav's active-state background/indicator uses a liquid/morphing 
+  shape animation only while transitioning between tabs (stretch-and-
+  settle morph, not a glow crossfade) — e.g. via Framer Motion shared 
+  layout animation (layoutId) if React-based, or CSS transform/border-
+  radius keyframe transitions otherwise.
+- At rest (no interaction happening), the nav and all buttons are solid 
+  and crisp — no liquid effect, no glow, nothing animating.
+- Every button sitewide plays a small liquid/morph feedback animation on 
+  click/tap (e.g. subtle squash/stretch or border-radius ripple) without 
+  changing its final position or size — visual feedback only, no 
+  permanent layout shift.
+- Icon color/opacity crossfades smoothly on tab change (no instant 
+  snapping), synced with the morph.
+
+ACCEPTANCE CRITERIA:
+- No glow, blur-shine, or circular highlight anywhere in the nav or on 
+  any button, at any breakpoint or state.
+- Active nav item is clearly distinguishable from inactive items via 
+  color + liquid-morph indicator only.
+- Nav visually matches Apple App Store layout conventions (frosted 
+  glass, correct breakpoint behavior) without adopting its glow effect.
+- Buttons and nav are solid/static at rest; liquid morph plays only 
+  during active transitions or click feedback; nothing permanently 
+  shifts position after animation completes.
+- Nav item order, labels, icon set, and click/routing logic are 
+  unchanged.

@@ -1,0 +1,48 @@
+# Replit Prompt — Study Hub v3 (Import + Backend for Cloudflare Pages)
+
+## Before pasting the prompt
+1. Create your new Replit project.
+2. Import/upload the `project.zip` from the previous version into it (unzip it into the project root, replacing the starter files).
+3. Then paste the prompt below into the Replit AI Agent.
+
+---
+
+## Prompt to paste into Replit
+
+I'm importing an existing project called Study Hub (a personal study organizer web app built with React + Tailwind + Framer Motion, currently using localStorage for data). The zipped project files are already in this workspace — locate them, unzip if needed, and continue building on top of the existing code rather than starting over. Preserve the current Liquid Glass / Apple HIG design system, icon-only buttons, and responsive nav behavior (bottom bar on mobile, sidebar on iPad, top bar on desktop) exactly as they are.
+
+Apply the following three changes:
+
+### A. Remove the Pomodoro timer completely
+Delete the Pomodoro widget component, its floating button, its timer logic, and any related state, settings, or styling references. Nothing Pomodoro-related should remain in the UI or codebase.
+
+### B. Add Edit and Delete buttons to every item the user can create
+Every entity that can currently be added must also support **editing** and **deleting**, each as a separate icon-only button (pencil icon for edit, trash icon for delete), consistent with the app's icon-only style:
+- Subjects
+- Lectures (within a subject)
+- Exams (within a subject, including the grade field)
+- Schedule events
+- Checklist tasks
+- Checklist task lists and their sub-tasks (edit/delete both the list itself and individual sub-tasks)
+
+Edit should open the same style of glass modal used for creation, pre-filled with the existing values. Delete should ask for a quick confirmation (glass confirmation sheet/modal) before permanently removing the item, to avoid accidental taps.
+
+### C. Add a backend so the site works fully when deployed via GitHub → Cloudflare Pages
+Right now all data lives only in the browser's localStorage, which doesn't sync or persist reliably once this becomes a real deployed site. Restructure the project so that:
+
+- The **frontend stays the same** (React app, same design/pages/features).
+- Add a proper backend data layer built specifically to work with **Cloudflare Pages** when the repo is connected via GitHub — meaning:
+  - Use **Cloudflare Pages Functions** (the `/functions` directory convention) for all API routes (create/read/update/delete for subjects, lectures, exams, schedule events, checklist tasks/lists).
+  - Use **Cloudflare D1** (Cloudflare's built-in SQL database) as the actual data store, since it's the natural persistent-storage option for a Pages Functions backend and requires no separate server to manage.
+  - Include the necessary `wrangler.toml` configuration and D1 binding setup so the database works once connected in the Cloudflare dashboard.
+  - Replace all current localStorage read/write calls in the frontend with calls to these new API routes (fetch requests), so data is saved to the database instead of the browser.
+  - Keep the JSON export/import feature in Settings, but now export should pull from the backend and import should write to the backend, not localStorage.
+- Add a short `DEPLOY.md` file to the project explaining, in plain steps: how to push this repo to GitHub, connect it to Cloudflare Pages, create the D1 database in the Cloudflare dashboard, and bind it to the Pages project — so I can follow it myself when deploying.
+- Make sure the app still runs locally in Replit's preview for continued development, even though the production data layer is meant for Cloudflare.
+
+---
+
+## Notes for the agent
+- Do not lose any existing functionality, styling, or the responsive/dark-mode behavior already built — this is an extension of the current app, not a rebuild.
+- Test edit/delete on every entity type across mobile, iPad, and desktop, and in both light and dark mode.
+- Once finished, package the updated project into a downloadable `.zip` file again so it can be pushed to GitHub from my machine.

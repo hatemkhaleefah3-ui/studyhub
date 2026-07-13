@@ -1,0 +1,249 @@
+LIFE – Development & Improvement Specification
+
+════════════════════════════════════════
+GLOBAL RULES (APPLY TO EVERYTHING BELOW)
+════════════════════════════════════════
+
+1. Do NOT change the site’s overall theme, color palette, typography system, spacing system, or navigation structure unless explicitly required.
+2. Do NOT refactor, rename, or restructure files, routes, components, database models, or APIs unrelated to the current task.
+3. Do NOT modify build configuration, dependencies, deployment settings, Cloudflare Pages configuration, or D1 settings unless explicitly required.
+4. This site is LIVE. Every change must be backward-compatible with existing user data. No data loss is acceptable.
+5. Maintain full mobile responsiveness for every feature. Mobile experience is the highest priority.
+6. Any new feature must be fully integrated with existing create, edit, delete, archive, search, filter, checklist, schedule, and progress systems where applicable.
+7. Whenever a new field, filter, setting, or feature is added, ensure it is supported consistently across:
+    * Add forms
+    * Edit forms
+    * Filters
+    * Search
+    * Storage/database
+    * Display cards/lists
+    * Archive system
+    * Progress calculations (if applicable)
+8. Do not create isolated functionality. Every feature must be connected to the relevant existing workflows.
+9. Prioritize stability over speed.
+10. Confirm each phase works before moving to the next phase.
+11. After every deployment:
+
+* Verify Cloudflare Pages build logs.
+* Verify D1 database operations.
+* Verify Functions execution.
+* Verify mobile layouts.
+* Verify dark mode and light mode behavior.
+
+12. Any database schema changes must include a reminder that production D1 requires:
+
+wrangler d1 execute study-hub-db –file=schema.sql –remote
+
+Cloudflare Pages deployments do NOT automatically apply D1 schema changes.
+
+════════════════════════════════════════
+HIGH PRIORITY FIXES (DO BEFORE ANY NEW FEATURES)
+════════════════════════════════════════
+
+A. Archive & Delete Persistence Fix
+
+Current issue:
+
+* Deleted items reappear after page reload.
+* Archive page remains empty.
+
+Requirements:
+
+* Ensure deleted items are permanently removed from active lists after reload.
+* Ensure deleted items appear correctly inside Archive.
+* Verify archive records are successfully written to production D1.
+* Test with real production data.
+* Test delete → reload → archive workflow.
+* Test restore from archive.
+* Test permanent deletion if supported.
+* Ensure no existing data is lost.
+
+B. Filter System Redesign
+
+Current issue:
+
+* Filter options are always visible.
+
+Requirements:
+
+* Filters should only appear after pressing the Filter button.
+* Clicking Filter should open a clean filter panel/modal/drawer.
+* Clicking outside or pressing close should hide filters.
+* The filter UI must be mobile-friendly.
+* Filter state should remain active until cleared.
+* Active filters should be visually indicated.
+
+Important:
+Any filter added must automatically be supported by:
+
+* Add Task
+* Edit Task
+* Task Details
+* Task Cards
+* Schedule View
+* Progress Calculations
+* Archive View (where applicable)
+
+No filter may exist only in the filter menu without being manageable elsewhere.
+
+════════════════════════════════════════
+CHECKLIST PAGE REDESIGN
+════════════════════════════════════════
+
+Filter Enhancements
+
+Filters must be combinable (not mutually exclusive).
+
+Supported filters:
+
+* Importance
+* Due Date / Time
+* Status
+    * Checked
+    * Unchecked
+    * Did Not Do
+* Repeating
+* One-Time Tasks
+
+New rule:
+
+Whenever a new filter category is added:
+
+* Add Task form must support it.
+* Edit Task form must support it.
+* Existing tasks must display it.
+* Database storage must support it.
+* Search and sorting must support it.
+
+Add/Edit Task Form Redesign
+
+Completely redesign task settings UI.
+
+Goals:
+
+* Cleaner layout.
+* Better grouping.
+* Fewer clicks.
+* Better mobile usability.
+* More intuitive field order.
+
+Suggested order:
+
+1. Task Name
+2. Description
+3. Importance
+4. Due Date
+5. Due Time
+6. Repeat Settings
+7. Category/Subject
+8. Optional Link
+9. Additional Settings
+
+Requirements:
+
+* Consistent design between Add Task and Edit Task.
+* Shared components where possible.
+* Same validation rules.
+* Same visual style.
+* Modern card-based layout.
+* Better spacing and hierarchy.
+
+════════════════════════════════════════
+DARK/LIGHT MODE REFINEMENT
+════════════════════════════════════════
+
+Current goal:
+Improve overall dark mode and light mode experience.
+
+Special focus:
+Navigation Bar.
+
+Requirements:
+
+Navigation Bar
+
+* Improve contrast in both themes.
+* Ensure active page is clearly visible.
+* Improve icon visibility.
+* Improve text readability.
+* Remove inconsistent colors.
+* Fix hover/pressed states.
+* Fix transparency issues.
+* Ensure smooth theme transitions.
+
+Global Theme Improvements
+
+* Verify every page in both themes.
+* Verify all modals.
+* Verify forms.
+* Verify dropdowns.
+* Verify filters.
+* Verify archive pages.
+* Verify schedule/calendar pages.
+* Verify progress pages.
+
+No component should have:
+
+* Low contrast text.
+* Invisible icons.
+* Incorrect backgrounds.
+* Theme flickering.
+
+════════════════════════════════════════
+INTEGRATION RULE
+════════════════════════════════════════
+
+For every modification:
+
+Before implementation ask:
+
+“If I add or change this feature, where else should it also be updated?”
+
+Examples:
+
+If adding a filter:
+
+* Add Task
+* Edit Task
+* Search
+* Archive
+* Progress
+* Database
+
+If adding a task field:
+
+* Add Form
+* Edit Form
+* Display Cards
+* Filters
+* Search
+* Archive
+* Export/Import
+* Progress
+
+If changing a workflow:
+
+* Verify all related pages continue working.
+
+No feature should be implemented in only one location when related systems also depend on it.
+
+════════════════════════════════════════
+PHASES 3 & 4
+════════════════════════════════════════
+
+Keep all existing requirements from Phases 3 and 4 exactly as currently specified below.
+
+Additional rule:
+
+Before marking any Phase 3 or Phase 4 task complete:
+
+* Test on mobile.
+* Test on desktop.
+* Test in dark mode.
+* Test in light mode.
+* Test after page reload.
+* Test with existing production data.
+* Test with newly created data.
+* Verify archive compatibility.
+* Verify filter compatibility.
+* Verify progress calculations remain accurate.
