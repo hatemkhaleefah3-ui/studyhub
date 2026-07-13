@@ -32,7 +32,7 @@ export function ExamEdit() {
     return <div className="p-8 text-center text-muted-foreground">Exam not found</div>;
   }
 
-  const accentColor = subject.color;
+  // No per-subject color theming anymore
   const inputCls =
     "w-full bg-background border border-border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 text-foreground";
 
@@ -98,7 +98,7 @@ export function ExamEdit() {
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-bold tracking-tight truncate" style={{ color: accentColor }}>
+          <h1 className="text-2xl font-bold tracking-tight truncate text-primary">
             {exam.name}
           </h1>
           <p className="text-sm text-muted-foreground">Edit exam</p>
@@ -123,8 +123,7 @@ export function ExamEdit() {
           </div>
           <button
             type="submit"
-            className="w-full text-white font-semibold rounded-xl py-3 transition-opacity hover:opacity-90"
-            style={{ backgroundColor: accentColor }}
+            className="w-full text-primary-foreground bg-primary font-semibold rounded-xl py-3 transition-opacity hover:opacity-90"
           >
             Save Changes
           </button>
@@ -141,7 +140,7 @@ export function ExamEdit() {
               className={`flex-1 py-2 rounded-lg text-sm font-semibold capitalize transition-all ${
                 exam.type === t ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
               }`}
-              style={exam.type === t ? { color: accentColor } : {}}
+              
             >
               {t}
             </button>
@@ -192,7 +191,7 @@ export function ExamEdit() {
                   className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-secondary/60 transition-colors text-left"
                 >
                   {isLinked ? (
-                    <CheckSquare className="w-4 h-4 shrink-0" style={{ color: accentColor }} />
+                    <CheckSquare className="w-4 h-4 shrink-0 text-primary" />
                   ) : (
                     <Square className="w-4 h-4 text-muted-foreground shrink-0" />
                   )}

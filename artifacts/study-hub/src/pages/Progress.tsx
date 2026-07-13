@@ -116,11 +116,6 @@ function SubjectSwipeCard({ subject, examMatchesFilter }: SubjectCardProps) {
                       <p className="text-sm text-muted-foreground">No graded exams yet</p>
                     )}
                   </div>
-                  <div className="shrink-0 flex flex-col items-center gap-0.5 opacity-30">
-                    <div className="w-1 h-1 rounded-full bg-foreground" />
-                    <div className="w-1 h-1 rounded-full bg-foreground" />
-                    <div className="w-1 h-1 rounded-full bg-foreground" />
-                  </div>
                 </div>
               </div>
             </motion.div>

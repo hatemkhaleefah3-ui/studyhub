@@ -28,7 +28,7 @@ export function ExamTake() {
     return <div className="p-8 text-center text-muted-foreground">Exam not found</div>;
   }
 
-  const accentColor = subject.color;
+  // No per-subject color theming anymore
 
   if (questions.length === 0) {
     return (
@@ -40,15 +40,14 @@ export function ExamTake() {
           >
             <ArrowLeft className="w-5 h-5" />
           </Link>
-          <h1 className="text-2xl font-bold" style={{ color: accentColor }}>{exam.name}</h1>
+          <h1 className="text-2xl font-bold text-primary">{exam.name}</h1>
         </div>
         <GlassCard className="p-10 text-center text-muted-foreground border-dashed border-2 bg-transparent">
           <p className="font-medium">No questions yet</p>
           <p className="text-sm mt-1 opacity-70">Import questions from the exam's edit page first.</p>
           <button
             onClick={() => setLocation(`/subjects/${subject.id}/exams/${exam.id}/edit`)}
-            className="mt-4 text-white font-semibold rounded-xl px-5 py-2.5"
-            style={{ backgroundColor: accentColor }}
+            className="mt-4 text-primary-foreground bg-primary hover:bg-primary/90 transition-colors font-semibold rounded-xl px-5 py-2.5"
           >
             Go to Edit
           </button>
@@ -84,7 +83,7 @@ export function ExamTake() {
           >
             <ArrowLeft className="w-5 h-5" />
           </Link>
-          <h1 className="text-2xl font-bold" style={{ color: accentColor }}>Results</h1>
+          <h1 className="text-2xl font-bold text-primary">Results</h1>
         </div>
         <GlassCard className="p-8 text-center space-y-4">
           <div
@@ -113,8 +112,7 @@ export function ExamTake() {
             </button>
             <button
               onClick={() => setLocation(`/subjects/${subject.id}`)}
-              className="flex-1 rounded-xl py-3 font-semibold text-white"
-              style={{ backgroundColor: accentColor }}
+              className="flex-1 rounded-xl py-3 font-semibold text-primary-foreground bg-primary hover:bg-primary/90 transition-colors"
             >
               Done
             </button>
@@ -143,7 +141,7 @@ export function ExamTake() {
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div className="flex-1 min-w-0">
-          <h1 className="text-xl font-bold truncate" style={{ color: accentColor }}>{exam.name}</h1>
+          <h1 className="text-xl font-bold truncate text-primary">{exam.name}</h1>
           <p className="text-sm text-muted-foreground">
             Question {currentQ + 1} of {questions.length}
             {answeredCount > 0 && (
@@ -156,10 +154,9 @@ export function ExamTake() {
       {/* Progress bar */}
       <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
         <motion.div
-          className="h-full rounded-full"
+          className="h-full rounded-full bg-primary"
           animate={{ width: `${progressPct}%` }}
           transition={{ duration: 0.3, ease: "easeOut" }}
-          style={{ backgroundColor: accentColor }}
         />
       </div>
 
@@ -175,8 +172,7 @@ export function ExamTake() {
           <GlassCard className="p-5 space-y-4">
             <div className="flex items-start gap-2">
               <span
-                className="px-2 py-0.5 rounded-md text-xs font-bold text-white shrink-0 mt-0.5"
-                style={{ backgroundColor: accentColor }}
+                className="px-2 py-0.5 rounded-md text-xs font-bold text-primary-foreground bg-primary shrink-0 mt-0.5"
               >
                 Q{currentQ + 1}
               </span>
@@ -202,10 +198,9 @@ export function ExamTake() {
                     onClick={() => setAnswer(choiceNum)}
                     className={`w-full text-left px-4 py-3.5 rounded-xl border-2 transition-all text-sm flex items-center gap-3 ${
                       selected
-                        ? "border-transparent text-white"
+                        ? "border-primary bg-primary text-primary-foreground"
                         : "border-border hover:border-border/50 hover:bg-secondary/40"
                     }`}
-                    style={selected ? { backgroundColor: accentColor } : {}}
                   >
                     <span
                       className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs font-bold shrink-0 ${
@@ -236,16 +231,14 @@ export function ExamTake() {
           <button
             onClick={handleSubmit}
             disabled={!allAnswered}
-            className="flex-1 py-4 rounded-2xl font-semibold text-white flex items-center justify-center gap-2 text-sm transition-opacity disabled:opacity-40"
-            style={{ backgroundColor: accentColor }}
+            className="flex-1 py-4 rounded-2xl font-semibold text-primary-foreground bg-primary hover:bg-primary/90 flex items-center justify-center gap-2 text-sm transition-opacity disabled:opacity-40"
           >
             <CheckCircle2 className="w-4 h-4" /> Submit Exam
           </button>
         ) : (
           <button
             onClick={() => setCurrentQ(q => q + 1)}
-            className="flex-1 py-4 rounded-2xl font-semibold text-white flex items-center justify-center gap-2 text-sm"
-            style={{ backgroundColor: accentColor }}
+            className="flex-1 py-4 rounded-2xl font-semibold text-primary-foreground bg-primary hover:bg-primary/90 flex items-center justify-center gap-2 text-sm"
           >
             Next <ChevronRight className="w-4 h-4" />
           </button>
@@ -264,12 +257,11 @@ export function ExamTake() {
               title={`Q${i + 1}${isAnswered ? " — answered" : " — not answered"}`}
               className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
                 isCurrent
-                  ? "text-white shadow-sm scale-110"
+                  ? "bg-primary text-primary-foreground shadow-sm scale-110"
                   : isAnswered
                   ? "bg-secondary text-foreground"
                   : "bg-secondary/40 text-muted-foreground"
               }`}
-              style={isCurrent ? { backgroundColor: accentColor } : {}}
             >
               {i + 1}
             </button>

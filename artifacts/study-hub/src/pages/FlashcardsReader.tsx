@@ -29,7 +29,7 @@ export function FlashcardsReader() {
     return <div className="p-8 text-center text-muted-foreground">Lecture not found</div>;
   }
 
-  const accentColor = subject.color;
+  // No per-subject color theming anymore
 
   // ── No cards ────────────────────────────────────────────────────────────────
   if (cards.length === 0) {
@@ -42,14 +42,13 @@ export function FlashcardsReader() {
           >
             <ArrowLeft className="w-5 h-5" />
           </Link>
-          <h1 className="text-2xl font-bold" style={{ color: accentColor }}>{lecture.name}</h1>
+          <h1 className="text-2xl font-bold text-primary">{lecture.name}</h1>
         </div>
         <GlassCard className="p-10 text-center text-muted-foreground border-dashed border-2 bg-transparent">
           <p className="font-medium">No flashcards yet</p>
           <button
             onClick={() => setLocation(`/subjects/${subject.id}/lectures/${lecture.id}/flashcards`)}
-            className="mt-4 text-white font-semibold rounded-xl px-5 py-2.5"
-            style={{ backgroundColor: accentColor }}
+            className="mt-4 text-primary-foreground bg-primary hover:bg-primary/90 transition-colors font-semibold rounded-xl px-5 py-2.5"
           >
             Make some
           </button>
@@ -100,7 +99,7 @@ export function FlashcardsReader() {
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold" style={{ color: accentColor }}>Session Results</h1>
+            <h1 className="text-2xl font-bold text-primary">Session Results</h1>
             <p className="text-sm text-muted-foreground">{lecture.name}</p>
           </div>
         </div>
@@ -128,8 +127,7 @@ export function FlashcardsReader() {
             </button>
             <button
               onClick={() => setLocation(`/subjects/${subject.id}/lectures/${lecture.id}`)}
-              className="flex-1 rounded-2xl py-3.5 font-semibold text-white text-sm"
-              style={{ backgroundColor: accentColor }}
+              className="flex-1 rounded-2xl py-3.5 font-semibold text-primary-foreground bg-primary hover:bg-primary/90 transition-colors text-sm"
             >
               Done
             </button>
@@ -194,7 +192,7 @@ export function FlashcardsReader() {
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div className="flex-1 min-w-0">
-          <h1 className="text-lg font-bold truncate" style={{ color: accentColor }}>
+          <h1 className="text-lg font-bold truncate text-primary">
             {lecture.name}
           </h1>
           <p className="text-sm text-muted-foreground">
@@ -220,7 +218,7 @@ export function FlashcardsReader() {
               style={{
                 backgroundColor:
                   i === index
-                    ? accentColor
+                    ? "hsl(var(--primary))"
                     : i < results.length
                     ? results[i]
                       ? "#22c55e"
@@ -267,8 +265,7 @@ export function FlashcardsReader() {
                 {/* Label */}
                 <div className="px-6 pt-5 pb-2 flex items-center gap-2">
                   <span
-                    className="text-[10px] font-black uppercase tracking-widest"
-                    style={{ color: accentColor }}
+                    className="text-[10px] font-black uppercase tracking-widest text-primary"
                   >
                     Question
                   </span>
@@ -291,12 +288,12 @@ export function FlashcardsReader() {
 
               {/* ── Back ── */}
               <div
-                className="absolute inset-0 rounded-3xl flex flex-col shadow-xl text-white"
+                
                 style={{
                   backfaceVisibility: "hidden",
                   transform: "rotateY(180deg)",
-                  backgroundColor: accentColor,
                 }}
+                className="absolute inset-0 rounded-3xl flex flex-col shadow-xl text-primary-foreground bg-primary"
               >
                 {/* Label */}
                 <div className="px-6 pt-5 pb-2 flex items-center gap-2">
@@ -338,8 +335,7 @@ export function FlashcardsReader() {
               </button>
               <button
                 onClick={() => mark(true)}
-                className="flex-1 flex items-center justify-center gap-2 rounded-2xl py-4 font-bold text-sm text-white hover:opacity-90 active:scale-[0.98] transition-all shadow-md"
-                style={{ backgroundColor: accentColor }}
+                className="flex-1 flex items-center justify-center gap-2 rounded-2xl py-4 font-bold text-sm text-primary-foreground bg-primary hover:bg-primary/90 active:scale-[0.98] transition-all shadow-md"
               >
                 <Check className="w-5 h-5" /> Got it!
               </button>
