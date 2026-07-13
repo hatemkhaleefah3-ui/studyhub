@@ -9,7 +9,7 @@ import {
   Plus, Trash2, CheckCircle2, Circle, XCircle,
   List, ListChecks, ChevronDown, ChevronRight, X, Pencil,
   SlidersHorizontal, RotateCcw, Link as LinkIcon,
-  AlertCircle, Clock, Repeat,
+  AlertCircle, Clock, Repeat, Settings2,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { motion, AnimatePresence } from "framer-motion";
@@ -76,6 +76,15 @@ function TaskForm({
   onClose: () => void;
   submitLabel: string;
 }) {
+  // Auto-expand advanced section if the task already has advanced values
+  const hasAdvancedValues = !!(
+    defaultValues.importance ||
+    defaultValues.dueDate ||
+    (defaultValues.repeat && defaultValues.repeat !== 'none') ||
+    defaultValues.link
+  );
+  const [showAdvanced, setShowAdvanced] = useState(hasAdvancedValues);
+
   const { register, handleSubmit, reset } = useForm<TaskFormValues>({ defaultValues });
 
   const submit = (data: TaskFormValues) => {
@@ -83,7 +92,9 @@ function TaskForm({
     reset();
   };
 
-  const fieldCls = "w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 transition-shadow";
+  const fieldCls =
+    "w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 transition-shadow";
+
   const Section = ({ label, children }: { label: string; children: React.ReactNode }) => (
     <div className="space-y-2">
       <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-0.5">{label}</p>
@@ -95,7 +106,7 @@ function TaskForm({
     <BottomSheet isOpen title={title} onClose={onClose}>
       <form onSubmit={handleSubmit(submit)} className="space-y-5 pb-2">
 
-        {/* Task name */}
+        {/* ── Basic fields (always visible) ─────────────────────────────── */}
         <Section label="Task">
           <input
             {...register("text", { required: true })}
@@ -110,35 +121,6 @@ function TaskForm({
           />
         </Section>
 
-        {/* Importance */}
-        <Section label="Importance">
-          <select {...register("importance")} className={fieldCls}>
-            <option value="">No importance set</option>
-            <option value="high">🔴 High</option>
-            <option value="medium">🟡 Medium</option>
-            <option value="low">🟢 Low</option>
-          </select>
-        </Section>
-
-        {/* Due */}
-        <Section label="Due Date & Time">
-          <div className="grid grid-cols-2 gap-3">
-            <input {...register("dueDate")} type="date" className={fieldCls} />
-            <input {...register("dueTime")} type="time" className={fieldCls} />
-          </div>
-        </Section>
-
-        {/* Repeat */}
-        <Section label="Repeat">
-          <select {...register("repeat")} className={fieldCls}>
-            <option value="none">No repeat</option>
-            <option value="daily">Daily</option>
-            <option value="weekly">Weekly</option>
-            <option value="monthly">Monthly</option>
-          </select>
-        </Section>
-
-        {/* Subject */}
         <Section label="Category / Subject">
           <select {...register("subjectId")} className={fieldCls}>
             <option value="">No subject</option>
@@ -146,17 +128,89 @@ function TaskForm({
           </select>
         </Section>
 
-        {/* Link */}
-        <Section label="Link (optional)">
-          <input
-            {...register("link")}
-            type="url"
-            className={fieldCls}
-            placeholder="https://…"
+        {/* ── Advanced Settings toggle ────────────────────────────────────── */}
+        <button
+          type="button"
+          onClick={() => setShowAdvanced(v => !v)}
+          className="flex items-center gap-2 w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 hover:bg-secondary/70 transition-colors text-sm font-medium text-foreground"
+        >
+          <Settings2 className="w-4 h-4 text-muted-foreground shrink-0" />
+          <span className="flex-1 text-left">Advanced Settings</span>
+          {/* show a summary of what's set when collapsed */}
+          {!showAdvanced && hasAdvancedValues && (
+            <span className="text-xs text-primary font-normal">
+              {[
+                defaultValues.importance && IMPORTANCE_META[defaultValues.importance as ImportanceLevel]?.label,
+                defaultValues.dueDate && 'Due date',
+                defaultValues.repeat && defaultValues.repeat !== 'none' && REPEAT_META[defaultValues.repeat as RepeatInterval],
+                defaultValues.link && 'Link',
+              ].filter(Boolean).join(' · ')}
+            </span>
+          )}
+          <ChevronDown
+            className={`w-4 h-4 text-muted-foreground shrink-0 transition-transform duration-200 ${showAdvanced ? 'rotate-180' : ''}`}
           />
-        </Section>
+        </button>
 
-        <button type="submit" className="w-full bg-primary text-primary-foreground font-semibold rounded-xl py-3.5 mt-2">
+        {/* ── Advanced fields (collapsible) ─────────────────────────────── */}
+        <AnimatePresence initial={false}>
+          {showAdvanced && (
+            <motion.div
+              key="advanced"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+              className="overflow-hidden"
+            >
+              <div className="space-y-5 pt-1 pb-1 border-l-2 border-primary/20 pl-4">
+
+                <Section label="Importance">
+                  <select {...register("importance")} className={fieldCls}>
+                    <option value="">No importance set</option>
+                    <option value="high">🔴 High</option>
+                    <option value="medium">🟡 Medium</option>
+                    <option value="low">🟢 Low</option>
+                  </select>
+                </Section>
+
+                <Section label="Due Date & Time">
+                  <div className="grid grid-cols-2 gap-3">
+                    <input {...register("dueDate")} type="date" className={fieldCls} />
+                    <input {...register("dueTime")} type="time" className={fieldCls} />
+                  </div>
+                </Section>
+
+                <Section label="Repeat">
+                  <select {...register("repeat")} className={fieldCls}>
+                    <option value="none">No repeat</option>
+                    <option value="daily">Daily — repeats every day</option>
+                    <option value="weekly">Weekly — repeats every 7 days</option>
+                    <option value="monthly">Monthly — repeats same day each month</option>
+                  </select>
+                  <p className="text-xs text-muted-foreground px-0.5">
+                    When you complete a repeating task, the next occurrence is created automatically on the next due date.
+                  </p>
+                </Section>
+
+                <Section label="Link (optional)">
+                  <input
+                    {...register("link")}
+                    type="url"
+                    className={fieldCls}
+                    placeholder="https://…"
+                  />
+                </Section>
+
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <button
+          type="submit"
+          className="w-full bg-primary text-primary-foreground font-semibold rounded-xl py-3.5"
+        >
           {submitLabel}
         </button>
       </form>
