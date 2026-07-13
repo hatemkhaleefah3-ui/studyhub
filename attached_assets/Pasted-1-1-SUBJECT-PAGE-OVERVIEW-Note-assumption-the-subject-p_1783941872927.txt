@@ -1,0 +1,312 @@
+1.1 SUBJECT PAGE — OVERVIEW
+   Note/assumption: the subject page has 4 sub-pages. This spec now
+   covers all 4: Details, Pages, Exams (1.2–1.4 below, previously
+   3.4–3.6) and a 4th sub-page (1.5, newly brought into scope below —
+   previously left out-of-scope). Flag if the 4th sub-page's actual
+   name/content differs from the assumption made in 1.5.
+
+   NEW — Theoretical / Practical split: neither the Lectures sub-page
+   (1.3) nor the Exams sub-page (1.4) currently has a Theoretical/
+   Practical distinction — both were flat, single lists. This revision
+   adds that split to both, and threads a "type" (Theoretical or
+   Practical) through every place that touches lectures or exams
+   (counts in 1.2, linking in 1.4, progress calc in 1.5). See 1.8 for
+   the full list of knock-on changes and how conflicts with the prior
+   version were resolved.
+
+1.2 SUBJECT PAGE — DETAILS SUB-PAGE
+   - Remove the existing "Edit" and "Open" buttons for the Google Drive
+     folder entry.
+   - Swipe right-to-left on the Google Drive folder entry → open the
+     folder (external link).
+   - Swipe left-to-right on the Google Drive folder entry → edit the
+     folder link.
+   - Exam count and lecture count shown on this page must be computed
+     values, not manually stored/edited fields:
+     - Exam count = live count of exams belonging to this subject in
+       the Exams sub-page (1.4).
+     - Lecture count = live count of lectures belonging to this subject
+       in the Pages sub-page (1.3).
+   - These counts must update automatically whenever an exam or lecture
+     is added/deleted — no separate "edit count" control.
+   - Updated for the Theoretical/Practical split (1.3, 1.4): show each
+     count as a total with a Theoretical/Practical breakdown next to it
+     (e.g. "Lectures: 12 (8 Theoretical / 4 Practical)") — assumption on
+     display format, flag if you'd rather show two fully separate count
+     rows instead of one combined line.
+
+1.3 SUBJECT PAGE — PAGES SUB-PAGE (Lectures) & Flashcards
+   NEW — Theoretical / Practical tabs:
+   - Add a segmented control (two tabs: "Theoretical" / "Practical") at
+     the top of the Pages sub-page. Each tab shows its own filtered
+     list of lecture rows — one lecture belongs to exactly one type.
+   - Every lecture gets a required "type" field (Theoretical or
+     Practical), set when the lecture is created and editable
+     afterward from the lecture edit page's Settings option (below) —
+     assumption: type lives alongside the other lecture-level fields,
+     not as a separate control; flag if you want type locked after
+     creation instead of editable.
+   - The "Add Lecture" action creates a lecture pre-set to whichever
+     tab is currently active; the user can still change its type
+     afterward via Settings.
+   - Default for existing lectures created before this change:
+     Theoretical (assumption, since that's the more common case for a
+     historical lecture backlog — flag if you'd rather backfill this
+     from another signal, or leave it required-but-unset and prompt
+     users to classify on first open).
+
+   List interaction (per lecture row) — flashcards, not delete, now own
+   both swipe directions on this row:
+   - Click/tap → opens the lecture edit page. Both "edit fields" and a
+     "remove/delete lecture" action live inside that page (route delete
+     through the soft-delete fix in 3.1, with confirmation). Deleting a
+     lecture no longer happens via swipe on this list.
+   - Swipe left-to-right → opens Flashcards Maker (create/edit cards)
+     for that lecture.
+   - Swipe right-to-left → opens Flashcards Reader (study/review mode)
+     for that lecture.
+   - Add a "Settings" option to the lecture edit flow (replaces the
+     "add link" field being removed from Exams per 1.4 — assumption:
+     lecture-level settings is the right home for lecture metadata like
+     an optional info link; flag if you intend something else here).
+
+   Flashcards Maker (swipe left-to-right):
+   - Simple, well-designed, text-only cards — one flashcard at a time,
+     full-face view.
+   - Starting state: an empty card front. Click the middle of the face
+     to type/edit its text.
+   - Double-click the card → flips to the back, with a smooth animated
+     flip transition and a sound effect on flip.
+   - Back starts empty too; click the middle to type/edit its text.
+     Double-click the back → advances to the next flashcard (creating a
+     new empty one if there isn't a next one yet).
+   - Small "Front" / "Back" indicator badge in the corner of the card,
+     showing which face is currently displayed (assumption: adding this
+     so the textless button below has a badge to sit next to, per the
+     textless-button requirement; flag if you don't want this chip).
+   - One icon-only button (no text label), positioned to the right of
+     that indicator badge:
+     - Delete (trash icon) — deletes the current flashcard (with
+       confirmation).
+   - The separate "Edit" button from the original spec is removed as
+     unnecessary: clicking the middle of whichever face is showing
+     already edits its text, so a dedicated Edit button is redundant.
+   - Flashcards are NOT exams: creating/editing them must not create,
+     update, or sync any record in the Exams sub-page (1.4). They are
+     lecture-only content.
+
+   Flashcards Reader (swipe right-to-left) — study mode, ungraded:
+   - Goes through the lecture's existing flashcards one at a time using
+     the same flip interaction (click to reveal, double-click/tap to
+     flip and to advance) — no MCQ, no scoring rubric, just recall
+     practice.
+   - After viewing each card's back, the user self-marks it "I knew it"
+     / "I didn't know it."
+   - On finishing the deck, show a results screen with: time taken for
+     the session, number of cards marked "knew it" out of total, and
+     the percentage known. This is NOT a grade and must NOT be written
+     to study_checklist exam records or factored into the subject's
+     Progress-page strong/weak calculation (3.8) — it's informational
+     only, scoped to this lecture.
+   - Store only the percentage from the most recent Reader session per
+     lecture (overwrite on each new session) — this is what feeds the
+     lecture cover badge below.
+
+   Lecture cover badge (list item for the lecture, e.g. on the Pages
+   sub-page):
+   - Show a small colored status badge reflecting the lecture's most
+     recent Flashcards Reader percentage (not shown until at least one
+     Reader session has been completed for that lecture).
+   - Show only the color + label — never the raw percentage number — on
+     the cover.
+   - Bands (assumption on boundary edges, flag if you want different
+     cutoffs): 0–69% "Bad" (yellow), 70–79% "Okay" (color not specified
+     in the request — defaulting to orange, change if you'd prefer
+     something else), 80–89% "Good" (blue), 90–99% "Very Good" (green),
+     100% "Excellent" (purple).
+   - If any additional action control is ever added to this row beyond
+     the swipe gestures above, it must be a textless (icon-only) button
+     placed to the right of this badge, consistent with 1.3's Flashcards
+     Maker and 1.5's list rows — no such control is needed today, since
+     swipe already covers all actions on this row.
+
+1.4 SUBJECT PAGE — EXAMS SUB-PAGE (replaces the old grade-popup flow)
+   NEW — Theoretical / Practical tabs:
+   - Same segmented control pattern as the Lectures sub-page (1.3): a
+     "Theoretical" / "Practical" tab at the top of the Exams sub-page,
+     each showing its own filtered exam list. Every exam gets a
+     required "type" field, set on creation and editable afterward via
+     the exam's swipe-right-to-left edit/settings flow.
+   - "Add Exam" creates an exam pre-set to the active tab's type; the
+     Excel import (1.6) inherits that same type automatically — the
+     import file itself does not need a type column, since the whole
+     imported exam is one type, set at the exam level.
+   - Default for existing exams created before this change: Theoretical
+     (same assumption and same flag as the Lectures default above, for
+     consistency — flag if you want a different backfill rule).
+
+   List interaction (per exam row) — this fully replaces the previous
+   "swipe left-to-right to enter a grade" behavior:
+   - Remove the grade-entry popup entirely.
+   - Swipe right-to-left → edit the exam (settings: title, question
+     source, etc.).
+   - Swipe left-to-right → remove/delete the exam (soft delete per 3.1,
+     with confirmation).
+   - Click/tap → opens the exam-taking page (below).
+   - Remove any "add link" field from the exam add/edit form (see 1.3
+     for where that capability moves to instead).
+   - Exams are only ever created manually or via the Excel import in
+     1.6 — nothing here is auto-generated from flashcards (see 1.3).
+
+   Exam-taking page — question types:
+   1. MCQ — question text + up to 4 choices, single correct answer.
+   2. Medical Case MCQ — same as MCQ, plus two extra display fields
+      shown as case context: a "labs" section and a "histo" (histology
+      findings) section.
+
+   Scoring, on finishing any exam:
+   - Show the result as a raw score (e.g. "20/30") and a percentage
+     (e.g. "66.6%").
+   - Apply that percentage to the subject's progress data used by the
+     Progress page (3.8) — same data source, so strong/weak stays
+     consistent between the Exams flow and the Progress page.
+   - ≥ 70% → exam becomes checked, and per the existing Exam–Lecture
+     rule (below) its linked lectures become checked too.
+   - < 70% → exam stays not checked, and the user can retake it
+     ("re-exam") — retaking updates the score to the latest attempt.
+
+   Exam–Lecture interconnection (data model updated for the type split):
+   - Exams and lectures are many-to-many linkable (one exam can link to
+     multiple lectures, and vice versa) — this part is unchanged.
+   - Checking a lecture has no effect on any exam it's linked to.
+   - An exam becoming checked (≥70%, above) automatically checks every
+     lecture linked to it.
+   - NEW — same-type linking constraint: the exam-linking picker (in
+     the exam's edit/settings flow) only offers lectures of the same
+     type as the exam — a Practical exam can only link to Practical
+     lectures, and a Theoretical exam only to Theoretical lectures.
+     Assumption: this keeps Theoretical/Practical as a clean, non-
+     crossing split throughout the subject page; flag if you actually
+     want cross-type linking allowed (e.g. a Practical exam that also
+     checks off a related Theoretical lecture).
+   - Existing links created before this change, where the linked exam
+     and lecture ended up with different types after the Theoretical
+     default backfill (1.3, 1.4), are left in place rather than auto-
+     removed — show a non-blocking warning on the exam's edit page
+     instead ("linked lecture type mismatch") so nothing silently
+     breaks, but flag if you'd rather auto-unlink these instead.
+   - This link data must live in a backward-compatible way in
+     study_checklist / study_schedule — do not lose or overwrite
+     existing checklist state for records that have no links yet.
+
+1.5 SUBJECT PAGE — 4TH SUB-PAGE (name TBD)
+   Assumption: this is likely the "Progress" page referenced elsewhere
+   (as the subject's strong/weak calculation view) — flag if the actual
+   4th sub-page is something else, since the fields shown on edit would
+   depend on what this page actually displays.
+
+   Bringing this sub-page in scope with the same swipe-based edit/
+   remove pattern used on the other sub-pages (matching the Exams
+   sub-page in 1.4, for consistency across the Subject page):
+   - Click/tap a list entry → open/view that entry's detail.
+   - Swipe right-to-left → edit the entry.
+   - Swipe left-to-right → remove/delete the entry (soft delete per
+     3.1, with confirmation).
+   - No standalone Edit/Delete buttons on the list rows — swipe
+     replaces them entirely, same as 1.4's Exams sub-page and 1.2's
+     Details sub-page. If any control can't be expressed as a swipe
+     (e.g. a bulk action), it must be a textless icon-only button
+     placed to the right of that entry's status badge, per the rule
+     applied in 1.3.
+   - NEW — effect of the type split on strong/weak: the underlying
+     progress data source (3.8) is fed by exam percentages (1.4)
+     regardless of type, so the overall strong/weak calculation stays
+     type-agnostic by default — a Practical exam and a Theoretical exam
+     both count toward the same subject-level score, unchanged.
+     Assumption: add an optional Theoretical/Practical filter on this
+     page's view (not a data-model change, just a display filter) so
+     the user can see strong/weak per type if they want; flag if you'd
+     rather the underlying calculation itself be split into two
+     separate scores instead of one combined score with a filter.
+
+1.6 EXAM QUESTIONS — EXCEL IMPORT (Add Exam settings)
+   Upload a single Excel file in the exam's add/edit settings to
+   populate its questions. One header row, one question per row after
+   that:
+   - Col 1: Question type — "MCQ" or "Medical Case MCQ".
+   - Col 2: Question text.
+   - Col 3–6: Choice 1–4.
+   - Col 7: Correct answer — assumption on format (flag if you meant
+     something else): a number 1–4 identifying which of Col 3–6 is
+     correct for that row.
+   - Col 8: Labs configuration — Medical Case MCQ rows only, blank for
+     plain MCQ rows.
+   - Col 9: Histo discovery — Medical Case MCQ rows only, blank for
+     plain MCQ rows.
+
+   Parsing this is plain deterministic spreadsheet parsing (fixed
+   columns, no free-form interpretation needed) — implement with a
+   standard spreadsheet-parsing library server- or client-side. No AI/
+   LLM API call is needed anywhere in this import flow.
+
+1.7 DEPLOYMENT / HOSTING — CAUTION
+   The website is hosted via GitHub and published through a connected
+   Cloudflare integration (e.g. Cloudflare Pages). This connection must
+   not be disrupted by any change in this spec:
+   - Do not modify, remove, or rename the GitHub repository's default
+     branch, build/output directory, or any config files the
+     GitHub–Cloudflare integration depends on (e.g. wrangler.toml,
+     Cloudflare Pages build settings, package.json build scripts)
+     unless explicitly required by a task.
+   - Be careful with dependency, routing, or config changes that could
+     cause a Cloudflare build/deploy failure — verify the build command
+     and output path stay consistent, and watch for conflicting
+     dependency versions, duplicate config, or broken imports that
+     would fail CI before merging/pushing.
+   - Treat any change touching build tooling, environment variables, or
+     repo structure as higher-risk: flag it explicitly rather than
+     applying it silently, since a failed Cloudflare build takes the
+     live site down.
+
+1.8 THEORETICAL / PRACTICAL — INTERCONNECTIONS & CONFLICT RESOLUTION
+   This section exists to make the ripple effects of the 1.3/1.4 type
+   split explicit in one place, and to record how each conflict with
+   the prior (flat-list) version of this spec was resolved.
+
+   Data model:
+   - Add a required `type` enum ("theoretical" | "practical") to both
+     the lecture record and the exam record. This is the single source
+     of truth every tab, count, and link check below reads from.
+   - Existing records: backfilled to "theoretical" (1.3, 1.4) — flag if
+     a different backfill or a forced re-classification step is wanted
+     instead of a silent default.
+
+   Resolved conflicts vs. the pre-split spec:
+   - Details sub-page counts (1.2) previously implied one number per
+     count — now shows total + breakdown, so the two are consistent
+     rather than the breakdown silently overriding the total.
+   - Exam–Lecture linking (1.4) previously allowed any exam to link to
+     any lecture — now constrained to same-type by default, with
+     existing cross-type links flagged (not deleted) rather than
+     silently broken, so no in-progress checklist state is lost.
+   - Progress/strong-weak (1.5, 3.8) previously had a single combined
+     score — kept combined by default (no data-model break for 3.8),
+     with type-filtering added as a view-only option so nothing that
+     depends on the existing combined score elsewhere in the app needs
+     to change.
+   - Flashcards (1.3) are unaffected structurally — they stay scoped to
+     their parent lecture and simply inherit that lecture's type for
+     filtering purposes only (e.g. if flashcard review is ever shown
+     grouped by type); no separate flashcard-level type field is added.
+   - Excel import (1.6) is unaffected structurally — an imported exam's
+     type comes from the exam it's imported into (set via the active
+     tab, 1.4), so no new column is needed in the import file.
+
+   Still open (flag these before implementation, since each changes
+   the data model or UX if answered differently):
+   - Should cross-type exam-lecture linking ever be allowed?
+   - Should Progress (1.5) split into two real scores instead of one
+     score with a display filter?
+   - Should existing pre-split records be silently backfilled to
+     "theoretical," or should the app force users to classify them?
+
