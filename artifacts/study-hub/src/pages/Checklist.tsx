@@ -22,8 +22,7 @@ function toRepeatRule(v: TaskDetailValues): RepeatRule | undefined {
   return { frequency: 'daily' };
 }
 
-function matchesTimeFilter(item: ChecklistItem, filter: ChecklistFilterState['time']): boolean {
-  if (filter === 'all') return true;
+function matchesTimeFilter(item: ChecklistItem, filter: ChecklistFilterState['time'][number]): boolean {
   if (filter === 'no-date') return !item.dueAt;
   if (!item.dueAt) return false;
   const due = new Date(item.dueAt);
@@ -179,11 +178,15 @@ export function Checklist() {
   // Apply combinable filters (Phase 3.2)
   const filteredChecklist = useMemo(() => {
     return checklist.filter((item) => {
-      if (filters.importance !== 'all' && (item.importance || 'medium') !== filters.importance) return false;
-      if (!matchesTimeFilter(item, filters.time)) return false;
-      if (filters.status !== 'all' && getChecklistItemStatus(item) !== filters.status) return false;
-      if (filters.repeat === 'repeated' && !item.seriesId) return false;
-      if (filters.repeat === 'one-off' && item.seriesId) return false;
+      if (filters.importance.length > 0 && !filters.importance.includes(item.importance || 'medium')) return false;
+      if (filters.time.length > 0 && !filters.time.some((t) => matchesTimeFilter(item, t))) return false;
+      if (filters.status.length > 0 && !filters.status.includes(getChecklistItemStatus(item))) return false;
+      if (filters.repeat.length > 0) {
+        const isRepeated = !!item.seriesId;
+        const matchesRepeat = filters.repeat.includes('repeated') && isRepeated;
+        const matchesOneOff = filters.repeat.includes('one-off') && !isRepeated;
+        if (!matchesRepeat && !matchesOneOff) return false;
+      }
       return true;
     });
   }, [checklist, filters]);
