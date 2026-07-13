@@ -52,7 +52,7 @@ export function TaskListDetail() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const {
-    checklist, subjects,
+    checklist,
     toggleSubTask, addSubTask, updateSubTask, deleteSubTask,
     updateChecklistItem,
   } = useStudyData();
@@ -77,7 +77,6 @@ export function TaskListDetail() {
     );
   }
 
-  const subject      = subjects.find(s => s.id === item.subjectId);
   const subTasks     = item.subTasks || [];
   const checkedCount = subTasks.filter(st => st.done).length;
   const skippedCount = subTasks.filter(st => st.didNotDo).length;
@@ -92,7 +91,6 @@ export function TaskListDetail() {
     updateChecklistItem(item.id, {
       text: (fd.get("text") as string).trim(),
       description: (fd.get("description") as string).trim() || undefined,
-      subjectId: (fd.get("subjectId") as string) || null,
     });
     setIsEditListOpen(false);
   };
@@ -189,12 +187,6 @@ export function TaskListDetail() {
               <Pencil className="w-4 h-4" />
             </button>
           </div>
-          {subject && (
-            <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-0.5">
-              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: subject.color }} />
-              {subject.name}
-            </p>
-          )}
           {item.description && (
             <p className="text-sm text-muted-foreground mt-1">{item.description}</p>
           )}
@@ -381,15 +373,6 @@ export function TaskListDetail() {
               placeholder="Description (optional)"
             />
           </div>
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-              Subject
-            </label>
-            <select name="subjectId" defaultValue={item.subjectId || ""} className={`${fieldCls} appearance-none`}>
-              <option value="">No subject</option>
-              {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          </div>
           <button type="submit" className="w-full bg-primary text-primary-foreground font-semibold rounded-xl py-3.5">
             Save Changes
           </button>
@@ -401,7 +384,6 @@ export function TaskListDetail() {
         <TaskForm
           title="New Sub-task"
           defaultValues={DEFAULT_TASK}
-          subjects={subjects}
           onSubmit={onAddSubTask}
           onClose={() => setIsAddOpen(false)}
           submitLabel="Add Sub-task"
@@ -414,7 +396,6 @@ export function TaskListDetail() {
         <TaskForm
           title="Edit Sub-task"
           defaultValues={getSubTaskDefaults(editingSubTask)}
-          subjects={subjects}
           onSubmit={onEditSubTask}
           onClose={() => setEditingSubTaskId(null)}
           submitLabel="Save Changes"

@@ -171,22 +171,16 @@ export function Dashboard() {
               </GlassCard>
             ) : (
               <GlassCard className="p-2">
-                {todaysTasks.map((task, i) => {
-                  const subject = subjects.find(s => s.id === task.subjectId);
-                  return (
-                    <button
-                      key={task.id}
-                      onClick={() => toggleChecklistItem(task.id)}
-                      className="w-full flex items-center gap-3 p-3 hover:bg-muted/50 rounded-xl transition-colors text-left group"
-                    >
-                      <Circle className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
-                      <span className="flex-1 text-sm font-medium">{task.text}</span>
-                      {subject && (
-                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: subject.color }} />
-                      )}
-                    </button>
-                  )
-                })}
+                {todaysTasks.map((task) => (
+                  <button
+                    key={task.id}
+                    onClick={() => toggleChecklistItem(task.id)}
+                    className="w-full flex items-center gap-3 p-3 hover:bg-muted/50 rounded-xl transition-colors text-left group"
+                  >
+                    <Circle className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                    <span className="flex-1 text-sm font-medium">{task.text}</span>
+                  </button>
+                ))}
               </GlassCard>
             )}
           </div>

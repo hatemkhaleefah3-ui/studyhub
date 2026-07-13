@@ -1,16 +1,18 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useRoute, useLocation } from "wouter";
-import { ArrowLeft, Plus, Trash2, Brain } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Brain, Layers, Pencil } from "lucide-react";
 import { useStudyData } from "@/hooks/useStudyData";
 import { GlassCard } from "@/components/shared/GlassCard";
 import { BottomSheet } from "@/components/shared/BottomSheet";
 import { ConfirmSheet } from "@/components/shared/ConfirmSheet";
 import { SwipeRow } from "@/components/shared/SwipeRow";
+import { motion, AnimatePresence } from "framer-motion";
 
 /**
- * Flashcards Maker — create/edit/delete flashcards for a lecture. Reached
- * by swiping a lecture row left-to-right on the Lectures tab (spec 1.3).
+ * Flashcards Maker — create/edit/delete flashcards for a lecture.
+ * Each card is displayed as a visual Q&A flashcard in the list.
+ * Tap a card to edit · swipe right to delete.
  */
 export function FlashcardsMaker() {
   const [, params] = useRoute("/subjects/:subjectId/lectures/:lectureId/flashcards");
@@ -32,9 +34,10 @@ export function FlashcardsMaker() {
   }
 
   const accentColor = subject.color;
-  const inputCls =
-    "w-full bg-background border border-border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 text-foreground";
   const cards = lecture.flashcards || [];
+
+  const inputCls =
+    "w-full bg-background border border-border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 text-foreground resize-none text-sm";
 
   const onAdd = (data: any) => {
     if (!data.front.trim() || !data.back.trim()) return;
@@ -56,8 +59,22 @@ export function FlashcardsMaker() {
     setEditingId(null);
   };
 
+  // Tab between textareas with Enter (Shift+Enter = newline)
+  const textareaNext = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key !== "Enter" || e.shiftKey) return;
+    const form = e.currentTarget.closest("form");
+    if (!form) return;
+    const areas = Array.from(form.querySelectorAll<HTMLElement>("textarea"));
+    const idx = areas.indexOf(e.currentTarget);
+    if (idx >= 0 && idx < areas.length - 1) {
+      e.preventDefault();
+      areas[idx + 1].focus();
+    }
+  };
+
   return (
     <div className="space-y-6 pb-20">
+      {/* ── Header ──────────────────────────────────────────────────── */}
       <div className="flex items-center gap-3">
         <Link
           href={`/subjects/${subject.id}/lectures/${lecture.id}`}
@@ -66,68 +83,176 @@ export function FlashcardsMaker() {
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-bold tracking-tight truncate" style={{ color: accentColor }}>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground truncate">
             {lecture.name}
+          </p>
+          <h1 className="text-2xl font-bold tracking-tight" style={{ color: accentColor }}>
+            Flashcards
           </h1>
-          <p className="text-sm text-muted-foreground">Flashcards Maker &middot; {cards.length} cards</p>
         </div>
-        {cards.length > 0 && (
-          <button
-            onClick={() => setLocation(`/subjects/${subject.id}/lectures/${lecture.id}/study`)}
-            className="p-2.5 rounded-full text-white shrink-0"
-            style={{ backgroundColor: accentColor }}
-            title="Study these cards"
-          >
-            <Brain className="w-4 h-4" />
-          </button>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-secondary text-muted-foreground">
+            {cards.length} {cards.length === 1 ? "card" : "cards"}
+          </span>
+          {cards.length > 0 && (
+            <button
+              onClick={() => setLocation(`/subjects/${subject.id}/lectures/${lecture.id}/study`)}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-white text-sm font-semibold shadow-md transition-opacity hover:opacity-90 active:scale-95"
+              style={{ backgroundColor: accentColor }}
+            >
+              <Brain className="w-4 h-4" /> Study
+            </button>
+          )}
+        </div>
       </div>
 
-      {cards.length === 0 ? (
-        <GlassCard className="p-10 text-center text-muted-foreground border-dashed border-2 bg-transparent">
-          <p className="font-medium">No flashcards yet</p>
-          <p className="text-sm mt-1 opacity-70">Add a card to get started</p>
-        </GlassCard>
-      ) : (
-        <div className="space-y-3">
-          {cards.map(card => (
-            <SwipeRow
-              key={card.id}
-              onTap={() => openEdit(card.id)}
-              onSwipeRight={() => setDeletingId(card.id)}
-              rightLabel="Delete"
-              rightIcon={Trash2}
-              rightColor="#ef4444"
-            >
-              <GlassCard className="p-4 cursor-pointer">
-                <p className="font-semibold text-sm">{card.front}</p>
-                <p className="text-sm text-muted-foreground mt-1">{card.back}</p>
-              </GlassCard>
-            </SwipeRow>
-          ))}
+      {/* ── Empty state ──────────────────────────────────────────────── */}
+      {cards.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-16 gap-5 text-center">
+          <div
+            className="w-24 h-24 rounded-[28px] flex items-center justify-center shadow-lg"
+            style={{
+              background: `linear-gradient(135deg, ${accentColor}30, ${accentColor}10)`,
+              border: `2px solid ${accentColor}30`,
+            }}
+          >
+            <Layers className="w-12 h-12" style={{ color: accentColor }} />
+          </div>
+          <div>
+            <p className="text-lg font-bold">No cards yet</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Add your first flashcard to get started
+            </p>
+          </div>
+          <button
+            onClick={() => setIsAddOpen(true)}
+            className="flex items-center gap-2 px-6 py-3 rounded-2xl text-white font-semibold text-sm shadow-md transition-opacity hover:opacity-90 active:scale-95"
+            style={{ backgroundColor: accentColor }}
+          >
+            <Plus className="w-4 h-4" /> Add First Card
+          </button>
         </div>
       )}
 
-      <button
-        onClick={() => setIsAddOpen(true)}
-        className="w-full border-2 border-dashed border-border rounded-2xl p-4 text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-all flex items-center justify-center gap-2 font-medium"
-      >
-        <Plus className="w-4 h-4" /> Add Flashcard
-      </button>
+      {/* ── Card list ────────────────────────────────────────────────── */}
+      {cards.length > 0 && (
+        <div className="space-y-3">
+          <AnimatePresence initial={false}>
+            {cards.map((card, i) => (
+              <motion.div
+                key={card.id}
+                layout
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.18 }}
+              >
+                <SwipeRow
+                  onTap={() => openEdit(card.id)}
+                  onSwipeRight={() => setDeletingId(card.id)}
+                  rightLabel="Delete"
+                  rightIcon={Trash2}
+                  rightColor="#ef4444"
+                >
+                  <GlassCard className="overflow-hidden cursor-pointer">
+                    {/* Card header strip */}
+                    <div
+                      className="px-4 py-2.5 flex items-center justify-between"
+                      style={{ background: `linear-gradient(90deg, ${accentColor}18, ${accentColor}06)` }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px] font-black text-white shadow-sm shrink-0"
+                          style={{ backgroundColor: accentColor }}
+                        >
+                          {i + 1}
+                        </span>
+                        <span
+                          className="text-[10px] font-black uppercase tracking-widest"
+                          style={{ color: accentColor }}
+                        >
+                          Flashcard
+                        </span>
+                      </div>
+                      <span className="flex items-center gap-1 text-[10px] text-muted-foreground opacity-50 font-medium">
+                        <Pencil className="w-2.5 h-2.5" /> tap to edit
+                      </span>
+                    </div>
 
-      <BottomSheet isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} title="New Flashcard">
+                    {/* Question */}
+                    <div className="px-4 pt-3 pb-2">
+                      <p
+                        className="text-[10px] font-black uppercase tracking-widest mb-1.5"
+                        style={{ color: accentColor }}
+                      >
+                        Q
+                      </p>
+                      <p className="font-semibold text-sm leading-relaxed">{card.front}</p>
+                    </div>
+
+                    {/* Divider */}
+                    <div className="mx-4 border-t border-dashed border-border/60" />
+
+                    {/* Answer */}
+                    <div className="px-4 pt-2 pb-3.5">
+                      <p className="text-[10px] font-black uppercase tracking-widest mb-1.5 text-muted-foreground">
+                        A
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">{card.back}</p>
+                    </div>
+                  </GlassCard>
+                </SwipeRow>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
+      )}
+
+      {/* ── Add button (when cards exist) ───────────────────────────── */}
+      {cards.length > 0 && (
+        <button
+          onClick={() => setIsAddOpen(true)}
+          className="w-full border-2 border-dashed border-border rounded-2xl p-4 text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-all flex items-center justify-center gap-2 font-medium text-sm"
+        >
+          <Plus className="w-4 h-4" /> Add Card
+        </button>
+      )}
+
+      {/* ── Add sheet ───────────────────────────────────────────────── */}
+      <BottomSheet
+        isOpen={isAddOpen}
+        onClose={() => { setIsAddOpen(false); addForm.reset(); }}
+        title="New Flashcard"
+      >
         <form onSubmit={addForm.handleSubmit(onAdd)} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium mb-2">Front</label>
-            <textarea {...addForm.register("front", { required: true })} className={inputCls} rows={3} />
+            <label className="block text-sm font-semibold mb-2">
+              Question{" "}
+              <span className="text-muted-foreground font-normal text-xs">(front side)</span>
+            </label>
+            <textarea
+              {...addForm.register("front", { required: true })}
+              className={inputCls}
+              rows={3}
+              placeholder="What is…?"
+              onKeyDown={textareaNext}
+            />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-2">Back</label>
-            <textarea {...addForm.register("back", { required: true })} className={inputCls} rows={3} />
+            <label className="block text-sm font-semibold mb-2">
+              Answer{" "}
+              <span className="text-muted-foreground font-normal text-xs">(back side)</span>
+            </label>
+            <textarea
+              {...addForm.register("back", { required: true })}
+              className={inputCls}
+              rows={3}
+              placeholder="The answer is…"
+            />
           </div>
           <button
             type="submit"
-            className="w-full text-white font-semibold rounded-xl py-3.5 transition-opacity hover:opacity-90"
+            className="w-full text-white font-semibold rounded-xl py-3.5 transition-opacity hover:opacity-90 active:scale-[0.98]"
             style={{ backgroundColor: accentColor }}
           >
             Add Card
@@ -135,19 +260,31 @@ export function FlashcardsMaker() {
         </form>
       </BottomSheet>
 
+      {/* ── Edit sheet ──────────────────────────────────────────────── */}
       <BottomSheet isOpen={!!editingId} onClose={() => setEditingId(null)} title="Edit Flashcard">
         <form onSubmit={editForm.handleSubmit(onEdit)} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium mb-2">Front</label>
-            <textarea {...editForm.register("front", { required: true })} className={inputCls} rows={3} />
+            <label className="block text-sm font-semibold mb-2">
+              Question{" "}
+              <span className="text-muted-foreground font-normal text-xs">(front side)</span>
+            </label>
+            <textarea
+              {...editForm.register("front", { required: true })}
+              className={inputCls}
+              rows={3}
+              onKeyDown={textareaNext}
+            />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-2">Back</label>
+            <label className="block text-sm font-semibold mb-2">
+              Answer{" "}
+              <span className="text-muted-foreground font-normal text-xs">(back side)</span>
+            </label>
             <textarea {...editForm.register("back", { required: true })} className={inputCls} rows={3} />
           </div>
           <button
             type="submit"
-            className="w-full text-white font-semibold rounded-xl py-3.5 transition-opacity hover:opacity-90"
+            className="w-full text-white font-semibold rounded-xl py-3.5 transition-opacity hover:opacity-90 active:scale-[0.98]"
             style={{ backgroundColor: accentColor }}
           >
             Save Changes
@@ -155,6 +292,7 @@ export function FlashcardsMaker() {
         </form>
       </BottomSheet>
 
+      {/* ── Delete confirm ──────────────────────────────────────────── */}
       <ConfirmSheet
         isOpen={!!deletingId}
         onClose={() => setDeletingId(null)}

@@ -271,7 +271,6 @@ export function Schedule() {
                       key={`task-${entry.id}`}
                       taskId={entry.id}
                       checklist={checklist}
-                      subjects={subjects}
                       onToggle={() => toggleChecklistItem(entry.id)}
                       onRemove={() => removeFromSchedule(entry.id)}
                       onCycleStatus={() => cycleChecklistStatus(entry.id)}
@@ -694,19 +693,17 @@ function getTaskCycleAction(done: boolean, didNotDo?: boolean): SwipeAction {
 // ── Task card (checklist items with dueDate) ──────────────────────────────────
 
 function TaskCard({
-  taskId, checklist, subjects, onToggle, onRemove, onCycleStatus,
+  taskId, checklist, onToggle, onRemove, onCycleStatus,
 }: {
   taskId: string;
   checklist: any[];
-  subjects: any[];
   onToggle: () => void;
   onRemove: () => void;
   onCycleStatus: () => void;
 }) {
   const item = checklist.find((c: any) => c.id === taskId);
   if (!item) return null;
-  const subject = subjects.find((s: any) => s.id === item.subjectId);
-  const imp     = item.importance ? IMPORTANCE_META[item.importance as ImportanceLevel] : null;
+  const imp = item.importance ? IMPORTANCE_META[item.importance as ImportanceLevel] : null;
   const isOverdue = !item.done && !item.didNotDo && item.dueDate
     && isPast(parseISO(item.dueDate)) && !dateFnsIsToday(parseISO(item.dueDate));
 
@@ -736,12 +733,6 @@ function TaskCard({
             )}
           </div>
 
-          {/* Subject colour bar */}
-          <div
-            className="w-1.5 rounded-full shrink-0 self-stretch"
-            style={{ backgroundColor: subject?.color || "hsl(var(--muted-foreground))" }}
-          />
-
           {/* Content */}
           <div className="flex-1 py-0.5 min-w-0">
             <h3 className={`font-semibold ${item.done ? "line-through text-muted-foreground" : item.didNotDo ? "line-through text-muted-foreground/60" : ""}`}>
@@ -749,7 +740,6 @@ function TaskCard({
             </h3>
 
             <div className="flex items-center gap-1 flex-wrap mt-1">
-              {subject && <span className="text-xs text-muted-foreground">{subject.name}</span>}
               {imp && (
                 <span className={`inline-flex items-center gap-1 text-xs ${imp.color}`}>
                   <span className={`w-1.5 h-1.5 rounded-full ${imp.dot}`} />

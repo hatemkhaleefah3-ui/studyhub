@@ -279,45 +279,56 @@ export function SubjectDetail() {
           {/* ── DETAILS TAB ─────────────────────────────────────────────────── */}
           {activeTab === "details" && (
             <div className="space-y-4">
-              {/* Drive Link card — tap or swipe left to open, swipe right to edit */}
+              {/* Drive Link card — native <a> to open (never blocked), swipe right to edit */}
               <SwipeRow
-                onTap={() => {
-                  if (subject.driveLink) window.open(subject.driveLink, "_blank", "noreferrer");
-                  else openEditDriveLink();
-                }}
-                onSwipeLeft={() => subject.driveLink && window.open(subject.driveLink, "_blank", "noreferrer")}
-                leftLabel="Open"
-                leftIcon={ExternalLink}
-                leftColor={accentColor}
                 onSwipeRight={openEditDriveLink}
                 rightLabel="Edit"
                 rightIcon={Pencil}
                 rightColor="#6366f1"
               >
-                <GlassCard className="p-5">
-                  <div className="flex items-center gap-2.5 mb-3">
-                    <div
-                      className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                      style={{ backgroundColor: `${accentColor}20` }}
-                    >
-                      <FolderOpen className="w-4 h-4" style={{ color: accentColor }} />
-                    </div>
-                    <span className="font-semibold">Google Drive Folder</span>
-                  </div>
-                  {subject.driveLink ? (
-                    <p className="flex items-center gap-2 text-sm font-medium truncate" style={{ color: accentColor }}>
-                      <ExternalLink className="w-4 h-4 shrink-0" />
-                      <span className="truncate">{subject.driveLink}</span>
-                    </p>
-                  ) : (
-                    <p className="text-sm text-muted-foreground flex items-center gap-1.5">
-                      <Link2 className="w-3.5 h-3.5" /> Swipe right to add a folder link
-                    </p>
-                  )}
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Swipe left to open &middot; swipe right to edit
-                  </p>
-                </GlassCard>
+                {subject.driveLink ? (
+                  <a href={subject.driveLink} target="_blank" rel="noreferrer" className="block">
+                    <GlassCard className="p-5">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div
+                            className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                            style={{ backgroundColor: `${accentColor}20` }}
+                          >
+                            <FolderOpen className="w-5 h-5" style={{ color: accentColor }} />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-sm">Google Drive Folder</p>
+                            <p className="text-xs font-semibold mt-0.5" style={{ color: accentColor }}>
+                              Connected · tap to open
+                            </p>
+                          </div>
+                        </div>
+                        <ExternalLink className="w-4 h-4 shrink-0 text-muted-foreground opacity-50" />
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-3 opacity-50">Swipe right to change link</p>
+                    </GlassCard>
+                  </a>
+                ) : (
+                  <button className="w-full text-left" onClick={openEditDriveLink}>
+                    <GlassCard className="p-5">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                          style={{ backgroundColor: `${accentColor}12` }}
+                        >
+                          <FolderOpen className="w-5 h-5 opacity-40" style={{ color: accentColor }} />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-sm">Google Drive Folder</p>
+                          <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+                            <Link2 className="w-3 h-3" /> Tap to add a folder link
+                          </p>
+                        </div>
+                      </div>
+                    </GlassCard>
+                  </button>
+                )}
               </SwipeRow>
 
               {/* Progress card */}
