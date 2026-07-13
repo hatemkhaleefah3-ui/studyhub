@@ -9,6 +9,7 @@ export interface Subject {
   id: string;
   name: string;
   color: string;
+  emoji?: string;
   wallpaper?: string;
   driveLink?: string;
   lectureCount?: number;
@@ -133,6 +134,40 @@ export interface Settings {
   accentColor: AccentColor;
 }
 
+// ── Schedule Plans ─────────────────────────────────────────────────────────────
+export const DEFAULT_SUBJECT_EMOJIS = [
+  '📚','🔬','🧮','📐','🧪','📖','🎨','🏥','⚖️','💻',
+  '🌍','🎭','🎵','📊','🔭','🏛️','💊','🌱','📝','🎯',
+  '🔢','🧠','💡','🏆','🌟','⚗️','🎓','🔩','🌊','🎸',
+];
+
+export type ScheduleType = 'exam' | 'study';
+export type RepeatPatternPlan = 'daily' | 'weekly' | 'monthly';
+
+export interface SchedulePlanItem {
+  id: string;
+  subjectName: string;
+  subjectId?: string;
+  /** Exam-type fields */
+  date?: string;       // yyyy-MM-dd
+  time?: string;       // HH:mm
+  /** Study-type fields */
+  startTime?: string;  // HH:mm
+  endTime?: string;    // HH:mm
+  repeatPattern?: RepeatPatternPlan;
+  weekDays?: number[]; // 0=Sun … 6=Sat
+}
+
+export interface SchedulePlan {
+  id: string;
+  type: ScheduleType;
+  title: string;
+  startDate: string; // yyyy-MM-dd
+  endDate: string;   // yyyy-MM-dd
+  items: SchedulePlanItem[];
+  createdAt: string;
+}
+
 // ── Backfill helper ────────────────────────────────────────────────────────────
 // Records created before the Theoretical/Practical split have no `type` field.
 // Silently default them to "theoretical" on load rather than forcing
@@ -178,7 +213,7 @@ interface StudyDataContextType {
   settings: Settings;
   isLoaded: boolean;
 
-  addSubject: (s: Omit<Subject, 'id' | 'lectures' | 'exams' | 'color' | 'wallpaper' | 'attachments'>) => void;
+  addSubject: (s: Omit<Subject, 'id' | 'lectures' | 'exams' | 'wallpaper' | 'attachments'>) => void;
   updateSubject: (id: string, s: Partial<Subject>) => void;
   deleteSubject: (id: string) => void;
   addAttachment: (subjectId: string, a: Omit<Attachment, 'id'>) => void;
@@ -218,6 +253,11 @@ interface StudyDataContextType {
   updateSettings: (s: Partial<Settings>) => void;
   resetData: () => void;
   importData: (data: any) => void;
+
+  schedulePlans: SchedulePlan[];
+  addSchedulePlan: (plan: Omit<SchedulePlan, 'id' | 'createdAt'>) => void;
+  updateSchedulePlan: (id: string, plan: Partial<SchedulePlan>) => void;
+  deleteSchedulePlan: (id: string) => void;
 
   archive: ArchiveEntry[];
   isArchiveLoaded: boolean;
@@ -268,6 +308,7 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
   const [isLoaded,         setIsLoaded]         = useState(false);
   const [archive,          setArchive]          = useState<ArchiveEntry[]>([]);
   const [isArchiveLoaded,  setIsArchiveLoaded]  = useState(false);
+  const [schedulePlans,    setSchedulePlans]    = useState<SchedulePlan[]>([]);
 
   // Load from API on mount
   useEffect(() => {
@@ -280,6 +321,7 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
       })
       .catch((err) => console.error('Failed to load study data from API:', err))
       .finally(() => setIsLoaded(true));
+    api.getSchedulePlans().then(setSchedulePlans).catch(console.error);
   }, []);
 
   const refreshArchive = useCallback(() => {
@@ -369,11 +411,12 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
   }, [isLoaded, rolloverRepeats]);
 
   // ─── Subjects ──────────────────────────────────────────────────────────────
-  const addSubject = useCallback((s: Omit<Subject, 'id' | 'lectures' | 'exams' | 'color' | 'wallpaper' | 'attachments'>) => {
-    const colors       = Object.values(ACCENT_HEX);
-    const autoColor    = colors[Math.floor(Math.random() * colors.length)];
+  const addSubject = useCallback((s: Omit<Subject, 'id' | 'lectures' | 'exams' | 'wallpaper' | 'attachments'>) => {
+    const colors        = Object.values(ACCENT_HEX);
+    const autoColor     = s.color ?? colors[Math.floor(Math.random() * colors.length)];
     const autoWallpaper = SUBJECT_WALLPAPERS[Math.floor(Math.random() * SUBJECT_WALLPAPERS.length)];
-    const newSubject: Subject = { ...s, id: crypto.randomUUID(), color: autoColor, wallpaper: autoWallpaper, attachments: [], lectures: [], exams: [] };
+    const autoEmoji     = s.emoji ?? DEFAULT_SUBJECT_EMOJIS[Math.floor(Math.random() * DEFAULT_SUBJECT_EMOJIS.length)];
+    const newSubject: Subject = { ...s, id: crypto.randomUUID(), color: autoColor, wallpaper: autoWallpaper, attachments: [], lectures: [], exams: [], emoji: autoEmoji };
     setSubjects((prev) => [...prev, newSubject]);
     api.createSubject(newSubject).catch(console.error);
   }, []);
@@ -812,6 +855,23 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
     api.resetData().catch(console.error);
   }, []);
 
+  // ─── Schedule Plans ────────────────────────────────────────────────────────
+  const addSchedulePlan = useCallback((plan: Omit<SchedulePlan, 'id' | 'createdAt'>) => {
+    const newPlan: SchedulePlan = { ...plan, id: crypto.randomUUID(), createdAt: new Date().toISOString() };
+    setSchedulePlans((prev) => [...prev, newPlan]);
+    api.createSchedulePlan(newPlan).catch(console.error);
+  }, []);
+
+  const updateSchedulePlan = useCallback((id: string, plan: Partial<SchedulePlan>) => {
+    setSchedulePlans((prev) => prev.map((p) => (p.id === id ? { ...p, ...plan } : p)));
+    api.updateSchedulePlan(id, plan).catch(console.error);
+  }, []);
+
+  const deleteSchedulePlan = useCallback((id: string) => {
+    setSchedulePlans((prev) => prev.filter((p) => p.id !== id));
+    api.deleteSchedulePlan(id).catch(console.error);
+  }, []);
+
   const importData = useCallback((data: any) => {
     if (data.subjects)  setSubjects(data.subjects.map(normalizeSubject));
     if (data.schedule)  setSchedule(data.schedule);
@@ -835,6 +895,7 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
         addSubTask, updateSubTask, toggleSubTask, deleteSubTask,
         updateSettings, resetData, importData,
         archive, isArchiveLoaded, refreshArchive, restoreArchiveItem, permanentlyDeleteArchiveItem,
+        schedulePlans, addSchedulePlan, updateSchedulePlan, deleteSchedulePlan,
       }}
     >
       {isLoaded ? children : (

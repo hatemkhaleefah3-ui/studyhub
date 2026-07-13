@@ -452,4 +452,49 @@ router.delete("/reset", async (_req, res) => {
   }
 });
 
+// ─── Schedule Plans (stored as JSON in settings table) ──────────────────────
+
+async function getSchedulePlansList(): Promise<any[]> {
+  const rows = await db.select().from(studySettings).where(eq(studySettings.key, 'schedule_plans')).limit(1);
+  if (!rows.length) return [];
+  try { return JSON.parse(rows[0].value); } catch { return []; }
+}
+
+async function saveSchedulePlansList(plans: any[]) {
+  await db.insert(studySettings)
+    .values({ key: 'schedule_plans', value: JSON.stringify(plans) })
+    .onConflictDoUpdate({ target: studySettings.key, set: { value: JSON.stringify(plans) } });
+}
+
+router.get('/schedule-plans', async (_req, res) => {
+  try { res.json(await getSchedulePlansList()); }
+  catch (err) { res.status(500).json({ error: String(err) }); }
+});
+
+router.post('/schedule-plans', async (req, res) => {
+  try {
+    const plans = await getSchedulePlansList();
+    const newPlan = { ...(req.body as any), id: (req.body as any).id || crypto.randomUUID() };
+    await saveSchedulePlansList([...plans, newPlan]);
+    res.json(newPlan);
+  } catch (err) { res.status(500).json({ error: String(err) }); }
+});
+
+router.put('/schedule-plans/:id', async (req, res) => {
+  try {
+    const plans = await getSchedulePlansList();
+    const updated = plans.map((p: any) => p.id === req.params.id ? { ...p, ...(req.body as any) } : p);
+    await saveSchedulePlansList(updated);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: String(err) }); }
+});
+
+router.delete('/schedule-plans/:id', async (req, res) => {
+  try {
+    const plans = await getSchedulePlansList();
+    await saveSchedulePlansList(plans.filter((p: any) => p.id !== req.params.id));
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: String(err) }); }
+});
+
 export default router;

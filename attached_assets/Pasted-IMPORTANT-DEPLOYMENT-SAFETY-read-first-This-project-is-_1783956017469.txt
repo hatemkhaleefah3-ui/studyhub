@@ -1,0 +1,86 @@
+IMPORTANT — DEPLOYMENT SAFETY (read first):
+This project is deployed via GitHub → GitHub Actions → Cloudflare Pages. 
+- Do NOT modify any GitHub Actions workflow files (.github/workflows/*)
+- Do NOT modify build configuration, environment variables, wrangler.toml, or Cloudflare-related config files
+- Do NOT change the build/output directory structure or package.json build/start scripts
+- Do NOT introduce new dependencies that could break the existing build pipeline unless strictly necessary — if you must add one, keep it minimal and confirm it builds successfully
+- After making changes, verify the app still builds cleanly (no lint/type/build errors) since a failed build will break the live site
+- Do not touch any CI/CD, deployment, or hosting-related files at all — only application/UI code
+
+---
+
+GOAL: Add a Study Schedule + Calendar system, redesign the Subjects page cards, and keep the nav bar and dark/light theming consistent throughout.
+
+1) NAVIGATION
+- Add a "Schedule" (calendar icon) item to the main nav bar that routes to the Calendar/Schedule page.
+- After adding this new item, refine and re-balance the entire nav bar layout (spacing, icon sizes, active-state indicators, alignment) so it still looks intentional and well-designed — not like an item was just squeezed in. Treat it as a full nav bar re-pass, not a single insertion.
+
+2) SCHEDULE PAGE
+
+A. Page layout (top to bottom):
+   1. "Next Exam" section (top priority section)
+   2. "Schedules" section
+   3. "Tasks" section (existing)
+   4. Calendar view below, visually reflecting the schedules/exams (e.g. highlighted days, color-coded date ranges)
+
+B. Add button (schedule page)
+   - Opens a creation flow with two types: "Exam Schedule" and "Study Schedule"
+   
+   Exam Schedule fields:
+   - One or more exams, each with:
+     - Subject name (this IS the exam name)
+     - Exact date
+     - Exact time
+   - Support adding multiple exams in one schedule (e.g. a full exam week)
+
+   Study Schedule fields:
+   - One or more subjects, each with:
+     - Subject name
+     - Time (start time, and ideally duration/end time)
+     - Repeat pattern: Daily / Weekly / Monthly
+     - For Weekly (the most common case): which day(s) of week
+   - This represents a recurring attendance/study timetable
+
+C. Schedule cards (in the "Schedules" section)
+   - Compact, well-designed card per schedule showing a visual timeline (start date → end date)
+   - Gestures:
+     - Swipe right-to-left → reveal Delete
+     - Swipe left-to-right → reveal Edit
+     - Tap → opens a detail view showing:
+       - Full timeline
+       - All subjects with their times (study) or exam dates/times (exam)
+       - Days remaining until start/end or until next occurrence
+       - Other metadata (repeat pattern, subject count, etc.)
+
+D. Conflict/overlap rule
+   - If two schedules occupy the same or overlapping date range, only ONE is shown in the main Schedules list to avoid clutter.
+   - Priority: Exam Schedule > Study Schedule (exam always wins visibility).
+   - The hidden/overlapped schedule should NOT be deleted — it's just deprioritized in the UI. Make it accessible (e.g. via the detail view or an "N overlapping schedules" indicator) so nothing is silently lost.
+
+E. Next Exam section
+   - Shows upcoming exams/quizzes sorted soonest-first, nearest one visually emphasized (e.g. featured/larger, or first in a horizontal list)
+   - Each exam card shows: subject/exam name, exact date & time, days remaining
+   - Empty state: friendly message when there are no upcoming exams
+
+F. Calendar visual effects
+   - Days with exams or study sessions should be visually marked/highlighted on the calendar (e.g. color dot or shaded range), so the calendar reflects schedule data at a glance
+
+3) SUBJECTS PAGE — CARD REDESIGN
+   - Remove the current logo/image from subject cards
+   - Each subject card gets a distinct visual identity via a colorful icon or emoji, chosen by the user:
+     - Selectable when creating a subject (Add flow)
+     - Editable later (Edit settings)
+   - Suggested improvement: also let the user pick (or auto-suggest) an accent color per subject, so the emoji + a matching color theme (card border/background tint) reinforce each other — this gives stronger visual differentiation than emoji alone and helps at-a-glance recognition across the app (subject cards, schedule cards, next-exam cards).
+   - If no icon is chosen, auto-assign a default from a preset palette/emoji set so no card looks broken or empty.
+
+4) DARK/LIGHT MODE CONSISTENCY PASS
+   - After all the above changes are implemented, do a full review of dark mode AND light mode across the whole website, not just the new pages.
+   - Confirm every new component (nav item, schedule page, schedule cards, exam cards, calendar highlights, subject card emoji/color accents) has correctly defined colors for both themes — no hardcoded colors that only work in one mode.
+   - Check for contrast issues, invisible text, mismatched backgrounds, or colors that clash with the existing theme palette in either mode.
+   - Reuse existing theme tokens/variables where the app already has a theming system, rather than introducing new one-off colors, so the new features feel native to the app instead of bolted on.
+   - Test the toggle between dark and light mode on every affected page before considering this done.
+
+DATA MODEL NOTE:
+Please structure schedules so each has: type (exam/study), title, date range (start/end), repeat rule (for study), list of items (subject/date/time or subject/time/days), and a linked subjectId/icon/color where applicable — so the Subjects page icon/color can be reused consistently on schedule and exam cards too.
+
+Implement cleanly, keep the design consistent with the existing app style, and double check the build succeeds before finishing.
