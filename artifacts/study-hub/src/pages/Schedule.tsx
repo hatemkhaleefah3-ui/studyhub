@@ -38,15 +38,30 @@ export function Schedule() {
   const {
     schedule, subjects, checklist,
     updateScheduleEvent, deleteScheduleEvent,
-    toggleChecklistItem, updateChecklistItem,
+    toggleChecklistItem, skipChecklistItem, deleteChecklistItem,
+    setCascadeChecklistStatus,
   } = useStudyData();
 
+  // Left→Right swipe on schedule task:
+  // repeated task → skip for today + spawn next occurrence (stays in checklist for future days)
+  // non-repeated task → fully delete from schedule + checklist
+  const removeFromSchedule = (id: string) => {
+    const it = checklist.find(c => c.id === id);
+    if (!it) return;
+    if (it.repeat && it.repeat !== 'none') {
+      skipChecklistItem(id);
+    } else {
+      deleteChecklistItem(id);
+    }
+  };
+
+  // Right→Left swipe: 3-state cycle, cascades to sub-tasks for list tasks
   const cycleChecklistStatus = (id: string) => {
     const it = checklist.find(c => c.id === id);
     if (!it) return;
-    if (!it.done && !it.didNotDo) toggleChecklistItem(id);
-    else if (it.done)              updateChecklistItem(id, { done: false, didNotDo: true });
-    else                           updateChecklistItem(id, { done: false, didNotDo: false });
+    if (!it.done && !it.didNotDo) setCascadeChecklistStatus(id, true,  false);
+    else if (it.done)              setCascadeChecklistStatus(id, false, true);
+    else                           setCascadeChecklistStatus(id, false, false);
   };
 
   const [editingId, setEditingId]   = useState<string | null>(null);
@@ -212,7 +227,7 @@ export function Schedule() {
                   checklist={checklist}
                   subjects={subjects}
                   onToggle={() => toggleChecklistItem(entry.id)}
-                  onRemove={() => toggleChecklistItem(entry.id)}
+                  onRemove={() => removeFromSchedule(entry.id)}
                   onCycleStatus={() => cycleChecklistStatus(entry.id)}
                 />
               );

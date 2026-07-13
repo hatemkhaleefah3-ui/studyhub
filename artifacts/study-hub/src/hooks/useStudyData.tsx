@@ -138,6 +138,8 @@ interface StudyDataContextType {
   updateChecklistItem: (id: string, i: Partial<ChecklistItem>) => void;
   toggleChecklistItem: (id: string) => void;
   deleteChecklistItem: (id: string) => void;
+  skipChecklistItem: (id: string) => void;
+  setCascadeChecklistStatus: (id: string, done: boolean, didNotDo: boolean) => void;
 
   addSubTask: (itemId: string, subTask: Omit<SubTask, 'id'>) => void;
   updateSubTask: (itemId: string, subTaskId: string, data: Partial<SubTask>) => void;
@@ -441,6 +443,80 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
     api.deleteChecklistItem(id).catch(console.error);
   }, []);
 
+  // Mark as skipped-for-the-day (didNotDo). For repeated tasks, also spawns the
+  // next occurrence so future days still see it. For non-repeated tasks, fully
+  // deletes the item from both schedule and checklist.
+  const skipChecklistItem = useCallback((id: string) => {
+    setChecklist((prev) => {
+      const item = prev.find(i => i.id === id);
+      if (!item) return prev;
+
+      // Non-repeated: full delete
+      if (!item.repeat || item.repeat === 'none') {
+        api.deleteChecklistItem(id).catch(console.error);
+        return prev.filter(i => i.id !== id);
+      }
+
+      // Repeated: mark didNotDo + spawn next occurrence
+      const updated = { ...item, done: false, didNotDo: true, doneAt: undefined };
+      api.updateChecklistItem(id, { done: false, didNotDo: true, doneAt: undefined }).catch(console.error);
+
+      const nextDue = getNextDueDate(item.dueDate!, item.repeat);
+      const occurrence: ChecklistItem = {
+        ...item,
+        id: crypto.randomUUID(),
+        done: false,
+        didNotDo: false,
+        doneAt: undefined,
+        dueDate: nextDue,
+      };
+      api.createChecklistItem(occurrence).catch(console.error);
+
+      return [...prev.map(i => i.id === id ? updated : i), occurrence];
+    });
+  }, []);
+
+  // Set a checklist item's done/didNotDo status and cascade the same status to
+  // all sub-tasks (for task lists). Also handles repeat-spawn when going done.
+  const setCascadeChecklistStatus = useCallback((id: string, done: boolean, didNotDo: boolean) => {
+    setChecklist((prev) => {
+      const item = prev.find(i => i.id === id);
+      if (!item) return prev;
+
+      const doneAt = done ? new Date().toISOString() : undefined;
+
+      const newSubTasks = item.subTasks?.map(st => ({
+        ...st,
+        done,
+        didNotDo,
+        doneAt: done ? new Date().toISOString() : undefined,
+      }));
+
+      const updated = { ...item, done, didNotDo, doneAt, subTasks: newSubTasks ?? item.subTasks };
+      api.updateChecklistItem(id, { done, didNotDo, doneAt, subTasks: updated.subTasks }).catch(console.error);
+
+      let next = prev.map(i => i.id === id ? updated : i);
+
+      // Spawn next occurrence when marking done on a repeated task
+      if (done && item.repeat && item.repeat !== 'none' && item.dueDate) {
+        const nextDue = getNextDueDate(item.dueDate, item.repeat);
+        const occurrence: ChecklistItem = {
+          ...item,
+          id: crypto.randomUUID(),
+          done: false,
+          didNotDo: false,
+          doneAt: undefined,
+          dueDate: nextDue,
+          subTasks: item.subTasks?.map(st => ({ ...st, done: false, didNotDo: false, doneAt: undefined })),
+        };
+        api.createChecklistItem(occurrence).catch(console.error);
+        next = [...next, occurrence];
+      }
+
+      return next;
+    });
+  }, []);
+
   // ─── SubTasks ──────────────────────────────────────────────────────────────
 
   const addSubTask = useCallback((itemId: string, subTask: Omit<SubTask, 'id'>) => {
@@ -557,6 +633,7 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
         addExam, updateExam, deleteExam,
         addScheduleEvent, updateScheduleEvent, deleteScheduleEvent,
         addChecklistItem, updateChecklistItem, toggleChecklistItem, deleteChecklistItem,
+        skipChecklistItem, setCascadeChecklistStatus,
         addSubTask, updateSubTask, toggleSubTask, deleteSubTask,
         updateSettings, resetData, importData,
         archive, isArchiveLoaded, refreshArchive, restoreArchiveItem, permanentlyDeleteArchiveItem,

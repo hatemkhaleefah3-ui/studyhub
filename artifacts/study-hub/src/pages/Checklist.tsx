@@ -91,6 +91,7 @@ export function Checklist() {
   const {
     checklist, subjects,
     toggleChecklistItem, deleteChecklistItem, addChecklistItem, updateChecklistItem,
+    setCascadeChecklistStatus,
   } = useStudyData();
   const [, navigate] = useLocation();
 
@@ -181,15 +182,16 @@ export function Checklist() {
   };
 
   // Cycles: undone → done → didNotDo → undone
+  // For task lists, cascades the new status to every sub-task.
   const cycleStatus = (id: string) => {
     const item = checklist.find(c => c.id === id);
     if (!item) return;
     if (!item.done && !item.didNotDo) {
-      toggleChecklistItem(id);
+      setCascadeChecklistStatus(id, true, false);   // → done
     } else if (item.done) {
-      updateChecklistItem(id, { done: false, didNotDo: true });
+      setCascadeChecklistStatus(id, false, true);   // → skipped
     } else {
-      updateChecklistItem(id, { done: false, didNotDo: false });
+      setCascadeChecklistStatus(id, false, false);  // → undone
     }
   };
 
