@@ -61,11 +61,22 @@ export interface SubTask {
   done: boolean;
 }
 
+export type ImportanceLevel = 'high' | 'medium' | 'low';
+export type RepeatInterval = 'none' | 'daily' | 'weekly' | 'monthly';
+export type TaskStatus = 'undone' | 'done' | 'didNotDo';
+
 export interface ChecklistItem {
   id: string;
   text: string;
+  description?: string;
   subjectId: string | null;
   done: boolean;
+  didNotDo?: boolean;
+  importance?: ImportanceLevel | null;
+  dueDate?: string | null;   // ISO date string YYYY-MM-DD
+  dueTime?: string | null;   // HH:mm
+  repeat?: RepeatInterval | null;
+  link?: string | null;
   linkedScheduleId: string | null;
   doneAt?: string;
   isTaskList?: boolean;
