@@ -7,9 +7,10 @@ import { BottomSheet } from "@/components/shared/BottomSheet";
 import { FabPortal } from "@/components/shared/FabPortal";
 import { SwipeableRow, type SwipeAction } from "@/components/shared/SwipeableRow";
 import { TaskForm, TaskFormValues, DEFAULT_TASK, IMPORTANCE_META } from "@/components/shared/TaskForm";
+import { LinkChip } from "@/components/shared/LinkChip";
 import {
   ArrowLeft, Plus, CheckCircle2, Circle, XCircle,
-  Clock, Link as LinkIcon, ListChecks, Pencil, Trash2, RotateCcw,
+  Clock, ListChecks, Pencil, Trash2, RotateCcw,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { format, parseISO, isToday, isPast } from "date-fns";
@@ -310,17 +311,7 @@ export function TaskListDetail() {
                                   </span>
                                 )}
                                 {dueBadge(st)}
-                                {st.link && (
-                                  <a
-                                    href={st.link}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    onClick={e => e.stopPropagation()}
-                                    className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary"
-                                  >
-                                    <LinkIcon className="w-3 h-3" /> Link
-                                  </a>
-                                )}
+                                {st.link && <LinkChip href={st.link} />}
                               </div>
                             )}
                           </div>

@@ -12,9 +12,10 @@ import {
 import {
   Plus, CheckCircle2, Circle, XCircle, Trash2,
   List, ListChecks, ChevronRight,
-  SlidersHorizontal, RotateCcw, Link as LinkIcon,
+  SlidersHorizontal, RotateCcw,
   Clock, Repeat,
 } from "lucide-react";
+import { LinkChip } from "@/components/shared/LinkChip";
 import { motion, AnimatePresence } from "framer-motion";
 import { format, isToday, isPast, parseISO } from "date-fns";
 
@@ -398,17 +399,7 @@ export function Checklist() {
                                           {REPEAT_META[item.repeat]}
                                         </span>
                                       )}
-                                      {item.link && (
-                                        <a
-                                          href={item.link}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          onClick={e => e.stopPropagation()}
-                                          className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary"
-                                        >
-                                          <LinkIcon className="w-3 h-3" /> Link
-                                        </a>
-                                      )}
+                                      {item.link && <LinkChip href={item.link} />}
                                     </div>
                                   )}
                                 </div>
