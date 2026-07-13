@@ -1,27 +1,42 @@
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { useStudyData } from "@/hooks/useStudyData";
 import { GlassCard } from "@/components/shared/GlassCard";
 import { BottomSheet } from "@/components/shared/BottomSheet";
 import { ConfirmSheet } from "@/components/shared/ConfirmSheet";
 import { FabPortal } from "@/components/shared/FabPortal";
 import { SwipeableRow } from "@/components/shared/SwipeableRow";
-import { format, startOfWeek, addDays, isSameDay } from "date-fns";
+import { format, isSameDay, subDays, addDays } from "date-fns";
 import { Plus, CheckCircle, Link2, Pencil, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
+
+type DateFilter = "today" | "yesterday" | "tomorrow" | "nodate";
+
+const DATE_FILTERS: { key: DateFilter; label: string }[] = [
+  { key: "today",     label: "Today"     },
+  { key: "yesterday", label: "Yesterday" },
+  { key: "tomorrow",  label: "Tomorrow"  },
+  { key: "nodate",    label: "No date"   },
+];
 
 export function Schedule() {
   const { schedule, subjects, checklist, addScheduleEvent, updateScheduleEvent, deleteScheduleEvent, toggleChecklistItem } = useStudyData();
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const [activeFilter, setActiveFilter] = useState<DateFilter>("today");
+
+  const today = new Date();
+  const filterDate: Record<Exclude<DateFilter, "nodate">, Date> = {
+    today:     today,
+    yesterday: subDays(today, 1),
+    tomorrow:  addDays(today, 1),
+  };
 
   const { register, handleSubmit, reset } = useForm({
     defaultValues: {
       title: "",
       subjectId: "",
-      date: format(new Date(), "yyyy-MM-dd"),
+      date: format(today, "yyyy-MM-dd"),
       time: "09:00",
       note: "",
       createChecklist: false,
@@ -32,19 +47,8 @@ export function Schedule() {
     defaultValues: { title: "", subjectId: "", date: "", time: "", note: "" }
   });
 
-  // Auto-scroll to today on mount
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (scrollAreaRef.current) {
-        const todayBtn = scrollAreaRef.current.querySelector('[data-today="true"]') as HTMLElement | null;
-        todayBtn?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-      }
-    }, 80);
-    return () => clearTimeout(timer);
-  }, []);
-
   const onSubmit = (data: any) => {
-    const datetime = new Date(`${data.date}T${data.time}`).toISOString();
+    const datetime = data.date ? new Date(`${data.date}T${data.time}`).toISOString() : "";
     addScheduleEvent({
       title: data.title,
       subjectId: data.subjectId,
@@ -56,7 +60,7 @@ export function Schedule() {
     reset({
       title: "",
       subjectId: "",
-      date: format(new Date(), "yyyy-MM-dd"),
+      date: format(today, "yyyy-MM-dd"),
       time: "09:00",
       note: "",
       createChecklist: false,
@@ -67,12 +71,13 @@ export function Schedule() {
   const openEdit = (id: string) => {
     const ev = schedule.find(e => e.id === id);
     if (!ev) return;
-    const dt = new Date(ev.datetime);
+    const hasDate = !!ev.datetime;
+    const dt = hasDate ? new Date(ev.datetime) : today;
     resetEdit({
       title: ev.title,
       subjectId: ev.subjectId,
-      date: format(dt, "yyyy-MM-dd"),
-      time: format(dt, "HH:mm"),
+      date: hasDate ? format(dt, "yyyy-MM-dd") : "",
+      time: hasDate ? format(dt, "HH:mm") : "09:00",
       note: ev.note,
     });
     setEditingId(id);
@@ -80,7 +85,7 @@ export function Schedule() {
 
   const onEditSubmit = (data: any) => {
     if (!editingId) return;
-    const datetime = new Date(`${data.date}T${data.time}`).toISOString();
+    const datetime = data.date ? new Date(`${data.date}T${data.time}`).toISOString() : "";
     updateScheduleEvent(editingId, {
       title: data.title,
       subjectId: data.subjectId,
@@ -90,70 +95,58 @@ export function Schedule() {
     setEditingId(null);
   };
 
-  const startDate = startOfWeek(selectedDate, { weekStartsOn: 1 });
-  const weekDays = Array.from({ length: 7 }).map((_, i) => addDays(startDate, i));
-
   const inputCls = "w-full bg-background border border-border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50";
+
+  const headingLabel: Record<DateFilter, string> = {
+    today:     "Today's Events",
+    yesterday: "Yesterday's Events",
+    tomorrow:  "Tomorrow's Events",
+    nodate:    "Events with No Date",
+  };
 
   return (
     <div className="space-y-8 pb-20">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-4xl font-bold tracking-tight mb-2">Schedule</h1>
-          <p className="text-muted-foreground text-lg">{format(startDate, "MMMM yyyy")}</p>
+          <p className="text-muted-foreground text-lg">{format(today, "MMMM yyyy")}</p>
         </div>
       </div>
 
-      {/* Day selector — fixed shape, no scale transform that causes overflow.
-          overflow-y-visible + vertical padding keep the selected-day ring/shadow
-          fully contained in its own row instead of clipping into content above. */}
-      <div
-        ref={scrollAreaRef}
-        className="relative z-10 flex gap-2 overflow-x-auto overflow-y-visible py-2 -my-2 scrollbar-hide snap-x snap-mandatory"
-      >
-        {weekDays.map((date, i) => {
-          const isToday = isSameDay(date, new Date());
-          const isSelected = isSameDay(date, selectedDate);
-
-          return (
-            <button
-              key={i}
-              data-today={isToday ? "true" : undefined}
-              onClick={() => setSelectedDate(date)}
-              className={`snap-center flex-shrink-0 flex flex-col items-center justify-center w-[4.5rem] h-[4.75rem] rounded-2xl transition-all duration-200 ${
-                isSelected
-                  ? 'bg-primary text-primary-foreground shadow-md shadow-primary/25 ring-2 ring-primary/30'
-                  : 'bg-card/60 backdrop-blur border border-border hover:bg-card text-muted-foreground'
-              }`}
-              data-testid={`btn-day-${format(date, "yyyy-MM-dd")}`}
-            >
-              <span className="text-[10px] uppercase font-bold tracking-wider leading-none">
-                {format(date, "EEE")}
-              </span>
-              <span className="text-xl font-bold mt-1 leading-none">{format(date, "d")}</span>
-              {isToday && !isSelected && (
-                <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5" />
-              )}
-            </button>
-          );
-        })}
+      {/* Date filter pills */}
+      <div className="flex gap-2 flex-wrap">
+        {DATE_FILTERS.map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setActiveFilter(key)}
+            className={`px-5 py-2 rounded-full text-sm font-semibold transition-all duration-200 ${
+              activeFilter === key
+                ? "bg-primary text-primary-foreground shadow-md shadow-primary/25"
+                : "bg-card/60 backdrop-blur border border-border text-muted-foreground hover:bg-card"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
-      {/* Events for selected day */}
+      {/* Events for selected filter */}
       <div className="space-y-4">
-        <h2 className="text-xl font-semibold">
-          {isSameDay(selectedDate, new Date()) ? "Today's Events" : format(selectedDate, "EEEE, MMM d")}
-        </h2>
+        <h2 className="text-xl font-semibold">{headingLabel[activeFilter]}</h2>
 
         {(() => {
-          const dayEvents = schedule
-            .filter(e => isSameDay(new Date(e.datetime), selectedDate))
-            .sort((a, b) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime());
+          const dayEvents = activeFilter === "nodate"
+            ? schedule
+                .filter(e => !e.datetime)
+                .sort((a, b) => a.title.localeCompare(b.title))
+            : schedule
+                .filter(e => e.datetime && isSameDay(new Date(e.datetime), filterDate[activeFilter]))
+                .sort((a, b) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime());
 
           if (dayEvents.length === 0) {
             return (
               <GlassCard className="p-12 text-center border-dashed border-2 bg-transparent text-muted-foreground">
-                No events scheduled for this day.
+                {activeFilter === "nodate" ? "No events without a date." : "No events scheduled for this day."}
               </GlassCard>
             );
           }
