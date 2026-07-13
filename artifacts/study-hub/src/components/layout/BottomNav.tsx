@@ -4,14 +4,15 @@ import { useRef, useState } from 'react';
 import { NAV_ITEMS } from './Sidebar';
 
 const ACTIVE_COLOR = '#3b82f6';
-const INACTIVE_COLOR = 'rgba(255,255,255,0.45)';
+// CSS variable so inactive icons respect light / dark mode
+const INACTIVE_COLOR = 'var(--nav-icon-inactive)';
 
-// Clear water/gel capsule — strong specular highlight, no colour
+// Water-gel capsule — uses CSS variables so it adapts to light & dark mode
 const GEL_STYLE: React.CSSProperties = {
   background:
-    'linear-gradient(148deg, rgba(255,255,255,0.56) 0%, rgba(255,255,255,0.03) 38%, rgba(0,0,0,0.05) 56%, rgba(255,255,255,0.17) 100%)',
-  border: '1px solid rgba(255,255,255,0.34)',
-  boxShadow: 'inset 0 1.5px 0 rgba(255,255,255,0.72), inset 0 -1px 0 rgba(0,0,0,0.1)',
+    'linear-gradient(148deg, var(--gel-hi) 0%, rgba(128,128,128,0.03) 38%, rgba(0,0,0,0.04) 56%, var(--gel-lo) 100%)',
+  border: '1px solid var(--gel-border)',
+  boxShadow: 'inset 0 1.5px 0 var(--gel-inner-top), inset 0 -1px 0 rgba(0,0,0,0.08)',
 };
 
 export function BottomNav() {
@@ -53,7 +54,7 @@ export function BottomNav() {
     dragActive.current = false;
     longPressTimer.current = setTimeout(() => {
       dragActive.current = true;
-      fireNavPulse(); // reaction from nav bar, fast
+      fireNavPulse();
       try { pillScope.current?.setPointerCapture(pointerIdRef.current!); } catch {}
       setHoverIdx(getIdx(e.clientX));
     }, 150);
@@ -96,7 +97,7 @@ export function BottomNav() {
         ref={pillScope}
         className="flex items-center px-2 py-2 w-full touch-none select-none"
         style={{
-          background: 'rgba(20,20,20,0.75)',
+          background: 'var(--nav-bg)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
           borderRadius: '9999px',

@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { addDays, addWeeks, addMonths, parseISO, format } from 'date-fns';
 import { api, ArchiveEntry } from '@/lib/api';
 
 export type Theme = 'light' | 'dark';
@@ -61,11 +62,32 @@ export interface SubTask {
   done: boolean;
 }
 
+export type ImportanceLevel = 'high' | 'medium' | 'low';
+export type RepeatInterval = 'none' | 'daily' | 'weekly' | 'monthly';
+export type TaskStatus = 'undone' | 'done' | 'didNotDo';
+
+// ── Repeat date helper (placed after types so RepeatInterval is in scope) ────
+function getNextDueDate(currentDate: string, repeat: RepeatInterval): string {
+  const date = parseISO(currentDate);
+  const next =
+    repeat === 'daily'   ? addDays(date, 1)   :
+    repeat === 'weekly'  ? addWeeks(date, 1)  :
+    /* monthly */          addMonths(date, 1);
+  return format(next, 'yyyy-MM-dd');
+}
+
 export interface ChecklistItem {
   id: string;
   text: string;
+  description?: string;
   subjectId: string | null;
   done: boolean;
+  didNotDo?: boolean;
+  importance?: ImportanceLevel | null;
+  dueDate?: string | null;   // ISO date string YYYY-MM-DD
+  dueTime?: string | null;   // HH:mm
+  repeat?: RepeatInterval | null;
+  link?: string | null;
   linkedScheduleId: string | null;
   doneAt?: string;
   isTaskList?: boolean;
@@ -427,25 +449,48 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const toggleChecklistItem = useCallback((id: string) => {
-    setChecklist((prev) =>
-      prev.map((item) => {
-        if (item.id !== id) return item;
-        const done = !item.done;
-        const updated = { ...item, done, doneAt: done ? new Date().toISOString() : undefined };
-        api.updateChecklistItem(id, { done, doneAt: updated.doneAt }).catch(console.error);
+    setChecklist((prev) => {
+      const item = prev.find((i) => i.id === id);
+      if (!item) return prev;
 
-        // Sync linked schedule event
-        if (item.linkedScheduleId) {
-          setSchedule((prevSched) =>
-            prevSched.map((ev) =>
-              ev.id === item.linkedScheduleId ? { ...ev, done } : ev
-            )
-          );
-          api.updateScheduleEvent(item.linkedScheduleId, { done }).catch(console.error);
-        }
-        return updated;
-      })
-    );
+      const done = !item.done;
+      const updated: ChecklistItem = {
+        ...item,
+        done,
+        doneAt: done ? new Date().toISOString() : undefined,
+      };
+      api.updateChecklistItem(id, { done, doneAt: updated.doneAt }).catch(console.error);
+
+      // Sync linked schedule event
+      if (item.linkedScheduleId) {
+        setSchedule((prevSched) =>
+          prevSched.map((ev) =>
+            ev.id === item.linkedScheduleId ? { ...ev, done } : ev
+          )
+        );
+        api.updateScheduleEvent(item.linkedScheduleId, { done }).catch(console.error);
+      }
+
+      let next = prev.map((i) => (i.id === id ? updated : i));
+
+      // ── Real repeat: spawn next occurrence when task is completed ──────────
+      // Only fires on done=true, only if a repeat interval and due date are set.
+      if (done && item.repeat && item.repeat !== 'none' && item.dueDate) {
+        const nextDue = getNextDueDate(item.dueDate, item.repeat);
+        const occurrence: ChecklistItem = {
+          ...item,
+          id: crypto.randomUUID(),
+          done: false,
+          didNotDo: false,
+          doneAt: undefined,
+          dueDate: nextDue,
+        };
+        api.createChecklistItem(occurrence).catch(console.error);
+        next = [...next, occurrence];
+      }
+
+      return next;
+    });
   }, []);
 
   const deleteChecklistItem = useCallback((id: string) => {

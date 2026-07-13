@@ -12,22 +12,24 @@ export const NAV_ITEMS = [
   { href: '/progress', icon: BarChart2, label: 'Progress' },
 ];
 
+// All colours come from CSS variables so light & dark mode both look right
 const glassStyle: React.CSSProperties = {
-  background: 'rgba(20,20,20,0.78)',
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
+  background: 'var(--nav-bg)',
+  backdropFilter: 'blur(22px)',
+  WebkitBackdropFilter: 'blur(22px)',
 };
 
-// Clear water/gel capsule — strong specular highlight, no colour
+// Water-gel capsule — uses CSS variables so it adapts to light & dark mode
 const GEL_STYLE: React.CSSProperties = {
   background:
-    'linear-gradient(148deg, rgba(255,255,255,0.56) 0%, rgba(255,255,255,0.03) 38%, rgba(0,0,0,0.05) 56%, rgba(255,255,255,0.17) 100%)',
-  border: '1px solid rgba(255,255,255,0.34)',
-  boxShadow: 'inset 0 1.5px 0 rgba(255,255,255,0.72), inset 0 -1px 0 rgba(0,0,0,0.1)',
+    'linear-gradient(148deg, var(--gel-hi) 0%, rgba(128,128,128,0.03) 38%, rgba(0,0,0,0.04) 56%, var(--gel-lo) 100%)',
+  border: '1px solid var(--gel-border)',
+  boxShadow: 'inset 0 1.5px 0 var(--gel-inner-top), inset 0 -1px 0 rgba(0,0,0,0.08)',
 };
 
 const ACTIVE_COLOR = '#3b82f6';
-const INACTIVE_COLOR = 'rgba(255,255,255,0.45)';
+// CSS variable so inactive icons respect light / dark mode
+const INACTIVE_COLOR = 'var(--nav-icon-inactive)';
 
 // ── Sidebar drag-to-select (vertical) ───────────────────────────────────────
 function useSidebarDrag(onNavigate: (idx: number) => void) {
@@ -187,7 +189,7 @@ export function Sidebar() {
     </div>
   );
 
-  const sidebarShadow = '1px 0 0 rgba(255,255,255,0.06), 4px 0 20px rgba(0,0,0,0.25)';
+  const sidebarShadow = '1px 0 0 var(--nav-edge), 4px 0 20px var(--nav-shadow-color)';
 
   return (
     <>
