@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useStudyData } from "@/hooks/useStudyData";
 import { type ImportanceLevel, type RepeatInterval } from "@/hooks/useStudyData";
 import { GlassCard } from "@/components/shared/GlassCard";
@@ -85,7 +85,18 @@ function TaskForm({
   );
   const [showAdvanced, setShowAdvanced] = useState(hasAdvancedValues);
 
-  const { register, handleSubmit, reset } = useForm<TaskFormValues>({ defaultValues });
+  const { register, handleSubmit, reset, watch, setValue } = useForm<TaskFormValues>({ defaultValues });
+
+  // Auto-fill today's date the moment the user picks a repeat interval
+  const repeatValue = watch('repeat');
+  const dueDateValue = watch('dueDate');
+  useEffect(() => {
+    if (repeatValue && repeatValue !== 'none' && !dueDateValue) {
+      setValue('dueDate', format(new Date(), 'yyyy-MM-dd'));
+      // Also expand advanced so the user can see the date was set
+      setShowAdvanced(true);
+    }
+  }, [repeatValue, dueDateValue, setValue]);
 
   const submit = (data: TaskFormValues) => {
     onSubmit(data);
@@ -272,7 +283,11 @@ export function Checklist() {
       done: false,
       didNotDo: false,
       importance: (data.importance as ImportanceLevel) || null,
-      dueDate: data.dueDate || null,
+      // If a repeat interval is chosen but the user left the date blank,
+      // default to today so the repeat engine always has a base date to work from.
+      dueDate: data.dueDate || (data.repeat && data.repeat !== 'none'
+        ? format(new Date(), 'yyyy-MM-dd')
+        : null),
       dueTime: data.dueTime || null,
       repeat: (data.repeat !== "none" ? data.repeat : null) as RepeatInterval | null,
       link: data.link || null,
@@ -326,7 +341,9 @@ export function Checklist() {
       description: data.description || undefined,
       subjectId: data.subjectId || null,
       importance: (data.importance as ImportanceLevel) || null,
-      dueDate: data.dueDate || null,
+      dueDate: data.dueDate || (data.repeat && data.repeat !== 'none'
+        ? format(new Date(), 'yyyy-MM-dd')
+        : null),
       dueTime: data.dueTime || null,
       repeat: (data.repeat !== "none" ? data.repeat : null) as RepeatInterval | null,
       link: data.link || null,
