@@ -10,6 +10,11 @@ import { AppShell } from '@/components/layout/AppShell';
 import { Dashboard } from '@/pages/Dashboard';
 import { Subjects } from '@/pages/Subjects';
 import { SubjectDetail } from '@/pages/SubjectDetail';
+import { LectureEdit } from '@/pages/LectureEdit';
+import { ExamEdit } from '@/pages/ExamEdit';
+import { ExamTake } from '@/pages/ExamTake';
+import { FlashcardsMaker } from '@/pages/FlashcardsMaker';
+import { FlashcardsReader } from '@/pages/FlashcardsReader';
 import { Schedule } from '@/pages/Schedule';
 import { Checklist } from '@/pages/Checklist';
 import { TaskListDetail } from '@/pages/TaskListDetail';
@@ -25,6 +30,11 @@ function Router() {
       <Route path="/" component={Dashboard} />
       <Route path="/subjects" component={Subjects} />
       <Route path="/subjects/:id" component={SubjectDetail} />
+      <Route path="/subjects/:subjectId/lectures/:lectureId" component={LectureEdit} />
+      <Route path="/subjects/:subjectId/lectures/:lectureId/flashcards" component={FlashcardsMaker} />
+      <Route path="/subjects/:subjectId/lectures/:lectureId/study" component={FlashcardsReader} />
+      <Route path="/subjects/:subjectId/exams/:examId/edit" component={ExamEdit} />
+      <Route path="/subjects/:subjectId/exams/:examId/take" component={ExamTake} />
       <Route path="/schedule" component={Schedule} />
       <Route path="/checklist" component={Checklist} />
       <Route path="/checklist/:id" component={TaskListDetail} />
