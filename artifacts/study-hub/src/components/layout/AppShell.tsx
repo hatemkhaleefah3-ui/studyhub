@@ -9,13 +9,18 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="h-[100dvh] w-full bg-background text-foreground overflow-hidden">
-      {/* Top bar (md+) */}
+      {/* Left sidebar — icon-only on both tablet (md) and desktop (lg) */}
       <Sidebar />
-      {/* Floating bottom pill (mobile) */}
+      {/* Floating bottom pill — mobile only */}
       <BottomNav />
 
-      {/* Scrollable content — iPad: left offset for sidebar; Desktop: top offset for top bar */}
-      <div className="h-full md:pl-20 lg:pl-0 lg:pt-14 overflow-y-auto overscroll-contain">
+      {/*
+        Content offsets:
+          mobile:  no offset        (bottom nav floats)
+          tablet:  pl-20  (80px)    (icon sidebar)
+          desktop: pl-20  (80px)    (icon sidebar, same width)
+      */}
+      <div className="h-full md:pl-20 overflow-y-auto overscroll-contain">
         <main className="w-full max-w-5xl mx-auto p-4 md:p-8 lg:p-10 pb-28 md:pb-12">
           <AnimatePresence mode="wait">
             <motion.div
