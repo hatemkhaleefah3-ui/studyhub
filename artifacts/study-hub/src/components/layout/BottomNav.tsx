@@ -19,7 +19,7 @@ export function BottomNav() {
   const [location, setLocation] = useLocation();
   const [pillScope, animatePill] = useAnimate();
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const longPressTimer = useRef<ReturnType<typeof setTimeout>>();
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const dragActive = useRef(false);
   const pointerIdRef = useRef<number | null>(null);
   const preventNext = useRef(false);

@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
+import { useLocation } from "wouter";
 import { useStudyData } from "@/hooks/useStudyData";
 import { type ImportanceLevel, type RepeatInterval } from "@/hooks/useStudyData";
 import { GlassCard } from "@/components/shared/GlassCard";
@@ -6,28 +7,18 @@ import { BottomSheet } from "@/components/shared/BottomSheet";
 import { FabPortal } from "@/components/shared/FabPortal";
 import { SwipeableRow } from "@/components/shared/SwipeableRow";
 import {
-  Plus, Trash2, CheckCircle2, Circle, XCircle,
-  List, ListChecks, ChevronDown, ChevronRight, X, Pencil,
+  TaskForm, TaskFormValues, DEFAULT_TASK, IMPORTANCE_META, REPEAT_META,
+} from "@/components/shared/TaskForm";
+import {
+  Plus, CheckCircle2, Circle, XCircle,
+  List, ListChecks, ChevronRight,
   SlidersHorizontal, RotateCcw, Link as LinkIcon,
-  AlertCircle, Clock, Repeat, Settings2,
+  Clock, Repeat,
 } from "lucide-react";
-import { useForm } from "react-hook-form";
 import { motion, AnimatePresence } from "framer-motion";
 import { format, isToday, isPast, parseISO } from "date-fns";
 
-// ── Constants ────────────────────────────────────────────────────────────────
-
-const IMPORTANCE_META: Record<ImportanceLevel, { label: string; color: string; dot: string }> = {
-  high:   { label: "High",   color: "text-rose-500",   dot: "bg-rose-500" },
-  medium: { label: "Medium", color: "text-amber-500",  dot: "bg-amber-500" },
-  low:    { label: "Low",    color: "text-emerald-500", dot: "bg-emerald-500" },
-};
-
-const REPEAT_META: Record<RepeatInterval, string> = {
-  none: "No repeat", daily: "Daily", weekly: "Weekly", monthly: "Monthly",
-};
-
-// ── Filter types ─────────────────────────────────────────────────────────────
+// ── Filter types ──────────────────────────────────────────────────────────────
 
 interface Filters {
   importance: ImportanceLevel[];
@@ -44,189 +35,6 @@ function toggleArr<T>(arr: T[], val: T): T[] {
 
 function activeFilterCount(f: Filters) {
   return f.importance.length + f.status.length + f.repeat.length + (f.hasDueDate !== null ? 1 : 0);
-}
-
-// ── Form value types ──────────────────────────────────────────────────────────
-
-interface TaskFormValues {
-  text: string;
-  description: string;
-  importance: ImportanceLevel | "";
-  dueDate: string;
-  dueTime: string;
-  repeat: RepeatInterval;
-  subjectId: string;
-  link: string;
-}
-
-const DEFAULT_TASK: TaskFormValues = {
-  text: "", description: "", importance: "", dueDate: "", dueTime: "",
-  repeat: "none", subjectId: "", link: "",
-};
-
-// ── Shared TaskForm component ─────────────────────────────────────────────────
-
-function TaskForm({
-  title, defaultValues, subjects, onSubmit, onClose, submitLabel,
-}: {
-  title: string;
-  defaultValues: TaskFormValues;
-  subjects: { id: string; name: string }[];
-  onSubmit: (data: TaskFormValues) => void;
-  onClose: () => void;
-  submitLabel: string;
-}) {
-  // Auto-expand advanced section if the task already has advanced values
-  const hasAdvancedValues = !!(
-    defaultValues.importance ||
-    defaultValues.dueDate ||
-    (defaultValues.repeat && defaultValues.repeat !== 'none') ||
-    defaultValues.link
-  );
-  const [showAdvanced, setShowAdvanced] = useState(hasAdvancedValues);
-
-  const { register, handleSubmit, reset, watch, setValue } = useForm<TaskFormValues>({ defaultValues });
-
-  // Auto-fill today's date the moment the user picks a repeat interval
-  const repeatValue = watch('repeat');
-  const dueDateValue = watch('dueDate');
-  useEffect(() => {
-    if (repeatValue && repeatValue !== 'none' && !dueDateValue) {
-      setValue('dueDate', format(new Date(), 'yyyy-MM-dd'));
-      // Also expand advanced so the user can see the date was set
-      setShowAdvanced(true);
-    }
-  }, [repeatValue, dueDateValue, setValue]);
-
-  const submit = (data: TaskFormValues) => {
-    onSubmit(data);
-    reset();
-  };
-
-  const fieldCls =
-    "w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 transition-shadow";
-
-  const Section = ({ label, children }: { label: string; children: React.ReactNode }) => (
-    <div className="space-y-2">
-      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-0.5">{label}</p>
-      {children}
-    </div>
-  );
-
-  return (
-    <BottomSheet isOpen title={title} onClose={onClose}>
-      <form onSubmit={handleSubmit(submit)} className="space-y-5 pb-2">
-
-        {/* ── Basic fields (always visible) ─────────────────────────────── */}
-        <Section label="Task">
-          <input
-            {...register("text", { required: true })}
-            className={fieldCls}
-            placeholder="Task name…"
-            autoFocus
-          />
-          <textarea
-            {...register("description")}
-            className={`${fieldCls} resize-none min-h-[64px]`}
-            placeholder="Description (optional)"
-          />
-        </Section>
-
-        <Section label="Category / Subject">
-          <select {...register("subjectId")} className={fieldCls}>
-            <option value="">No subject</option>
-            {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-        </Section>
-
-        {/* ── Advanced Settings toggle ────────────────────────────────────── */}
-        <button
-          type="button"
-          onClick={() => setShowAdvanced(v => !v)}
-          className="flex items-center gap-2 w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 hover:bg-secondary/70 transition-colors text-sm font-medium text-foreground"
-        >
-          <Settings2 className="w-4 h-4 text-muted-foreground shrink-0" />
-          <span className="flex-1 text-left">Advanced Settings</span>
-          {/* show a summary of what's set when collapsed */}
-          {!showAdvanced && hasAdvancedValues && (
-            <span className="text-xs text-primary font-normal">
-              {[
-                defaultValues.importance && IMPORTANCE_META[defaultValues.importance as ImportanceLevel]?.label,
-                defaultValues.dueDate && 'Due date',
-                defaultValues.repeat && defaultValues.repeat !== 'none' && REPEAT_META[defaultValues.repeat as RepeatInterval],
-                defaultValues.link && 'Link',
-              ].filter(Boolean).join(' · ')}
-            </span>
-          )}
-          <ChevronDown
-            className={`w-4 h-4 text-muted-foreground shrink-0 transition-transform duration-200 ${showAdvanced ? 'rotate-180' : ''}`}
-          />
-        </button>
-
-        {/* ── Advanced fields (collapsible) ─────────────────────────────── */}
-        <AnimatePresence initial={false}>
-          {showAdvanced && (
-            <motion.div
-              key="advanced"
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-              className="overflow-hidden"
-            >
-              <div className="space-y-5 pt-1 pb-1 border-l-2 border-primary/20 pl-4">
-
-                <Section label="Importance">
-                  <select {...register("importance")} className={fieldCls}>
-                    <option value="">No importance set</option>
-                    <option value="high">🔴 High</option>
-                    <option value="medium">🟡 Medium</option>
-                    <option value="low">🟢 Low</option>
-                  </select>
-                </Section>
-
-                <Section label="Due Date & Time">
-                  <div className="grid grid-cols-2 gap-3">
-                    <input {...register("dueDate")} type="date" className={fieldCls} />
-                    <input {...register("dueTime")} type="time" className={fieldCls} />
-                  </div>
-                </Section>
-
-                <Section label="Repeat">
-                  <select {...register("repeat")} className={fieldCls}>
-                    <option value="none">No repeat</option>
-                    <option value="daily">Daily — repeats every day</option>
-                    <option value="weekly">Weekly — repeats every 7 days</option>
-                    <option value="monthly">Monthly — repeats same day each month</option>
-                  </select>
-                  <p className="text-xs text-muted-foreground px-0.5">
-                    When you complete a repeating task, the next occurrence is created automatically on the next due date.
-                  </p>
-                </Section>
-
-                <Section label="Link (optional)">
-                  <input
-                    {...register("link")}
-                    type="url"
-                    className={fieldCls}
-                    placeholder="https://…"
-                  />
-                </Section>
-
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <button
-          type="submit"
-          className="w-full bg-primary text-primary-foreground font-semibold rounded-xl py-3.5"
-        >
-          {submitLabel}
-        </button>
-      </form>
-    </BottomSheet>
-  );
 }
 
 // ── Filter Chip ───────────────────────────────────────────────────────────────
@@ -253,21 +61,15 @@ export function Checklist() {
   const {
     checklist, subjects,
     toggleChecklistItem, deleteChecklistItem, addChecklistItem, updateChecklistItem,
-    toggleSubTask, addSubTask, deleteSubTask, updateSubTask,
   } = useStudyData();
+  const [, navigate] = useLocation();
 
   // UI state
-  const [showActionMenu, setShowActionMenu]   = useState(false);
-  const [isAddTaskOpen, setIsAddTaskOpen]     = useState(false);
-  const [isAddListOpen, setIsAddListOpen]     = useState(false);
-  const [isFilterOpen, setIsFilterOpen]       = useState(false);
-  const [editingItemId, setEditingItemId]     = useState<string | null>(null);
-  const [expandedItems, setExpandedItems]     = useState<Set<string>>(new Set());
-  const [newSubTaskInputs, setNewSubTaskInputs] = useState<string[]>(['']);
-  const [addingSubTaskFor, setAddingSubTaskFor] = useState<string | null>(null);
-  const [newSubTaskText, setNewSubTaskText]   = useState('');
-  const [editingSubTask, setEditingSubTask]   = useState<{ itemId: string; subTaskId: string } | null>(null);
-  const [editSubTaskText, setEditSubTaskText] = useState('');
+  const [showActionMenu, setShowActionMenu] = useState(false);
+  const [isAddTaskOpen, setIsAddTaskOpen]   = useState(false);
+  const [isAddListOpen, setIsAddListOpen]   = useState(false);
+  const [isFilterOpen, setIsFilterOpen]     = useState(false);
+  const [editingItemId, setEditingItemId]   = useState<string | null>(null);
 
   // Filters
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
@@ -283,10 +85,8 @@ export function Checklist() {
       done: false,
       didNotDo: false,
       importance: (data.importance as ImportanceLevel) || null,
-      // If a repeat interval is chosen but the user left the date blank,
-      // default to today so the repeat engine always has a base date to work from.
-      dueDate: data.dueDate || (data.repeat && data.repeat !== 'none'
-        ? format(new Date(), 'yyyy-MM-dd')
+      dueDate: data.dueDate || (data.repeat && data.repeat !== "none"
+        ? format(new Date(), "yyyy-MM-dd")
         : null),
       dueTime: data.dueTime || null,
       repeat: (data.repeat !== "none" ? data.repeat : null) as RepeatInterval | null,
@@ -297,27 +97,26 @@ export function Checklist() {
     setIsAddTaskOpen(false);
   };
 
-  const onAddList = (data: any) => {
-    const validSubTasks = newSubTaskInputs
-      .filter(t => t.trim())
-      .map(text => ({ id: crypto.randomUUID(), text: text.trim(), done: false }));
+  const onAddList = (data: TaskFormValues) => {
     addChecklistItem({
-      text: data.title,
+      text: data.text,
+      description: data.description || undefined,
       subjectId: data.subjectId || null,
       done: false,
+      didNotDo: false,
+      importance: null,
+      dueDate: null,
+      dueTime: null,
+      repeat: null,
+      link: null,
       linkedScheduleId: null,
       isTaskList: true,
-      subTasks: validSubTasks,
+      subTasks: [],
     });
-    setNewSubTaskInputs(['']);
     setIsAddListOpen(false);
   };
 
-  const { register: registerList, handleSubmit: handleListSubmit, reset: resetList } = useForm({
-    defaultValues: { title: "", subjectId: "" },
-  });
-
-  const openEditItem = (id: string) => setEditingItemId(id);
+  const openEdit = (id: string) => setEditingItemId(id);
 
   const getEditDefaults = (id: string): TaskFormValues => {
     const item = checklist.find(c => c.id === id);
@@ -341,8 +140,8 @@ export function Checklist() {
       description: data.description || undefined,
       subjectId: data.subjectId || null,
       importance: (data.importance as ImportanceLevel) || null,
-      dueDate: data.dueDate || (data.repeat && data.repeat !== 'none'
-        ? format(new Date(), 'yyyy-MM-dd')
+      dueDate: data.dueDate || (data.repeat && data.repeat !== "none"
+        ? format(new Date(), "yyyy-MM-dd")
         : null),
       dueTime: data.dueTime || null,
       repeat: (data.repeat !== "none" ? data.repeat : null) as RepeatInterval | null,
@@ -351,61 +150,35 @@ export function Checklist() {
     setEditingItemId(null);
   };
 
-  // Toggle did-not-do (cycles: undone → done → didNotDo → undone)
+  // Cycles: undone → done → didNotDo → undone
   const cycleStatus = (id: string) => {
     const item = checklist.find(c => c.id === id);
     if (!item) return;
     if (!item.done && !item.didNotDo) {
-      // undone → done
       toggleChecklistItem(id);
     } else if (item.done) {
-      // done → didNotDo
       updateChecklistItem(id, { done: false, didNotDo: true });
     } else {
-      // didNotDo → undone
       updateChecklistItem(id, { done: false, didNotDo: false });
     }
-  };
-
-  const toggleExpanded = (id: string) => {
-    setExpandedItems(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
-
-  const handleAddSubTaskInline = (itemId: string) => {
-    const text = newSubTaskText.trim();
-    if (text) { addSubTask(itemId, text); setNewSubTaskText(''); setAddingSubTaskFor(null); }
-  };
-
-  const saveEditSubTask = () => {
-    if (!editingSubTask || !editSubTaskText.trim()) return;
-    updateSubTask(editingSubTask.itemId, editingSubTask.subTaskId, { text: editSubTaskText.trim() });
-    setEditingSubTask(null);
   };
 
   // ── Filtering ──────────────────────────────────────────────────────────────
 
   const filteredChecklist = useMemo(() => {
     return checklist.filter(item => {
-      // importance
       if (filters.importance.length > 0) {
         if (!item.importance || !filters.importance.includes(item.importance)) return false;
       }
-      // status
       if (filters.status.length > 0) {
         const status = item.done ? "done" : item.didNotDo ? "didNotDo" : "undone";
         if (!filters.status.includes(status as any)) return false;
       }
-      // repeat
       if (filters.repeat.length > 0) {
         const isRepeating = !!item.repeat && item.repeat !== "none";
         if (filters.repeat.includes("repeating") && !isRepeating) return false;
         if (filters.repeat.includes("oneTime") && isRepeating) return false;
       }
-      // hasDueDate
       if (filters.hasDueDate === true && !item.dueDate) return false;
       if (filters.hasDueDate === false && !!item.dueDate) return false;
       return true;
@@ -424,19 +197,17 @@ export function Checklist() {
   const sortedKeys = Object.keys(groups).sort((a, b) => {
     if (a === "uncategorized") return 1;
     if (b === "uncategorized") return -1;
-    const subA = subjects.find(s => s.id === a);
-    const subB = subjects.find(s => s.id === b);
-    return (subA?.name || "").localeCompare(subB?.name || "");
+    return (subjects.find(s => s.id === a)?.name || "").localeCompare(subjects.find(s => s.id === b)?.name || "");
   });
 
-  // ── Due date helpers ───────────────────────────────────────────────────────
+  // ── Due date badge ─────────────────────────────────────────────────────────
 
   const dueBadge = (item: typeof checklist[number]) => {
     if (!item.dueDate) return null;
     try {
-      const date = parseISO(item.dueDate);
+      const date    = parseISO(item.dueDate);
       const overdue = !item.done && !item.didNotDo && isPast(date) && !isToday(date);
-      const due = isToday(date);
+      const due     = isToday(date);
       return (
         <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${
           overdue ? "bg-rose-500/15 text-rose-500" :
@@ -449,6 +220,10 @@ export function Checklist() {
       );
     } catch { return null; }
   };
+
+  // ── Editing item lookup ────────────────────────────────────────────────────
+
+  const editingItem = editingItemId ? checklist.find(c => c.id === editingItemId) : null;
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -465,7 +240,6 @@ export function Checklist() {
           </p>
         </div>
 
-        {/* Filter button */}
         <button
           onClick={() => setIsFilterOpen(true)}
           className="relative flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border bg-card hover:bg-secondary/60 transition-colors text-sm font-medium"
@@ -500,9 +274,9 @@ export function Checklist() {
       ) : (
         <div className="space-y-8">
           {sortedKeys.map(key => {
-            const items = groups[key];
+            const items   = groups[key];
             const subject = subjects.find(s => s.id === key);
-            const sorted = [...items].sort((a, b) => Number(a.done || a.didNotDo) - Number(b.done || b.didNotDo));
+            const sorted  = [...items].sort((a, b) => Number(a.done || a.didNotDo) - Number(b.done || b.didNotDo));
 
             return (
               <div key={key} className="space-y-3">
@@ -515,9 +289,9 @@ export function Checklist() {
                 <div className="space-y-2">
                   <AnimatePresence initial={false}>
                     {sorted.map(item => {
-                      const isExpanded = expandedItems.has(item.id);
                       const subTasks = item.subTasks || [];
-                      const imp = item.importance ? IMPORTANCE_META[item.importance] : null;
+                      const imp      = item.importance ? IMPORTANCE_META[item.importance] : null;
+                      const isListTask = item.isTaskList;
 
                       return (
                         <motion.div
@@ -529,49 +303,41 @@ export function Checklist() {
                           transition={{ type: "spring", stiffness: 300, damping: 28 }}
                         >
                           <SwipeableRow
-                            onEdit={() => openEditItem(item.id)}
+                            onEdit={() => isListTask
+                              ? navigate(`/checklist/${item.id}`)
+                              : openEdit(item.id)
+                            }
                             onDelete={() => deleteChecklistItem(item.id)}
                           >
-                            <GlassCard className={`transition-opacity duration-300 overflow-hidden ${
+                            <GlassCard className={`transition-opacity duration-300 ${
                               (item.done || item.didNotDo) ? "opacity-50" : "opacity-100"
                             }`}>
-                              {/* Main row */}
-                              <div className="p-4 flex items-start gap-3 group">
+                              <div className="p-4 flex items-start gap-3">
 
-                                {/* Status button — cycles undone → done → didNotDo */}
-                                <button
-                                  onClick={() => cycleStatus(item.id)}
-                                  className="shrink-0 mt-0.5 focus:outline-none"
-                                  data-testid={`checkbox-item-${item.id}`}
-                                >
-                                  <motion.div whileTap={{ scale: 0.75 }}>
-                                    {item.done ? (
-                                      <CheckCircle2 className="w-6 h-6 text-primary" />
-                                    ) : item.didNotDo ? (
-                                      <XCircle className="w-6 h-6 text-muted-foreground" />
-                                    ) : (
-                                      <Circle className="w-6 h-6 text-muted-foreground hover:text-primary transition-colors" />
-                                    )}
-                                  </motion.div>
-                                </button>
-
-                                {/* Content */}
+                                {/* Clickable content area */}
                                 <div
-                                  className={`flex-1 min-w-0 ${item.isTaskList ? "cursor-pointer select-none" : ""}`}
-                                  onClick={() => item.isTaskList && toggleExpanded(item.id)}
+                                  className="flex-1 min-w-0 py-0.5 cursor-pointer select-none"
+                                  onClick={() => isListTask
+                                    ? navigate(`/checklist/${item.id}`)
+                                    : openEdit(item.id)
+                                  }
                                 >
                                   <div className="flex items-center gap-2 flex-wrap">
                                     <span className={`text-base font-medium truncate transition-all ${
-                                      item.done ? "line-through text-muted-foreground" :
+                                      item.done     ? "line-through text-muted-foreground" :
                                       item.didNotDo ? "line-through text-muted-foreground/60" : ""
                                     }`}>
                                       {item.text}
                                     </span>
-                                    {item.isTaskList && (
-                                      <span className="text-xs text-muted-foreground bg-secondary px-2 py-0.5 rounded-full shrink-0">
-                                        {subTasks.filter(st => st.done).length}/{subTasks.length}
+
+                                    {/* List task progress badge */}
+                                    {isListTask && (
+                                      <span className="text-xs text-muted-foreground bg-secondary px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1">
+                                        <ListChecks className="w-3 h-3" />
+                                        {subTasks.filter(st => st.done).length + subTasks.filter(st => st.didNotDo).length}/{subTasks.length}
                                       </span>
                                     )}
+
                                     {item.didNotDo && (
                                       <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full shrink-0">
                                         Skipped
@@ -579,13 +345,12 @@ export function Checklist() {
                                     )}
                                   </div>
 
-                                  {/* Description */}
                                   {item.description && (
                                     <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{item.description}</p>
                                   )}
 
-                                  {/* Badges row */}
-                                  {(imp || item.dueDate || item.repeat) && (
+                                  {/* Badges */}
+                                  {(imp || item.dueDate || item.repeat || item.link) && (
                                     <div className="flex items-center flex-wrap gap-1.5 mt-1.5">
                                       {imp && (
                                         <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium bg-muted ${imp.color}`}>
@@ -615,119 +380,31 @@ export function Checklist() {
                                   )}
                                 </div>
 
-                                {/* Expand chevron */}
-                                {item.isTaskList && (
+                                {/* Right side: chevron for lists, status button for tasks */}
+                                {isListTask ? (
                                   <button
-                                    onClick={() => toggleExpanded(item.id)}
-                                    className="p-1 text-muted-foreground hover:text-foreground transition-colors shrink-0 mt-0.5"
+                                    onClick={() => navigate(`/checklist/${item.id}`)}
+                                    className="shrink-0 mt-0.5 p-1 text-muted-foreground hover:text-foreground transition-colors"
                                   >
-                                    {isExpanded ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+                                    <ChevronRight className="w-5 h-5" />
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => cycleStatus(item.id)}
+                                    className="shrink-0 mt-0.5 p-1 hover:scale-110 transition-transform focus:outline-none"
+                                  >
+                                    <motion.div whileTap={{ scale: 0.75 }}>
+                                      {item.done ? (
+                                        <CheckCircle2 className="w-6 h-6 text-primary" />
+                                      ) : item.didNotDo ? (
+                                        <XCircle className="w-6 h-6 text-muted-foreground" />
+                                      ) : (
+                                        <Circle className="w-6 h-6 text-muted-foreground hover:text-primary transition-colors" />
+                                      )}
+                                    </motion.div>
                                   </button>
                                 )}
-
-                                {/* Edit */}
-                                <button
-                                  onClick={() => openEditItem(item.id)}
-                                  className={`p-2 text-muted-foreground hover:text-foreground transition-opacity shrink-0 ${
-                                    (item.done || item.didNotDo) ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                                  }`}
-                                >
-                                  <Pencil className="w-4 h-4" />
-                                </button>
-
-                                {/* Delete */}
-                                <button
-                                  onClick={() => deleteChecklistItem(item.id)}
-                                  className={`p-2 text-muted-foreground hover:text-destructive transition-opacity shrink-0 ${
-                                    (item.done || item.didNotDo) ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                                  }`}
-                                >
-                                  <Trash2 className="w-5 h-5" />
-                                </button>
                               </div>
-
-                              {/* Sub-tasks */}
-                              <AnimatePresence initial={false}>
-                                {item.isTaskList && isExpanded && (
-                                  <motion.div
-                                    key="subtasks"
-                                    initial={{ height: 0, opacity: 0 }}
-                                    animate={{ height: "auto", opacity: 1 }}
-                                    exit={{ height: 0, opacity: 0 }}
-                                    transition={{ type: "spring", damping: 26, stiffness: 280 }}
-                                    className="overflow-hidden"
-                                  >
-                                    <div className="px-4 pb-4 pt-0 ml-9 border-t border-border/40 space-y-2">
-                                      <div className="pt-3 space-y-2">
-                                        {subTasks.map(st => (
-                                          <div key={st.id} className="flex items-center gap-3 group/sub">
-                                            <button onClick={() => toggleSubTask(item.id, st.id)} className="shrink-0">
-                                              <motion.div whileTap={{ scale: 0.75 }}>
-                                                {st.done
-                                                  ? <CheckCircle2 className="w-5 h-5 text-primary" />
-                                                  : <Circle className="w-5 h-5 text-muted-foreground hover:text-primary transition-colors" />}
-                                              </motion.div>
-                                            </button>
-
-                                            {editingSubTask?.subTaskId === st.id ? (
-                                              <form onSubmit={e => { e.preventDefault(); saveEditSubTask(); }} className="flex-1 flex gap-2">
-                                                <input
-                                                  autoFocus value={editSubTaskText}
-                                                  onChange={e => setEditSubTaskText(e.target.value)}
-                                                  onKeyDown={e => e.key === "Escape" && setEditingSubTask(null)}
-                                                  className="flex-1 text-sm bg-background border border-border rounded-lg px-3 py-1 focus:outline-none focus:ring-1 focus:ring-primary/50"
-                                                />
-                                                <button type="submit" className="text-xs text-primary font-semibold px-2">Save</button>
-                                                <button type="button" onClick={() => setEditingSubTask(null)} className="text-xs text-muted-foreground px-1">✕</button>
-                                              </form>
-                                            ) : (
-                                              <span className={`flex-1 text-sm ${st.done ? "line-through text-muted-foreground" : ""}`}>
-                                                {st.text}
-                                              </span>
-                                            )}
-
-                                            {editingSubTask?.subTaskId !== st.id && (
-                                              <button
-                                                onClick={() => { setEditingSubTask({ itemId: item.id, subTaskId: st.id }); setEditSubTaskText(st.text); }}
-                                                className="p-1 text-muted-foreground hover:text-foreground opacity-0 group-hover/sub:opacity-100 transition-opacity shrink-0"
-                                              >
-                                                <Pencil className="w-3.5 h-3.5" />
-                                              </button>
-                                            )}
-                                            <button
-                                              onClick={() => deleteSubTask(item.id, st.id)}
-                                              className="p-1 text-muted-foreground hover:text-destructive opacity-0 group-hover/sub:opacity-100 transition-opacity shrink-0"
-                                            >
-                                              <X className="w-4 h-4" />
-                                            </button>
-                                          </div>
-                                        ))}
-                                      </div>
-
-                                      {addingSubTaskFor === item.id ? (
-                                        <form onSubmit={e => { e.preventDefault(); handleAddSubTaskInline(item.id); }} className="flex gap-2 pt-1">
-                                          <input
-                                            autoFocus value={newSubTaskText}
-                                            onChange={e => setNewSubTaskText(e.target.value)}
-                                            onKeyDown={e => e.key === "Escape" && setAddingSubTaskFor(null)}
-                                            className="flex-1 text-sm bg-background border border-border rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary/50"
-                                            placeholder="New sub-task…"
-                                          />
-                                          <button type="submit" className="text-xs text-primary font-semibold px-2">Add</button>
-                                          <button type="button" onClick={() => setAddingSubTaskFor(null)} className="text-xs text-muted-foreground">✕</button>
-                                        </form>
-                                      ) : (
-                                        <button
-                                          onClick={() => setAddingSubTaskFor(item.id)}
-                                          className="flex items-center gap-1 text-xs text-primary/70 hover:text-primary transition-colors pt-1"
-                                        >
-                                          <Plus className="w-3.5 h-3.5" /> Add sub-task
-                                        </button>
-                                      )}
-                                    </div>
-                                  </motion.div>
-                                )}
-                              </AnimatePresence>
                             </GlassCard>
                           </SwipeableRow>
                         </motion.div>
@@ -741,7 +418,7 @@ export function Checklist() {
         </div>
       )}
 
-      {/* ── FAB + action menu ──────────────────────────────────────────────── */}
+      {/* ── FAB + action menu ───────────────────────────────────────────────── */}
       <FabPortal>
         <AnimatePresence>
           {showActionMenu && (
@@ -792,7 +469,7 @@ export function Checklist() {
         </motion.button>
       </FabPortal>
 
-      {/* ── Add Single Task ────────────────────────────────────────────────── */}
+      {/* ── Add Single Task ─────────────────────────────────────────────────── */}
       {isAddTaskOpen && (
         <TaskForm
           title="New Task"
@@ -804,92 +481,65 @@ export function Checklist() {
         />
       )}
 
-      {/* ── Add Task List ──────────────────────────────────────────────────── */}
-      <BottomSheet isOpen={isAddListOpen} onClose={() => { setIsAddListOpen(false); setNewSubTaskInputs(['']); }} title="New Task List">
-        <form onSubmit={handleListSubmit(onAddList)} className="space-y-5">
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">List Title</label>
-            <input
-              {...registerList("title", { required: true })}
-              className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-              placeholder="e.g. Chapter 5 Study Plan"
-              autoFocus
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Subject (optional)</label>
-            <select
-              {...registerList("subjectId")}
-              className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 appearance-none"
-            >
-              <option value="">No subject</option>
-              {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Sub-tasks</label>
-            <div className="space-y-2">
-              {newSubTaskInputs.map((val, idx) => (
-                <div key={idx} className="flex gap-2">
-                  <input
-                    value={val}
-                    onChange={e => { const u = [...newSubTaskInputs]; u[idx] = e.target.value; setNewSubTaskInputs(u); }}
-                    className="flex-1 bg-background border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-                    placeholder={`Sub-task ${idx + 1}`}
-                  />
-                  {newSubTaskInputs.length > 1 && (
-                    <button type="button" onClick={() => setNewSubTaskInputs(prev => prev.filter((_, i) => i !== idx))} className="p-2 text-muted-foreground hover:text-destructive">
-                      <X className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-            <button type="button" onClick={() => setNewSubTaskInputs(prev => [...prev, ''])} className="flex items-center gap-2 text-sm text-primary hover:underline mt-3">
-              <Plus className="w-4 h-4" /> Add another sub-task
-            </button>
-          </div>
-          <button type="submit" className="w-full bg-primary text-primary-foreground font-semibold rounded-xl py-3.5">
-            Create Task List
-          </button>
-        </form>
-      </BottomSheet>
+      {/* ── Add Task List ────────────────────────────────────────────────────── */}
+      {isAddListOpen && (
+        <TaskForm
+          title="New Task List"
+          defaultValues={DEFAULT_TASK}
+          subjects={subjects}
+          onSubmit={onAddList}
+          onClose={() => setIsAddListOpen(false)}
+          submitLabel="Create Task List"
+          hideRepeat
+        />
+      )}
 
-      {/* ── Edit Task ─────────────────────────────────────────────────────── */}
-      {editingItemId && (() => {
-        const item = checklist.find(c => c.id === editingItemId);
-        if (!item || item.isTaskList) {
-          // For task lists just edit the title inline via a simple sheet
-          return (
-            <BottomSheet isOpen onClose={() => setEditingItemId(null)} title="Edit Task List">
-              <div className="space-y-5">
-                <input
-                  autoFocus
-                  defaultValue={item?.text}
-                  onKeyDown={e => {
-                    if (e.key === "Enter") {
-                      updateChecklistItem(editingItemId, { text: (e.target as HTMLInputElement).value.trim() });
-                      setEditingItemId(null);
-                    }
-                    if (e.key === "Escape") setEditingItemId(null);
-                  }}
-                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-                />
-                <button
-                  onClick={() => {
-                    const el = document.querySelector<HTMLInputElement>('input[defaultValue]');
-                    // handled via onKeyDown above; close anyway
-                    setEditingItemId(null);
-                  }}
-                  className="w-full bg-primary text-primary-foreground font-semibold rounded-xl py-3.5"
-                >
-                  Save
-                </button>
-              </div>
-            </BottomSheet>
-          );
-        }
-        return (
+      {/* ── Edit Task / Edit Task List ────────────────────────────────────────── */}
+      {editingItemId && editingItem && (
+        editingItem.isTaskList ? (
+          // Simple title/description edit for list tasks
+          <BottomSheet isOpen onClose={() => setEditingItemId(null)} title="Edit Task List">
+            <form
+              className="space-y-5"
+              onSubmit={e => {
+                e.preventDefault();
+                const fd = new FormData(e.currentTarget);
+                updateChecklistItem(editingItemId, {
+                  text: (fd.get("text") as string).trim(),
+                  description: (fd.get("description") as string).trim() || undefined,
+                  subjectId: (fd.get("subjectId") as string) || null,
+                });
+                setEditingItemId(null);
+              }}
+            >
+              {(() => {
+                const fieldCls = "w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
+                return (
+                  <>
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">List Title</label>
+                      <input name="text" defaultValue={editingItem.text} required autoFocus className={fieldCls} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Description</label>
+                      <textarea name="description" defaultValue={editingItem.description || ""} className={`${fieldCls} resize-none min-h-[64px]`} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Subject</label>
+                      <select name="subjectId" defaultValue={editingItem.subjectId || ""} className={`${fieldCls} appearance-none`}>
+                        <option value="">No subject</option>
+                        {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                      </select>
+                    </div>
+                    <button type="submit" className="w-full bg-primary text-primary-foreground font-semibold rounded-xl py-3.5">
+                      Save Changes
+                    </button>
+                  </>
+                );
+              })()}
+            </form>
+          </BottomSheet>
+        ) : (
           <TaskForm
             title="Edit Task"
             defaultValues={getEditDefaults(editingItemId)}
@@ -898,14 +548,13 @@ export function Checklist() {
             onClose={() => setEditingItemId(null)}
             submitLabel="Save Changes"
           />
-        );
-      })()}
+        )
+      )}
 
-      {/* ── Filter sheet ──────────────────────────────────────────────────── */}
+      {/* ── Filter sheet ─────────────────────────────────────────────────────── */}
       <BottomSheet isOpen={isFilterOpen} onClose={() => setIsFilterOpen(false)} title="Filters">
         <div className="space-y-6 pb-2">
 
-          {/* Importance */}
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Importance</p>
             <div className="flex flex-wrap gap-2">
@@ -917,14 +566,13 @@ export function Checklist() {
             </div>
           </div>
 
-          {/* Status */}
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Status</p>
             <div className="flex flex-wrap gap-2">
               {[
                 { val: "undone" as const, label: "Unchecked" },
-                { val: "done" as const, label: "Checked" },
-                { val: "didNotDo" as const, label: "Did Not Do" },
+                { val: "done" as const,   label: "Checked" },
+                { val: "didNotDo" as const, label: "Skipped" },
               ].map(({ val, label }) => (
                 <Chip key={val} active={filters.status.includes(val)} onClick={() => setFilters(f => ({ ...f, status: toggleArr(f.status, val) }))}>
                   {label}
@@ -933,7 +581,6 @@ export function Checklist() {
             </div>
           </div>
 
-          {/* Repeat */}
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Type</p>
             <div className="flex flex-wrap gap-2">
@@ -946,11 +593,10 @@ export function Checklist() {
             </div>
           </div>
 
-          {/* Due date */}
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Due Date</p>
             <div className="flex flex-wrap gap-2">
-              <Chip active={filters.hasDueDate === true} onClick={() => setFilters(f => ({ ...f, hasDueDate: f.hasDueDate === true ? null : true }))}>
+              <Chip active={filters.hasDueDate === true}  onClick={() => setFilters(f => ({ ...f, hasDueDate: f.hasDueDate === true ? null : true }))}>
                 Has due date
               </Chip>
               <Chip active={filters.hasDueDate === false} onClick={() => setFilters(f => ({ ...f, hasDueDate: f.hasDueDate === false ? null : false }))}>
@@ -959,7 +605,6 @@ export function Checklist() {
             </div>
           </div>
 
-          {/* Actions */}
           <div className="flex gap-3 pt-2">
             <button
               onClick={() => setFilters(EMPTY_FILTERS)}
