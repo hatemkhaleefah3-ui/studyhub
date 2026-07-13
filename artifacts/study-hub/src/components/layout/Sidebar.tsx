@@ -106,7 +106,7 @@ function useSidebarDrag(onNavigate: (idx: number) => void) {
   };
 }
 
-// ── Shared icon-only nav items (used by both sidebar variants) ───────────────
+// ── Shared icon-only nav items (used by the desktop sidebar) ─────────────────
 function NavItems({
   hoverIdx,
   itemRefs,
@@ -169,6 +169,71 @@ function NavItems({
   );
 }
 
+// ── iPad rail nav items — icon + label, compact, no tooltip needed ───────────
+function RailNavItems({
+  hoverIdx,
+  itemRefs,
+  getIsActive,
+  preventClick,
+  layoutId,
+}: {
+  hoverIdx: number | null;
+  itemRefs: React.MutableRefObject<(HTMLDivElement | null)[]>;
+  getIsActive: (href: string) => boolean;
+  preventClick: (e: React.MouseEvent) => void;
+  layoutId: string;
+}) {
+  return (
+    <>
+      {NAV_ITEMS.map((item, i) => {
+        const isActive = hoverIdx !== null ? hoverIdx === i : getIsActive(item.href);
+        const Icon = item.icon;
+
+        return (
+          <div
+            key={item.href}
+            ref={(el) => { itemRefs.current[i] = el; }}
+            className="relative w-full flex items-center justify-center"
+          >
+            {isActive && (
+              <motion.div
+                layoutId={layoutId}
+                className="absolute inset-x-1.5 inset-y-0.5 rounded-2xl"
+                style={GEL_STYLE}
+                transition={{ type: 'spring', bounce: 0.22, duration: 0.45 }}
+              />
+            )}
+            <Link
+              href={item.href}
+              className="relative z-10 flex flex-col items-center justify-center gap-1 w-full py-3"
+              data-testid={`nav-${item.label.toLowerCase()}`}
+              onClick={preventClick}
+              style={{ WebkitTapHighlightColor: 'transparent' }}
+            >
+              <Icon
+                className="w-5 h-5"
+                style={{
+                  color: isActive ? ACTIVE_COLOR : INACTIVE_COLOR,
+                  transition: 'color 0.22s ease',
+                }}
+              />
+              <span
+                className="text-[10px] font-semibold tracking-tight leading-none"
+                style={{
+                  color: isActive ? ACTIVE_COLOR : INACTIVE_COLOR,
+                  transition: 'color 0.22s ease',
+                }}
+              >
+                {item.label}
+              </span>
+            </Link>
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
 export function Sidebar() {
   const [location, setLocation] = useLocation();
   const navigate = (idx: number) => setLocation(NAV_ITEMS[idx].href);
@@ -181,10 +246,12 @@ export function Sidebar() {
   const ipad = useSidebarDrag(navigate);
   const desktop = useSidebarDrag(navigate);
 
+  // Always visible in both light & dark mode — a solid brand-colour chip
+  // rather than a translucent-white one that vanishes on a light nav background.
   const logo = (
     <div
       className="w-10 h-10 rounded-2xl flex items-center justify-center mb-10 shrink-0"
-      style={{ background: 'rgba(255,255,255,0.12)' }}
+      style={{ background: ACTIVE_COLOR, boxShadow: '0 4px 14px rgba(59,130,246,0.35)' }}
     >
       <BookOpen className="w-5 h-5 text-white" />
     </div>
@@ -194,21 +261,26 @@ export function Sidebar() {
 
   return (
     <>
-      {/* ── iPad sidebar (md → lg) ────────────────────────────────────────── */}
+      {/* ── iPad rail (md → lg) — floating capsule, icon + label ─────────── */}
       <aside
-        className="hidden md:flex lg:hidden fixed left-0 top-0 bottom-0 w-20 z-50 flex-col items-center py-8"
-        style={{ ...glassStyle, boxShadow: sidebarShadow }}
+        className="hidden md:flex lg:hidden fixed left-4 top-1/2 -translate-y-1/2 z-50 flex-col items-center w-[76px] py-5 rounded-[28px]"
+        style={{ ...glassStyle, boxShadow: '0 1px 0 var(--nav-edge), 0 12px 32px var(--nav-shadow-color)' }}
       >
-        {logo}
-        {/* Nav container — this is what pulses on long-press.
-            flex-1 + justify-center distributes the (now 4) icons evenly
-            across the remaining height instead of clumping under the logo. */}
+        <div
+          className="w-9 h-9 rounded-xl flex items-center justify-center mb-5 shrink-0"
+          style={{ background: ACTIVE_COLOR, boxShadow: '0 4px 14px rgba(59,130,246,0.35)' }}
+        >
+          <BookOpen className="w-4.5 h-4.5 text-white" />
+        </div>
+        {/* Nav container — this is what pulses on long-press. Items are packed
+            tightly instead of spread across the full viewport height, so the
+            rail reads as one cohesive control rather than scattered icons. */}
         <div
           ref={ipad.scope}
-          className="flex flex-1 flex-col justify-center gap-8 w-full px-3 touch-none select-none"
+          className="flex flex-col gap-1 w-full px-2 touch-none select-none"
           {...ipad.handlers}
         >
-          <NavItems
+          <RailNavItems
             hoverIdx={ipad.hoverIdx}
             itemRefs={ipad.itemRefs}
             getIsActive={getIsActive}
@@ -218,7 +290,7 @@ export function Sidebar() {
         </div>
       </aside>
 
-      {/* ── Desktop sidebar (lg+) — icon-only, same width as iPad ───────── */}
+      {/* ── Desktop sidebar (lg+) — icon-only, edge-mounted ──────────────── */}
       <aside
         className="hidden lg:flex fixed left-0 top-0 bottom-0 w-20 z-50 flex-col items-center py-8"
         style={{ ...glassStyle, boxShadow: sidebarShadow }}
