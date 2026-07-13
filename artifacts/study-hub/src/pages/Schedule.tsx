@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useStudyData } from "@/hooks/useStudyData";
-import { type ImportanceLevel, type RepeatInterval, type ScheduleEvent, type ChecklistItem } from "@/hooks/useStudyData";
+import { type ImportanceLevel, type ScheduleEvent, type ChecklistItem } from "@/hooks/useStudyData";
 import { GlassCard } from "@/components/shared/GlassCard";
 import { BottomSheet } from "@/components/shared/BottomSheet";
 import { ConfirmSheet } from "@/components/shared/ConfirmSheet";
@@ -12,12 +12,10 @@ import {
 } from "date-fns";
 import {
   CheckCircle2, Circle, XCircle, Link2, Pencil, Trash2,
-  Clock, Repeat, CheckSquare, RotateCcw, ChevronLeft,
+  RotateCcw, ChevronLeft,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { motion, AnimatePresence } from "framer-motion";
-
-// ── Types ─────────────────────────────────────────────────────────────────────
 
 type ScheduleEntry =
   | { kind: "event"; id: string; sortTime: number }
@@ -31,14 +29,8 @@ const IMPORTANCE_META: Record<ImportanceLevel, { label: string; color: string; d
   low:    { label: "Low",    color: "text-emerald-500", dot: "bg-emerald-500" },
 };
 
-const REPEAT_LABEL: Record<RepeatInterval, string> = {
-  none: "", daily: "Daily", weekly: "Weekly", monthly: "Monthly",
-};
-
 const YEAR_RANGE_START = 1990;
 const YEAR_RANGE_END   = 2039;
-
-// ── Shared date-entry helpers (used by Day / Month / Year views alike) ────────
 
 function hasEntriesOnDate(schedule: ScheduleEvent[], checklist: ChecklistItem[], date: Date): boolean {
   const hasEvent = schedule.some(e => isSameDay(new Date(e.datetime), date));
@@ -59,8 +51,6 @@ function countEntriesInMonth(schedule: ScheduleEvent[], checklist: ChecklistItem
   return eventCount + taskCount;
 }
 
-// ── Main ──────────────────────────────────────────────────────────────────────
-
 export function Schedule() {
   const {
     schedule, subjects, checklist,
@@ -69,21 +59,13 @@ export function Schedule() {
     setCascadeChecklistStatus,
   } = useStudyData();
 
-  // Left→Right swipe on schedule task:
-  // repeated task → skip for today (stays in checklist, resets automatically once
-  //                 the next occurrence's date/time is reached)
-  // non-repeated task → fully delete from schedule + checklist
   const removeFromSchedule = (id: string) => {
     const it = checklist.find(c => c.id === id);
     if (!it) return;
-    if (it.repeat && it.repeat !== 'none') {
-      skipChecklistItem(id);
-    } else {
-      deleteChecklistItem(id);
-    }
+    if (it.repeat && it.repeat !== 'none') skipChecklistItem(id);
+    else deleteChecklistItem(id);
   };
 
-  // Right→Left swipe: 3-state cycle, cascades to sub-tasks for list tasks
   const cycleChecklistStatus = (id: string) => {
     const it = checklist.find(c => c.id === id);
     if (!it) return;
@@ -102,7 +84,6 @@ export function Schedule() {
     defaultValues: { title: "", subjectId: "", date: "", time: "", note: "" },
   });
 
-  // Auto-scroll to today on mount (Day view week strip)
   useEffect(() => {
     if (viewLevel !== "day") return;
     const timer = setTimeout(() => {
@@ -139,16 +120,12 @@ export function Schedule() {
     setEditingId(null);
   };
 
-  // ── Week strip (Day view) ────────────────────────────────────────────────────
-
   const startDate = startOfWeek(selectedDate, { weekStartsOn: 1 });
   const weekDays  = Array.from({ length: 7 }).map((_, i) => addDays(startDate, i));
 
-  // ── Build combined entry list for selected day ─────────────────────────────
-
   const dayEntries = useMemo((): ScheduleEntry[] => {
     const parseTaskTime = (dueDate: string, dueTime?: string | null): number => {
-      if (!dueTime) return Infinity; // tasks without a time go at the end
+      if (!dueTime) return Infinity;
       const [h, m] = dueTime.split(":").map(Number);
       const d = parseISO(dueDate);
       d.setHours(h, m, 0, 0);
@@ -168,47 +145,30 @@ export function Schedule() {
 
   const dayHasEntries = (date: Date) => hasEntriesOnDate(schedule, checklist, date);
 
-  // ── Drill-down navigation ────────────────────────────────────────────────────
+  const goToDay = (date: Date) => { setSelectedDate(date); setViewLevel("day"); };
+  const goToMonth = (year: number, month: number) => { setSelectedDate(new Date(year, month, Math.min(selectedDate.getDate(), 28))); setViewLevel("month"); };
 
-  const goToDay = (date: Date) => {
-    setSelectedDate(date);
-    setViewLevel("day");
-  };
-
-  const goToMonth = (year: number, month: number) => {
-    setSelectedDate(new Date(year, month, Math.min(selectedDate.getDate(), 28)));
-    setViewLevel("month");
-  };
-
-  const inputCls =
-    "w-full bg-background border border-border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50";
-
-  // ── Render ─────────────────────────────────────────────────────────────────
+  const inputCls = "w-full bg-background border border-border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 text-foreground";
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-6 pb-20 max-w-4xl mx-auto">
 
-      {/* Header — no add button */}
-      <div className="flex flex-col gap-4">
+      {/* Header & ViewToggle inline */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h1 className="text-4xl font-bold tracking-tight mb-1">Schedule</h1>
-          <p className="text-muted-foreground text-lg">
+          <h1 className="text-4xl font-bold tracking-tight mb-2">Schedule</h1>
+          <p className="text-muted-foreground font-medium text-lg">
             {viewLevel === "day" && format(startDate, "MMMM yyyy")}
             {viewLevel === "month" && format(selectedDate, "MMMM yyyy")}
             {viewLevel === "year" && getYear(selectedDate)}
           </p>
         </div>
-
         <ViewToggle level={viewLevel} onChange={setViewLevel} />
       </div>
 
       {viewLevel === "day" && (
         <>
-          {/* Day picker */}
-          <div
-            ref={scrollAreaRef}
-            className="relative z-10 flex gap-2 overflow-x-auto overflow-y-visible py-2 -my-2 scrollbar-hide snap-x snap-mandatory"
-          >
+          <div ref={scrollAreaRef} className="relative z-10 flex gap-2 overflow-x-auto overflow-y-visible py-2 -mx-2 px-2 scrollbar-hide snap-x snap-mandatory">
             {weekDays.map((date, i) => {
               const isToday    = isSameDay(date, new Date());
               const isSelected = isSameDay(date, selectedDate);
@@ -216,38 +176,36 @@ export function Schedule() {
 
               return (
                 <button
-                  key={i}
-                  data-today={isToday ? "true" : undefined}
-                  onClick={() => setSelectedDate(date)}
-                  className={`snap-center flex-shrink-0 flex flex-col items-center justify-center w-[4.5rem] h-[4.75rem] rounded-2xl transition-all duration-200 ${
+                  key={i} data-today={isToday ? "true" : undefined} onClick={() => setSelectedDate(date)}
+                  className={`snap-center flex-shrink-0 flex flex-col items-center justify-center w-[4.5rem] h-[5rem] rounded-2xl transition-all duration-200 border shadow-sm ${
                     isSelected
-                      ? "bg-primary text-primary-foreground shadow-md shadow-primary/25 ring-2 ring-primary/30"
-                      : "bg-card/60 backdrop-blur border border-border hover:bg-card text-muted-foreground"
+                      ? "bg-primary text-primary-foreground border-primary shadow-primary/20 scale-105"
+                      : "bg-card border-border/50 hover:bg-secondary/60 text-muted-foreground"
                   }`}
-                  data-testid={`btn-day-${format(date, "yyyy-MM-dd")}`}
                 >
-                  <span className="text-[10px] uppercase font-bold tracking-wider leading-none">
+                  <span className="text-[10px] uppercase font-bold tracking-wider leading-none mb-1">
                     {format(date, "EEE")}
                   </span>
-                  <span className="text-xl font-bold mt-1 leading-none">{format(date, "d")}</span>
-                  {/* Dot: today indicator OR entry indicator */}
+                  <span className="text-xl font-bold leading-none">{format(date, "d")}</span>
                   {!isSelected && (isToday || hasEntries) && (
-                    <div className={`w-1.5 h-1.5 rounded-full mt-1.5 ${isToday ? "bg-primary" : "bg-muted-foreground/40"}`} />
+                    <div className={`w-1.5 h-1.5 rounded-full mt-2 ${isToday ? "bg-primary" : "bg-muted-foreground/30"}`} />
+                  )}
+                  {isSelected && hasEntries && (
+                    <div className="w-1.5 h-1.5 rounded-full mt-2 bg-primary-foreground/80" />
                   )}
                 </button>
               );
             })}
           </div>
 
-          {/* Day content */}
-          <div className="space-y-3">
-            <h2 className="text-xl font-semibold">
-              {isSameDay(selectedDate, new Date()) ? "Today" : format(selectedDate, "EEEE, MMM d")}
+          <div className="space-y-4 pt-2">
+            <h2 className="text-xl font-bold tracking-tight text-foreground/90 pl-1">
+              {isSameDay(selectedDate, new Date()) ? "Today's Agenda" : format(selectedDate, "EEEE, MMMM d")}
             </h2>
 
             {dayEntries.length === 0 ? (
-              <GlassCard className="p-12 text-center border-dashed border-2 bg-transparent text-muted-foreground">
-                Nothing scheduled — add due dates to checklist tasks to see them here.
+              <GlassCard className="p-12 text-center border-dashed border-2 bg-transparent text-muted-foreground shadow-none">
+                Nothing scheduled — add due dates to tasks to see them here.
               </GlassCard>
             ) : (
               <AnimatePresence initial={false}>
@@ -255,25 +213,15 @@ export function Schedule() {
                   if (entry.kind === "event") {
                     return (
                       <EventCard
-                        key={`event-${entry.id}`}
-                        eventId={entry.id}
-                        schedule={schedule}
-                        subjects={subjects}
-                        checklist={checklist}
-                        onEdit={() => openEdit(entry.id)}
-                        onDelete={() => setDeletingId(entry.id)}
-                        onToggle={(cid) => toggleChecklistItem(cid)}
+                        key={`event-${entry.id}`} eventId={entry.id} schedule={schedule} subjects={subjects} checklist={checklist}
+                        onEdit={() => openEdit(entry.id)} onDelete={() => setDeletingId(entry.id)} onToggle={(cid) => toggleChecklistItem(cid)}
                       />
                     );
                   }
                   return (
                     <TaskCard
-                      key={`task-${entry.id}`}
-                      taskId={entry.id}
-                      checklist={checklist}
-                      onToggle={() => toggleChecklistItem(entry.id)}
-                      onRemove={() => removeFromSchedule(entry.id)}
-                      onCycleStatus={() => cycleChecklistStatus(entry.id)}
+                      key={`task-${entry.id}`} taskId={entry.id} checklist={checklist}
+                      onToggle={() => toggleChecklistItem(entry.id)} onRemove={() => removeFromSchedule(entry.id)} onCycleStatus={() => cycleChecklistStatus(entry.id)}
                     />
                   );
                 })}
@@ -283,28 +231,9 @@ export function Schedule() {
         </>
       )}
 
-      {viewLevel === "month" && (
-        <MonthView
-          anchor={selectedDate}
-          schedule={schedule}
-          checklist={checklist}
-          onSelectDay={goToDay}
-          onBackToYear={() => setViewLevel("year")}
-          onChangeMonth={(year, month) => setSelectedDate(new Date(year, month, 1))}
-        />
-      )}
+      {viewLevel === "month" && <MonthView anchor={selectedDate} schedule={schedule} checklist={checklist} onSelectDay={goToDay} onBackToYear={() => setViewLevel("year")} onChangeMonth={(year, month) => setSelectedDate(new Date(year, month, 1))} />}
+      {viewLevel === "year" && <YearView anchor={selectedDate} schedule={schedule} checklist={checklist} onSelectMonth={goToMonth} onChangeYear={(year) => setSelectedDate(new Date(year, getMonth(selectedDate), 1))} />}
 
-      {viewLevel === "year" && (
-        <YearView
-          anchor={selectedDate}
-          schedule={schedule}
-          checklist={checklist}
-          onSelectMonth={goToMonth}
-          onChangeYear={(year) => setSelectedDate(new Date(year, getMonth(selectedDate), 1))}
-        />
-      )}
-
-      {/* Edit event sheet (schedule events only — tasks are edited from Checklist) */}
       <BottomSheet isOpen={!!editingId} onClose={() => setEditingId(null)} title="Edit Event">
         <form onSubmit={handleEditSubmit(onEditSubmit)} className="space-y-5">
           <div>
@@ -338,48 +267,27 @@ export function Schedule() {
         </form>
       </BottomSheet>
 
-      {/* Delete confirm */}
       <ConfirmSheet
-        isOpen={!!deletingId}
-        onClose={() => setDeletingId(null)}
+        isOpen={!!deletingId} onClose={() => setDeletingId(null)}
         onConfirm={() => { if (deletingId) { deleteScheduleEvent(deletingId); setDeletingId(null); } }}
-        title="Delete event?"
-        message="This event will be moved to the Archive. You can restore it later from Settings."
-        confirmLabel="Move to Archive"
+        title="Delete event?" message="This event will be moved to the Archive." confirmLabel="Move to Archive"
       />
     </div>
   );
 }
 
-// ── View toggle (Day / Month / Year) ───────────────────────────────────────────
-
 function ViewToggle({ level, onChange }: { level: ViewLevel; onChange: (l: ViewLevel) => void }) {
-  const OPTIONS: { value: ViewLevel; label: string }[] = [
-    { value: "day",   label: "Day" },
-    { value: "month", label: "Month" },
-    { value: "year",  label: "Year" },
-  ];
-
+  const OPTIONS: { value: ViewLevel; label: string }[] = [ { value: "day", label: "Day" }, { value: "month", label: "Month" }, { value: "year", label: "Year" } ];
   return (
-    <div className="inline-flex p-1 rounded-full bg-secondary/60 border border-border self-start">
+    <div className="inline-flex p-1.5 rounded-2xl bg-secondary/60 border border-border/50 self-start w-full md:w-auto">
       {OPTIONS.map(opt => {
         const active = level === opt.value;
         return (
           <button
-            key={opt.value}
-            onClick={() => onChange(opt.value)}
-            data-testid={`btn-view-${opt.value}`}
-            className={`relative px-5 py-1.5 rounded-full text-sm font-semibold transition-colors ${
-              active ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-            }`}
+            key={opt.value} onClick={() => onChange(opt.value)}
+            className={`flex-1 md:flex-none relative px-6 py-2 rounded-xl text-sm font-bold transition-all ${active ? "text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground hover:bg-secondary/40"}`}
           >
-            {active && (
-              <motion.div
-                layoutId="schedule-view-toggle-pill"
-                className="absolute inset-0 bg-primary rounded-full"
-                transition={{ type: "spring", stiffness: 380, damping: 32 }}
-              />
-            )}
+            {active && <motion.div layoutId="schedule-view-toggle-pill" className="absolute inset-0 bg-primary rounded-xl" transition={{ type: "spring", stiffness: 380, damping: 32 }} />}
             <span className="relative z-10">{opt.label}</span>
           </button>
         );
@@ -388,42 +296,17 @@ function ViewToggle({ level, onChange }: { level: ViewLevel; onChange: (l: ViewL
   );
 }
 
-// ── Shared horizontal slider selector (years / months) ─────────────────────────
-
-function SliderSelector<T extends string | number>({
-  items, selected, onSelect, getLabel, testIdPrefix,
-}: {
-  items: T[];
-  selected: T;
-  onSelect: (v: T) => void;
-  getLabel: (v: T) => string;
-  testIdPrefix?: string;
-}) {
+function SliderSelector<T extends string | number>({ items, selected, onSelect, getLabel, testIdPrefix }: { items: T[]; selected: T; onSelect: (v: T) => void; getLabel: (v: T) => string; testIdPrefix?: string; }) {
   const scrollRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const el = scrollRef.current?.querySelector('[data-selected="true"]') as HTMLElement | null;
-    el?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
-  }, [selected]);
-
+  useEffect(() => { const el = scrollRef.current?.querySelector('[data-selected="true"]') as HTMLElement | null; el?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" }); }, [selected]);
   return (
-    <div
-      ref={scrollRef}
-      className="flex gap-2 overflow-x-auto scrollbar-hide py-1 -my-1 snap-x snap-mandatory"
-    >
+    <div ref={scrollRef} className="flex gap-2 overflow-x-auto scrollbar-hide py-1 -mx-2 px-2 snap-x snap-mandatory">
       {items.map((item) => {
         const isSelected = item === selected;
         return (
           <button
-            key={String(item)}
-            data-selected={isSelected ? "true" : undefined}
-            data-testid={testIdPrefix ? `${testIdPrefix}-${item}` : undefined}
-            onClick={() => onSelect(item)}
-            className={`snap-center flex-shrink-0 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-              isSelected
-                ? "bg-primary text-primary-foreground shadow-sm shadow-primary/25"
-                : "bg-card/60 backdrop-blur border border-border hover:bg-card text-muted-foreground"
-            }`}
+            key={String(item)} data-selected={isSelected ? "true" : undefined} data-testid={testIdPrefix ? `${testIdPrefix}-${item}` : undefined} onClick={() => onSelect(item)}
+            className={`snap-center flex-shrink-0 px-5 py-2.5 rounded-xl text-sm font-bold transition-all border shadow-sm ${isSelected ? "bg-primary text-primary-foreground border-primary shadow-primary/20 scale-105" : "bg-card border-border/50 hover:bg-secondary/60 text-muted-foreground"}`}
           >
             {getLabel(item)}
           </button>
@@ -433,25 +316,13 @@ function SliderSelector<T extends string | number>({
   );
 }
 
-// ── Month view: full grid with correct blank cells + leap-year-safe day count ──
-
-function MonthView({
-  anchor, schedule, checklist, onSelectDay, onBackToYear, onChangeMonth,
-}: {
-  anchor: Date;
-  schedule: ScheduleEvent[];
-  checklist: ChecklistItem[];
-  onSelectDay: (d: Date) => void;
-  onBackToYear: () => void;
-  onChangeMonth: (year: number, month: number) => void;
-}) {
+function MonthView({ anchor, schedule, checklist, onSelectDay, onBackToYear, onChangeMonth }: { anchor: Date; schedule: ScheduleEvent[]; checklist: ChecklistItem[]; onSelectDay: (d: Date) => void; onBackToYear: () => void; onChangeMonth: (year: number, month: number) => void; }) {
   const year  = getYear(anchor);
   const month = getMonth(anchor);
   const today = new Date();
 
-  // date-fns getDaysInMonth already accounts for leap years correctly.
   const daysInMonth   = getDaysInMonth(new Date(year, month, 1));
-  const leadingBlanks = getDay(new Date(year, month, 1)); // 0 = Sunday
+  const leadingBlanks = getDay(new Date(year, month, 1));
   const cells: (Date | null)[] = [];
   for (let i = 0; i < leadingBlanks; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(year, month, d));
@@ -460,121 +331,76 @@ function MonthView({
   const monthItems = Array.from({ length: 12 }, (_, i) => i);
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <button
-          onClick={onBackToYear}
-          className="inline-flex items-center gap-1 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors"
-          data-testid="btn-back-to-year"
-        >
+    <div className="space-y-6">
+      <div className="flex items-center justify-between pl-1">
+        <button onClick={onBackToYear} className="inline-flex items-center gap-1.5 text-sm font-bold text-muted-foreground hover:text-foreground transition-colors bg-secondary/50 px-3 py-1.5 rounded-lg border border-border/50">
           <ChevronLeft className="w-4 h-4" /> {year}
         </button>
       </div>
 
-      <SliderSelector
-        items={monthItems}
-        selected={month}
-        onSelect={(m) => onChangeMonth(year, m)}
-        getLabel={(m) => format(new Date(2000, m, 1), "MMM")}
-        testIdPrefix="btn-month"
-      />
+      <SliderSelector items={monthItems} selected={month} onSelect={(m) => onChangeMonth(year, m)} getLabel={(m) => format(new Date(2000, m, 1), "MMMM")} testIdPrefix="btn-month" />
 
-      <div className="grid grid-cols-7 gap-1.5 text-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-        {["S", "M", "T", "W", "T", "F", "S"].map((l, i) => <span key={i}>{l}</span>)}
-      </div>
+      <GlassCard className="p-4 md:p-6 border-border/60">
+        <div className="grid grid-cols-7 gap-1.5 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 mb-3">
+          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((l, i) => <span key={i} className="hidden sm:inline">{l}</span>)}
+          {["S", "M", "T", "W", "T", "F", "S"].map((l, i) => <span key={i} className="sm:hidden">{l}</span>)}
+        </div>
 
-      <div className="grid grid-cols-7 gap-1.5">
-        {cells.map((date, i) => {
-          if (!date) return <div key={i} className="aspect-square" />;
+        <div className="grid grid-cols-7 gap-1.5 md:gap-2">
+          {cells.map((date, i) => {
+            if (!date) return <div key={i} className="aspect-square rounded-xl bg-secondary/10 border border-dashed border-border/20" />;
 
-          const isCurrentDay = isSameDay(date, today);
-          const isAnchorDay  = isSameDay(date, anchor) && !isCurrentDay;
-          const hasEntries   = hasEntriesOnDate(schedule, checklist, date);
+            const isCurrentDay = isSameDay(date, today);
+            const isAnchorDay  = isSameDay(date, anchor) && !isCurrentDay;
+            const hasEntries   = hasEntriesOnDate(schedule, checklist, date);
 
-          return (
-            <button
-              key={i}
-              onClick={() => onSelectDay(date)}
-              data-testid={`btn-month-day-${format(date, "yyyy-MM-dd")}`}
-              className={`aspect-square rounded-xl flex flex-col items-center justify-center gap-0.5 text-sm font-medium transition-all ${
-                isCurrentDay
-                  ? "bg-primary text-primary-foreground font-bold shadow-sm shadow-primary/30"
-                  : isAnchorDay
-                  ? "border-2 border-primary/60 text-foreground"
-                  : "bg-card/60 border border-border hover:bg-card"
-              }`}
-            >
-              {format(date, "d")}
-              <span
-                className={`w-1 h-1 rounded-full ${
-                  hasEntries ? (isCurrentDay ? "bg-primary-foreground" : "bg-primary") : "bg-transparent"
+            return (
+              <button
+                key={i} onClick={() => onSelectDay(date)} data-testid={`btn-month-day-${format(date, "yyyy-MM-dd")}`}
+                className={`aspect-square rounded-xl flex flex-col items-center justify-center gap-1 text-sm md:text-base font-bold transition-all border shadow-sm ${
+                  isCurrentDay ? "bg-primary text-primary-foreground border-primary shadow-primary/30 scale-105 z-10" : isAnchorDay ? "bg-secondary border-border text-foreground shadow-sm" : "bg-card border-border/40 hover:bg-secondary/60 text-muted-foreground hover:text-foreground"
                 }`}
-              />
-            </button>
-          );
-        })}
-      </div>
+              >
+                {format(date, "d")}
+                <span className={`w-1.5 h-1.5 rounded-full ${hasEntries ? (isCurrentDay ? "bg-primary-foreground/80" : "bg-primary") : "bg-transparent"}`} />
+              </button>
+            );
+          })}
+        </div>
+      </GlassCard>
     </div>
   );
 }
 
-// ── Year view: 12-month grid ────────────────────────────────────────────────────
-
-function YearView({
-  anchor, schedule, checklist, onSelectMonth, onChangeYear,
-}: {
-  anchor: Date;
-  schedule: ScheduleEvent[];
-  checklist: ChecklistItem[];
-  onSelectMonth: (year: number, month: number) => void;
-  onChangeYear: (year: number) => void;
-}) {
+function YearView({ anchor, schedule, checklist, onSelectMonth, onChangeYear }: { anchor: Date; schedule: ScheduleEvent[]; checklist: ChecklistItem[]; onSelectMonth: (year: number, month: number) => void; onChangeYear: (year: number) => void; }) {
   const year  = getYear(anchor);
   const month = getMonth(anchor);
   const today = new Date();
 
-  const years = Array.from(
-    { length: YEAR_RANGE_END - YEAR_RANGE_START + 1 },
-    (_, i) => YEAR_RANGE_START + i
-  );
+  const years = Array.from({ length: YEAR_RANGE_END - YEAR_RANGE_START + 1 }, (_, i) => YEAR_RANGE_START + i);
   const months = Array.from({ length: 12 }, (_, i) => i);
 
   return (
-    <div className="space-y-5">
-      <SliderSelector
-        items={years}
-        selected={year}
-        onSelect={onChangeYear}
-        getLabel={(y) => String(y)}
-        testIdPrefix="btn-year"
-      />
+    <div className="space-y-6">
+      <SliderSelector items={years} selected={year} onSelect={onChangeYear} getLabel={(y) => String(y)} testIdPrefix="btn-year" />
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
         {months.map((m) => {
           const isCurrentMonth = year === getYear(today) && m === getMonth(today);
-          const isAnchorMonth  = m === month && !isCurrentMonth;
           const entryCount     = countEntriesInMonth(schedule, checklist, year, m);
 
           return (
             <button
-              key={m}
-              onClick={() => onSelectMonth(year, m)}
-              data-testid={`btn-year-month-${m}`}
-              className={`p-4 rounded-2xl border text-left transition-all ${
-                isCurrentMonth
-                  ? "bg-primary text-primary-foreground border-primary shadow-md shadow-primary/25"
-                  : isAnchorMonth
-                  ? "border-primary/60 bg-primary/5"
-                  : "border-border bg-card/60 hover:bg-card"
+              key={m} onClick={() => onSelectMonth(year, m)} data-testid={`btn-year-month-${m}`}
+              className={`p-5 rounded-2xl border text-left transition-all shadow-sm ${
+                isCurrentMonth ? "bg-primary text-primary-foreground border-primary shadow-primary/20 scale-[1.02]" : "bg-card border-border/50 hover:bg-secondary/60 hover:-translate-y-1"
               }`}
             >
-              <div className="flex items-center justify-between">
-                <span className="font-semibold">{format(new Date(year, m, 1), "MMMM")}</span>
-              </div>
-              {entryCount > 0 && (
-                <span className={`text-xs mt-1 block ${isCurrentMonth ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
-                  {entryCount} {entryCount === 1 ? "item" : "items"}
-                </span>
+              <span className={`block font-bold text-lg mb-1 ${isCurrentMonth ? "text-primary-foreground" : "text-foreground"}`}>{format(new Date(year, m, 1), "MMM")}</span>
+              {entryCount > 0 ? (
+                <span className={`text-[11px] font-bold uppercase tracking-wider block ${isCurrentMonth ? "text-primary-foreground/80" : "text-muted-foreground"}`}>{entryCount} {entryCount === 1 ? "item" : "items"}</span>
+              ) : (
+                <span className={`text-[11px] font-medium uppercase tracking-wider block opacity-0`}>-</span>
               )}
             </button>
           );
@@ -584,19 +410,7 @@ function YearView({
   );
 }
 
-// ── Event card (real schedule events) ────────────────────────────────────────
-
-function EventCard({
-  eventId, schedule, subjects, checklist, onEdit, onDelete, onToggle,
-}: {
-  eventId: string;
-  schedule: any[];
-  subjects: any[];
-  checklist: any[];
-  onEdit: () => void;
-  onDelete: () => void;
-  onToggle: (id: string) => void;
-}) {
+function EventCard({ eventId, schedule, subjects, checklist, onEdit, onDelete, onToggle }: { eventId: string; schedule: any[]; subjects: any[]; checklist: any[]; onEdit: () => void; onDelete: () => void; onToggle: (id: string) => void; }) {
   const ev = schedule.find((e: any) => e.id === eventId);
   if (!ev) return null;
   const subject    = subjects.find((s: any) => s.id === ev.subjectId);
@@ -604,54 +418,30 @@ function EventCard({
   const isDone     = linkedItem ? linkedItem.done : ev.done;
 
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.97 }}
-      transition={{ type: "spring", stiffness: 300, damping: 28 }}
-    >
+    <motion.div layout initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.97 }} transition={{ type: "spring", stiffness: 300, damping: 28 }}>
       <SwipeableRow onEdit={onEdit} onDelete={onDelete}>
-        <GlassCard className={`p-4 flex gap-4 transition-all group ${isDone ? "opacity-50" : ""}`}>
-          {/* Time column */}
+        <GlassCard className={`p-4 flex gap-4 transition-all group border-border/60 hover:bg-secondary/20 ${isDone ? "opacity-50" : ""}`}>
           <div className="w-14 shrink-0 text-center flex flex-col items-center justify-center border-r border-border/50 pr-3">
-            <span className="text-base font-bold leading-tight">
-              {format(new Date(ev.datetime), "HH:mm")}
-            </span>
+            <span className="text-base font-bold leading-tight tracking-tight text-foreground">{format(new Date(ev.datetime), "HH:mm")}</span>
           </div>
 
-          {/* Subject colour bar */}
           <div className="w-1.5 rounded-full shrink-0 self-stretch" style={{ backgroundColor: subject?.color || "hsl(var(--primary))" }} />
 
-          {/* Content */}
           <div className="flex-1 py-0.5 min-w-0">
-            <h3 className={`font-semibold ${isDone ? "line-through text-muted-foreground" : ""}`}>{ev.title}</h3>
-            {subject && <p className="text-sm text-muted-foreground mt-0.5">{subject.name}</p>}
-            {ev.note && (
-              <p className="text-xs mt-1.5 text-muted-foreground/80 bg-secondary/50 px-2 py-1.5 rounded-lg">
-                {ev.note}
-              </p>
-            )}
-            {ev.checklistItemId && (
-              <span className="inline-flex items-center gap-1 text-xs text-primary/70 mt-1.5">
-                <Link2 className="w-3 h-3" /> Linked to checklist
-              </span>
-            )}
+            <h3 className={`font-bold text-foreground text-sm ${isDone ? "line-through text-muted-foreground" : ""}`}>{ev.title}</h3>
+            {subject && <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mt-1">{subject.name}</p>}
+            {ev.note && <p className="text-[11px] font-medium mt-2 text-muted-foreground/80 bg-secondary/50 px-2.5 py-1.5 rounded-lg border border-border/40 inline-block">{ev.note}</p>}
+            {ev.checklistItemId && <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-primary mt-2"><Link2 className="w-3 h-3" /> Linked</span>}
           </div>
 
-          {/* Actions */}
           <div className="flex flex-col gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity self-start">
-            <button onClick={onEdit} className="p-2 text-muted-foreground hover:bg-secondary hover:text-foreground rounded-full transition-all">
-              <Pencil className="w-4 h-4" />
-            </button>
-            <button onClick={onDelete} className="p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive rounded-full transition-all">
-              <Trash2 className="w-4 h-4" />
-            </button>
+            <button onClick={onEdit} className="p-2 text-muted-foreground hover:bg-secondary hover:text-foreground rounded-full transition-all border border-transparent hover:border-border/50"><Pencil className="w-3.5 h-3.5" /></button>
+            <button onClick={onDelete} className="p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive rounded-full transition-all border border-transparent hover:border-destructive/20"><Trash2 className="w-3.5 h-3.5" /></button>
           </div>
 
           {ev.checklistItemId && (
             <button onClick={() => onToggle(ev.checklistItemId!)} className="p-2 h-max shrink-0 mt-0.5 hover:scale-110 transition-transform">
-              <CheckCircle2 className={`w-6 h-6 ${isDone ? "text-primary" : "text-muted-foreground"}`} />
+              <CheckCircle2 className={`w-6 h-6 ${isDone ? "text-primary drop-shadow-sm" : "text-muted-foreground"}`} />
             </button>
           )}
         </GlassCard>
@@ -660,120 +450,45 @@ function EventCard({
   );
 }
 
-// ── Swipe action configs for task cards ───────────────────────────────────────
-
-const SCHEDULE_REMOVE_ACTION: SwipeAction = {
-  icon: <Trash2 className="w-5 h-5" />,
-  label: "Remove",
-  bg: "bg-secondary",
-  color: "text-muted-foreground",
-};
-
+const SCHEDULE_REMOVE_ACTION: SwipeAction = { icon: <Trash2 className="w-5 h-5" />, label: "Remove", bg: "bg-secondary", color: "text-muted-foreground" };
 function getTaskCycleAction(done: boolean, didNotDo?: boolean): SwipeAction {
-  if (!done && !didNotDo) return {
-    icon: <CheckCircle2 className="w-5 h-5" />,
-    label: "Done",
-    bg: "bg-emerald-500/15",
-    color: "text-emerald-600",
-  };
-  if (done) return {
-    icon: <XCircle className="w-5 h-5" />,
-    label: "Skip",
-    bg: "bg-slate-400/15",
-    color: "text-slate-500",
-  };
-  return {
-    icon: <RotateCcw className="w-5 h-5" />,
-    label: "Undo",
-    bg: "bg-primary/15",
-    color: "text-primary",
-  };
+  if (!done && !didNotDo) return { icon: <CheckCircle2 className="w-5 h-5" />, label: "Done", bg: "bg-emerald-500/15", color: "text-emerald-600" };
+  if (done) return { icon: <XCircle className="w-5 h-5" />, label: "Skip", bg: "bg-slate-400/15", color: "text-slate-500" };
+  return { icon: <RotateCcw className="w-5 h-5" />, label: "Undo", bg: "bg-primary/15", color: "text-primary" };
 }
 
-// ── Task card (checklist items with dueDate) ──────────────────────────────────
-
-function TaskCard({
-  taskId, checklist, onToggle, onRemove, onCycleStatus,
-}: {
-  taskId: string;
-  checklist: any[];
-  onToggle: () => void;
-  onRemove: () => void;
-  onCycleStatus: () => void;
-}) {
+function TaskCard({ taskId, checklist, onToggle, onRemove, onCycleStatus }: { taskId: string; checklist: any[]; onToggle: () => void; onRemove: () => void; onCycleStatus: () => void; }) {
   const item = checklist.find((c: any) => c.id === taskId);
   if (!item) return null;
   const imp = item.importance ? IMPORTANCE_META[item.importance as ImportanceLevel] : null;
-  const isOverdue = !item.done && !item.didNotDo && item.dueDate
-    && isPast(parseISO(item.dueDate)) && !dateFnsIsToday(parseISO(item.dueDate));
+  const isOverdue = !item.done && !item.didNotDo && item.dueDate && isPast(parseISO(item.dueDate)) && !dateFnsIsToday(parseISO(item.dueDate));
 
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.97 }}
-      transition={{ type: "spring", stiffness: 300, damping: 28 }}
-    >
-      <SwipeableRow
-        onEdit={onRemove}
-        onDelete={onCycleStatus}
-        editAction={SCHEDULE_REMOVE_ACTION}
-        deleteAction={getTaskCycleAction(item.done, item.didNotDo)}
-      >
-        <GlassCard
-          className={`p-4 flex gap-4 transition-all ${item.done || item.didNotDo ? "opacity-50" : ""}`}
-        >
-          {/* Time column — shows dueTime or a task icon */}
+    <motion.div layout initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.97 }} transition={{ type: "spring", stiffness: 300, damping: 28 }}>
+      <SwipeableRow onEdit={onRemove} onDelete={onCycleStatus} editAction={SCHEDULE_REMOVE_ACTION} deleteAction={getTaskCycleAction(item.done, item.didNotDo)}>
+        <GlassCard className={`p-4 flex gap-4 transition-all border-border/60 hover:bg-secondary/20 ${item.done || item.didNotDo ? "opacity-50" : ""}`}>
           <div className="w-14 shrink-0 text-center flex flex-col items-center justify-center border-r border-border/50 pr-3">
             {item.dueTime ? (
-              <span className="text-base font-bold leading-tight">{item.dueTime}</span>
+              <span className={`text-base font-bold leading-tight tracking-tight ${isOverdue ? "text-destructive" : "text-foreground"}`}>{item.dueTime}</span>
             ) : (
-              <CheckSquare className="w-4 h-4 text-muted-foreground/60" />
+              <Circle className="w-5 h-5 text-muted-foreground/30" />
             )}
           </div>
 
-          {/* Content */}
           <div className="flex-1 py-0.5 min-w-0">
-            <h3 className={`font-semibold ${item.done ? "line-through text-muted-foreground" : item.didNotDo ? "line-through text-muted-foreground/60" : ""}`}>
-              {item.text}
-            </h3>
-
-            <div className="flex items-center gap-1 flex-wrap mt-1">
+            <h3 className={`font-bold text-sm text-foreground ${item.done ? "line-through text-muted-foreground" : item.didNotDo ? "text-muted-foreground" : ""}`}>{item.text}</h3>
+            <div className="flex flex-wrap items-center gap-2 mt-2">
               {imp && (
-                <span className={`inline-flex items-center gap-1 text-xs ${imp.color}`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${imp.dot}`} />
-                  {imp.label}
+                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-secondary/50 border border-border/50 ${imp.color}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${imp.dot}`} />{imp.label}
                 </span>
               )}
-              {item.repeat && item.repeat !== "none" && (
-                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                  <Repeat className="w-3 h-3" />
-                  {REPEAT_LABEL[item.repeat as RepeatInterval]}
-                </span>
-              )}
-              {isOverdue && <span className="text-xs text-rose-500 font-medium">Overdue</span>}
-              {item.didNotDo && (
-                <span className="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">Skipped</span>
-              )}
+              {isOverdue && <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-destructive/10 text-destructive border border-destructive/20">Overdue</span>}
             </div>
-
-            {item.description && (
-              <p className="text-xs mt-1 text-muted-foreground/80 line-clamp-2">{item.description}</p>
-            )}
           </div>
 
-          {/* Status button — tapping directly also cycles */}
-          <button
-            onClick={e => { e.stopPropagation(); onToggle(); }}
-            className="p-2 h-max shrink-0 mt-0.5 hover:scale-110 transition-transform"
-          >
-            {item.done
-              ? <CheckCircle2 className="w-6 h-6 text-primary" />
-              : item.didNotDo
-              ? <XCircle className="w-6 h-6 text-muted-foreground" />
-              : <Circle className="w-6 h-6 text-muted-foreground hover:text-primary transition-colors" />
-            }
+          <button onClick={onToggle} className="p-2 shrink-0 mt-0.5 hover:scale-110 transition-transform">
+            {item.done ? <CheckCircle2 className="w-6 h-6 text-primary drop-shadow-sm" /> : item.didNotDo ? <XCircle className="w-6 h-6 text-muted-foreground" /> : <Circle className="w-6 h-6 text-muted-foreground hover:text-primary transition-colors" />}
           </button>
         </GlassCard>
       </SwipeableRow>

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { focusNext } from "@/lib/focusNext";
-import { useStudyData, Attachment, AttachmentFormat, AttachmentPriority, AttachmentType, StudyType } from "@/hooks/useStudyData";
+import { useStudyData, AttachmentFormat, AttachmentPriority, AttachmentType, StudyType } from "@/hooks/useStudyData";
 import { GlassCard } from "@/components/shared/GlassCard";
 import { BottomSheet } from "@/components/shared/BottomSheet";
 import { ConfirmSheet } from "@/components/shared/ConfirmSheet";
@@ -38,14 +38,11 @@ export function SubjectDetail() {
   const [lectureTypeTab, setLectureTypeTab] = useState<StudyType>("theoretical");
   const [examTypeTab, setExamTypeTab] = useState<StudyType>("theoretical");
 
-  // Lecture state
+  // State setup
   const [isAddLectureOpen, setIsAddLectureOpen] = useState(false);
-
-  // Exam state
   const [isAddExamOpen, setIsAddExamOpen] = useState(false);
   const [deletingExamId, setDeletingExamId] = useState<string | null>(null);
 
-  // Attachment state
   const [isAddAttachmentOpen, setIsAddAttachmentOpen] = useState(false);
   const [editingAttachmentId, setEditingAttachmentId] = useState<string | null>(null);
   const [viewingAttachmentId, setViewingAttachmentId] = useState<string | null>(null);
@@ -54,10 +51,7 @@ export function SubjectDetail() {
   const [attachFormat, setAttachFormat] = useState<AttachmentFormat>('File');
   const [attachPriority, setAttachPriority] = useState<AttachmentPriority>('Important');
 
-  // Details edit state — Drive link only; lecture/exam counts are now computed live.
   const [isEditDriveLinkOpen, setIsEditDriveLinkOpen] = useState(false);
-
-  // Confirm delete subject
   const [isDeletingSubject, setIsDeletingSubject] = useState(false);
 
   const lecForm = useForm({ defaultValues: { name: "", link: "" } });
@@ -72,7 +66,6 @@ export function SubjectDetail() {
 
   const accentColor = subject.color;
 
-  // ── Computed counts (live, not stored fields — spec 1.2) ─────────────────
   const lecturesByType = {
     theoretical: subject.lectures.filter(l => l.type === "theoretical"),
     practical: subject.lectures.filter(l => l.type === "practical"),
@@ -89,14 +82,12 @@ export function SubjectDetail() {
   const visibleLectures = lecturesByType[lectureTypeTab];
   const visibleExams = examsByType[examTypeTab];
 
-  // ─── Lecture handlers ────────────────────────────────────────────────────
   const onAddLecture = (data: any) => {
     addLecture(subject.id, { name: data.name, link: data.link, type: lectureTypeTab });
     lecForm.reset();
     setIsAddLectureOpen(false);
   };
 
-  // ─── Exam handlers ────────────────────────────────────────────────────────
   const onAddExam = (data: any) => {
     addExam(subject.id, {
       name: data.name,
@@ -110,7 +101,6 @@ export function SubjectDetail() {
     setIsAddExamOpen(false);
   };
 
-  // ─── Attachment handlers ──────────────────────────────────────────────────
   const onAddAttachment = (data: any) => {
     if (!data.url.trim()) return;
     addAttachment(subject.id, {
@@ -149,7 +139,6 @@ export function SubjectDetail() {
     setEditingAttachmentId(null);
   };
 
-  // ─── Details handlers ─────────────────────────────────────────────────────
   const openEditDriveLink = () => {
     driveLinkForm.reset({ driveLink: subject.driveLink || "" });
     setIsEditDriveLinkOpen(true);
@@ -165,9 +154,7 @@ export function SubjectDetail() {
     setLocation("/subjects");
   };
 
-  const inputCls =
-    "w-full bg-background border border-border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 text-foreground";
-
+  const inputCls = "w-full bg-background border border-border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 text-foreground";
 
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: "details", label: "Details", icon: <Info className="w-3.5 h-3.5" /> },
@@ -176,43 +163,15 @@ export function SubjectDetail() {
     { id: "attachments", label: "Files", icon: <Paperclip className="w-3.5 h-3.5" /> },
   ];
 
-  const TagButton = ({
-    active,
-    onClick,
-    children,
-  }: {
-    active: boolean;
-    onClick: () => void;
-    children: React.ReactNode;
-  }) => (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-        active ? "text-white" : "bg-secondary/60 text-muted-foreground hover:bg-secondary"
-      }`}
-      style={active ? { backgroundColor: accentColor } : {}}
-    >
-      {children}
-    </button>
-  );
-
-  const TypeSegmented = ({
-    value,
-    onChange,
-  }: {
-    value: StudyType;
-    onChange: (v: StudyType) => void;
-  }) => (
-    <div className="bg-secondary/50 p-1 rounded-xl flex gap-1 mb-3">
+  const TypeSegmented = ({ value, onChange }: { value: StudyType; onChange: (v: StudyType) => void; }) => (
+    <div className="bg-secondary/40 border border-border/50 p-1.5 rounded-2xl flex gap-1 mb-4">
       {(["theoretical", "practical"] as StudyType[]).map(t => (
         <button
           key={t}
           onClick={() => onChange(t)}
-          className={`flex-1 py-2 rounded-lg text-sm font-semibold capitalize transition-all ${
-            value === t ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
+          className={`flex-1 py-2.5 rounded-xl text-sm font-semibold capitalize transition-all ${
+            value === t ? "bg-background text-foreground shadow-sm ring-1 ring-border/50" : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
           }`}
-          style={value === t ? { color: accentColor } : {}}
         >
           {t}
         </button>
@@ -222,44 +181,38 @@ export function SubjectDetail() {
 
   return (
     <div className="space-y-6 pb-20">
-      {/* ─── Header ─────────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3">
-        <Link
-          href="/subjects"
-          className="p-2 rounded-full bg-secondary hover:bg-secondary/80 transition-colors shrink-0"
-        >
-          <ArrowLeft className="w-5 h-5" />
+      {/* Header */}
+      <div className="flex items-center gap-4">
+        <Link href="/subjects" className="w-10 h-10 rounded-full bg-secondary/80 hover:bg-secondary flex items-center justify-center transition-colors shrink-0 border border-border/50 shadow-sm">
+          <ArrowLeft className="w-5 h-5 text-muted-foreground" />
         </Link>
-        <div className="flex-1 min-w-0">
-          <h1
-            className="text-2xl md:text-3xl font-bold tracking-tight truncate"
-            style={{ color: accentColor }}
-          >
+        <div className="flex-1 min-w-0 flex items-center gap-3">
+          <div className="w-3.5 h-3.5 rounded-full shadow-sm shrink-0" style={{ backgroundColor: accentColor }} />
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight truncate text-foreground">
             {subject.name}
           </h1>
         </div>
         <button
           onClick={() => setIsDeletingSubject(true)}
-          className="p-2 rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors shrink-0"
+          className="w-10 h-10 rounded-full bg-secondary/80 hover:bg-destructive/10 text-muted-foreground hover:text-destructive flex items-center justify-center transition-colors shrink-0 border border-border/50 shadow-sm"
           title="Delete subject"
         >
           <Trash2 className="w-5 h-5" />
         </button>
       </div>
 
-      {/* ─── Tabs ───────────────────────────────────────────────────────────── */}
-      <div className="overflow-x-auto -mx-4 px-4 pb-0.5">
-        <div className="bg-secondary/50 p-1.5 rounded-2xl flex gap-1 w-max md:w-full">
+      {/* Tabs */}
+      <div className="overflow-x-auto -mx-4 px-4 pb-0.5 scrollbar-hide">
+        <div className="bg-secondary/40 p-1.5 rounded-2xl flex gap-1 w-max md:w-full border border-border/50">
           {tabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 px-3 md:px-5 py-2 rounded-xl font-semibold flex items-center justify-center gap-1.5 transition-all text-sm whitespace-nowrap ${
+              className={`flex-1 px-4 md:px-6 py-2.5 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all text-sm whitespace-nowrap ${
                 activeTab === tab.id
-                  ? "bg-background shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
+                  ? "bg-card text-foreground shadow-sm ring-1 ring-border/50"
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
               }`}
-              style={activeTab === tab.id ? { color: accentColor } : {}}
             >
               {tab.icon} {tab.label}
             </button>
@@ -267,7 +220,7 @@ export function SubjectDetail() {
         </div>
       </div>
 
-      {/* ─── Tab Content ────────────────────────────────────────────────────── */}
+      {/* Tab Content */}
       <AnimatePresence mode="wait">
         <motion.div
           key={activeTab}
@@ -276,53 +229,44 @@ export function SubjectDetail() {
           exit={{ opacity: 0, y: -8 }}
           transition={{ duration: 0.15 }}
         >
-          {/* ── DETAILS TAB ─────────────────────────────────────────────────── */}
+          {/* DETAILS TAB */}
           {activeTab === "details" && (
             <div className="space-y-4">
-              {/* Drive Link card — native <a> to open (never blocked), swipe right to edit */}
               <SwipeRow
                 onSwipeRight={openEditDriveLink}
-                rightLabel="Edit"
-                rightIcon={Pencil}
-                rightColor="#6366f1"
+                rightLabel="Edit" rightIcon={Pencil} rightColor="#6366f1"
+                onSwipeLeft={subject.driveLink ? () => window.open(subject.driveLink, "_blank", "noopener,noreferrer") : undefined}
+                leftLabel="Open" leftIcon={ExternalLink} leftColor="#0ea5e9"
               >
                 {subject.driveLink ? (
-                  <a href={subject.driveLink} target="_blank" rel="noreferrer" className="block">
-                    <GlassCard className="p-5">
+                  <div className="block">
+                    <GlassCard className="p-5 border-border/60 hover:bg-secondary/20 transition-colors">
                       <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div
-                            className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                            style={{ backgroundColor: `${accentColor}20` }}
-                          >
-                            <FolderOpen className="w-5 h-5" style={{ color: accentColor }} />
+                        <div className="flex items-center gap-4 min-w-0">
+                          <div className="w-11 h-11 rounded-xl bg-secondary flex items-center justify-center shrink-0 border border-border/50 shadow-sm">
+                            <FolderOpen className="w-5 h-5 text-muted-foreground" />
                           </div>
                           <div className="min-w-0">
-                            <p className="font-semibold text-sm">Google Drive Folder</p>
-                            <p className="text-xs font-semibold mt-0.5" style={{ color: accentColor }}>
-                              Connected · tap to open
-                            </p>
+                            <p className="font-semibold text-sm text-foreground">Google Drive Folder</p>
+                            <p className="text-xs font-bold mt-1 text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">Connected</p>
                           </div>
                         </div>
-                        <ExternalLink className="w-4 h-4 shrink-0 text-muted-foreground opacity-50" />
+                        <ExternalLink className="w-4 h-4 shrink-0 text-muted-foreground/50" />
                       </div>
-                      <p className="text-xs text-muted-foreground mt-3 opacity-50">Swipe right to change link</p>
+                      <p className="text-xs text-muted-foreground mt-4 text-center">← Swipe left to open · swipe right to change link</p>
                     </GlassCard>
-                  </a>
+                  </div>
                 ) : (
                   <button className="w-full text-left" onClick={openEditDriveLink}>
-                    <GlassCard className="p-5">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                          style={{ backgroundColor: `${accentColor}12` }}
-                        >
-                          <FolderOpen className="w-5 h-5 opacity-40" style={{ color: accentColor }} />
+                    <GlassCard className="p-5 border-border/60 hover:bg-secondary/40 transition-colors group">
+                      <div className="flex items-center gap-4">
+                        <div className="w-11 h-11 rounded-xl bg-secondary/50 group-hover:bg-secondary flex items-center justify-center shrink-0 border border-border/50 shadow-sm transition-colors">
+                          <FolderOpen className="w-5 h-5 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
                         </div>
                         <div>
-                          <p className="font-semibold text-sm">Google Drive Folder</p>
-                          <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
-                            <Link2 className="w-3 h-3" /> Tap to add a folder link
+                          <p className="font-semibold text-sm text-foreground">Google Drive Folder</p>
+                          <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5 font-medium">
+                            <Link2 className="w-3.5 h-3.5" /> Tap to add a folder link
                           </p>
                         </div>
                       </div>
@@ -331,52 +275,37 @@ export function SubjectDetail() {
                 )}
               </SwipeRow>
 
-              {/* Progress card */}
-              <GlassCard className="p-5">
-                <div className="flex items-center gap-2.5 mb-4">
-                  <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                    style={{ backgroundColor: `${accentColor}20` }}
-                  >
-                    <BarChart2 className="w-4 h-4" style={{ color: accentColor }} />
+              <GlassCard className="p-6 border-border/60">
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center shrink-0 border border-border/50 shadow-sm">
+                    <BarChart2 className="w-4 h-4 text-muted-foreground" />
                   </div>
-                  <span className="font-semibold">Progress</span>
+                  <span className="font-bold text-foreground">Progress</span>
                 </div>
 
-                <div className="mb-1">
-                  <div className="flex items-end justify-between mb-2">
-                    <span className="text-3xl font-bold" style={{ color: accentColor }}>
-                      {progress}%
-                    </span>
-                    <span className="text-sm text-muted-foreground">
-                      {finishedExams} / {totalExams} exams checked
-                    </span>
+                <div className="mb-2">
+                  <div className="flex items-end justify-between mb-3">
+                    <span className="text-3xl font-bold tracking-tight text-foreground">{progress}%</span>
+                    <span className="text-sm font-medium text-muted-foreground">{finishedExams} / {totalExams} exams checked</span>
                   </div>
-                  <div className="h-2.5 bg-secondary rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{ width: `${progress}%`, backgroundColor: accentColor }}
-                    />
+                  <div className="h-3 bg-secondary border border-border/40 rounded-full overflow-hidden shadow-inner">
+                    <div className="h-full rounded-full transition-all duration-500" style={{ width: `${progress}%`, backgroundColor: accentColor }} />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 mt-5">
-                  <div className="bg-secondary/50 rounded-xl p-3">
-                    <p className="text-2xl font-bold text-center">{totalLectures}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5 font-medium uppercase tracking-wide text-center">
-                      Lectures
-                    </p>
-                    <p className="text-xs text-muted-foreground text-center mt-1">
-                      {lecturesByType.theoretical.length} Theoretical / {lecturesByType.practical.length} Practical
+                <div className="grid grid-cols-2 gap-3 mt-6">
+                  <div className="bg-secondary/40 border border-border/50 rounded-2xl p-4 flex flex-col justify-center">
+                    <p className="text-3xl font-bold text-center tracking-tight">{totalLectures}</p>
+                    <p className="text-[10px] text-muted-foreground mt-1.5 font-bold uppercase tracking-widest text-center">Lectures</p>
+                    <p className="text-[11px] text-muted-foreground/70 font-medium text-center mt-1.5">
+                      {lecturesByType.theoretical.length} Theo / {lecturesByType.practical.length} Prac
                     </p>
                   </div>
-                  <div className="bg-secondary/50 rounded-xl p-3">
-                    <p className="text-2xl font-bold text-center">{totalExams}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5 font-medium uppercase tracking-wide text-center">
-                      Exams
-                    </p>
-                    <p className="text-xs text-muted-foreground text-center mt-1">
-                      {examsByType.theoretical.length} Theoretical / {examsByType.practical.length} Practical
+                  <div className="bg-secondary/40 border border-border/50 rounded-2xl p-4 flex flex-col justify-center">
+                    <p className="text-3xl font-bold text-center tracking-tight">{totalExams}</p>
+                    <p className="text-[10px] text-muted-foreground mt-1.5 font-bold uppercase tracking-widest text-center">Exams</p>
+                    <p className="text-[11px] text-muted-foreground/70 font-medium text-center mt-1.5">
+                      {examsByType.theoretical.length} Theo / {examsByType.practical.length} Prac
                     </p>
                   </div>
                 </div>
@@ -384,199 +313,178 @@ export function SubjectDetail() {
             </div>
           )}
 
-          {/* ── LECTURES TAB ─────────────────────────────────────────────────── */}
+          {/* LECTURES TAB */}
           {activeTab === "lectures" && (
-            <div className="space-y-3">
+            <div className="space-y-4">
               <TypeSegmented value={lectureTypeTab} onChange={setLectureTypeTab} />
 
               {visibleLectures.length === 0 ? (
-                <GlassCard className="p-10 text-center text-muted-foreground border-dashed border-2 bg-transparent">
-                  <BookOpen className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                <GlassCard className="p-10 text-center text-muted-foreground border-dashed border-2 bg-transparent shadow-none">
+                  <div className="w-12 h-12 rounded-full bg-secondary/50 mx-auto flex items-center justify-center mb-4">
+                    <BookOpen className="w-6 h-6 opacity-40" />
+                  </div>
                   <p className="font-medium">No {lectureTypeTab} lectures yet</p>
                 </GlassCard>
               ) : (
-                visibleLectures.map(lec => (
-                  <SwipeRow
-                    key={lec.id}
-                    onTap={() => setLocation(`/subjects/${subject.id}/lectures/${lec.id}`)}
-                    onSwipeRight={() => setLocation(`/subjects/${subject.id}/lectures/${lec.id}/flashcards`)}
-                    rightLabel="Flashcards"
-                    rightIcon={Layers}
-                    rightColor="#6366f1"
-                    onSwipeLeft={() => setLocation(`/subjects/${subject.id}/lectures/${lec.id}/study`)}
-                    leftLabel="Study"
-                    leftIcon={Brain}
-                    leftColor="#0ea5e9"
-                  >
-                    <GlassCard className="p-4 flex items-center gap-3 cursor-pointer">
-                      <div
-                        className="w-8 h-8 rounded-lg shrink-0 flex items-center justify-center"
-                        style={{ backgroundColor: `${accentColor}20` }}
-                      >
-                        <BookOpen className="w-4 h-4" style={{ color: accentColor }} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold truncate">{lec.name}</p>
-                        {lec.link && (
-                          <span className="text-xs flex items-center gap-1 mt-0.5" style={{ color: accentColor }}>
-                            <ExternalLink className="w-3 h-3" /> Has material link
-                          </span>
-                        )}
-                      </div>
-                      <LectureCoverBadge percentage={lec.readerLastPercentage} />
-                      <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-                    </GlassCard>
-                  </SwipeRow>
-                ))
+                <div className="space-y-3">
+                  {visibleLectures.map(lec => (
+                    <SwipeRow
+                      key={lec.id}
+                      onTap={() => setLocation(`/subjects/${subject.id}/lectures/${lec.id}`)}
+                      onSwipeRight={() => setLocation(`/subjects/${subject.id}/lectures/${lec.id}/flashcards`)}
+                      rightLabel="Flashcards" rightIcon={Layers} rightColor="#6366f1"
+                      onSwipeLeft={() => setLocation(`/subjects/${subject.id}/lectures/${lec.id}/study`)}
+                      leftLabel="Study" leftIcon={Brain} leftColor="#0ea5e9"
+                    >
+                      <GlassCard className="p-4 flex items-center gap-4 cursor-pointer hover:bg-secondary/40 transition-colors border-border/60">
+                        <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center shrink-0 border border-border/50 shadow-sm">
+                          <BookOpen className="w-5 h-5 text-muted-foreground" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold truncate text-foreground">{lec.name}</p>
+                          {lec.link && (
+                            <span className="text-xs flex items-center gap-1.5 mt-1 text-muted-foreground font-medium">
+                              <ExternalLink className="w-3.5 h-3.5" /> Material attached
+                            </span>
+                          )}
+                        </div>
+                        <LectureCoverBadge percentage={lec.readerLastPercentage} />
+                        <ChevronRight className="w-4 h-4 text-muted-foreground/50 shrink-0 ml-1" />
+                      </GlassCard>
+                    </SwipeRow>
+                  ))}
+                </div>
               )}
               <button
                 onClick={() => setIsAddLectureOpen(true)}
-                className="w-full border-2 border-dashed border-border rounded-2xl p-4 text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-all flex items-center justify-center gap-2 font-medium"
+                className="w-full border-2 border-dashed border-border/60 rounded-2xl p-4 text-muted-foreground hover:text-foreground hover:border-foreground/30 hover:bg-secondary/20 transition-all flex items-center justify-center gap-2 font-semibold shadow-sm"
               >
                 <Plus className="w-4 h-4" /> Add {lectureTypeTab === "theoretical" ? "Theoretical" : "Practical"} Lecture
               </button>
             </div>
           )}
 
-          {/* ── EXAMS TAB ────────────────────────────────────────────────────── */}
+          {/* EXAMS TAB */}
           {activeTab === "exams" && (
-            <div className="space-y-3">
+            <div className="space-y-4">
               <TypeSegmented value={examTypeTab} onChange={setExamTypeTab} />
 
               {visibleExams.length === 0 ? (
-                <GlassCard className="p-10 text-center text-muted-foreground border-dashed border-2 bg-transparent">
-                  <FileText className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                <GlassCard className="p-10 text-center text-muted-foreground border-dashed border-2 bg-transparent shadow-none">
+                  <div className="w-12 h-12 rounded-full bg-secondary/50 mx-auto flex items-center justify-center mb-4">
+                    <FileText className="w-6 h-6 opacity-40" />
+                  </div>
                   <p className="font-medium">No {examTypeTab} exams yet</p>
                 </GlassCard>
               ) : (
-                visibleExams.map(exam => {
-                  const isChecked = !!exam.checked;
-                  return (
-                    <SwipeRow
-                      key={exam.id}
-                      onTap={() => setLocation(`/subjects/${subject.id}/exams/${exam.id}/take`)}
-                      onSwipeRight={() => setDeletingExamId(exam.id)}
-                      rightLabel="Delete"
-                      rightIcon={Trash2}
-                      rightColor="#ef4444"
-                      onSwipeLeft={() => setLocation(`/subjects/${subject.id}/exams/${exam.id}/edit`)}
-                      leftLabel="Edit"
-                      leftIcon={Pencil}
-                      leftColor="#6366f1"
-                    >
-                      <GlassCard className="p-4 cursor-pointer">
-                        <div className="flex items-start gap-3">
-                          <div
-                            className="w-8 h-8 rounded-lg shrink-0 flex items-center justify-center mt-0.5"
-                            style={{ backgroundColor: isChecked ? `${accentColor}20` : undefined }}
-                          >
-                            <FileText className="w-4 h-4" style={{ color: isChecked ? accentColor : undefined }} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold truncate">{exam.name}</p>
-                            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
-                              {exam.date && (
-                                <span className="text-xs text-muted-foreground">
-                                  {format(new Date(exam.date), "MMM d, yyyy")}
-                                </span>
-                              )}
-                              <span className="text-xs text-muted-foreground">
-                                {(exam.questions || []).length} question{(exam.questions || []).length === 1 ? "" : "s"}
-                              </span>
+                <div className="space-y-3">
+                  {visibleExams.map(exam => {
+                    const isChecked = !!exam.checked;
+                    return (
+                      <SwipeRow
+                        key={exam.id}
+                        onTap={() => setLocation(`/subjects/${subject.id}/exams/${exam.id}/take`)}
+                        onSwipeRight={() => setDeletingExamId(exam.id)}
+                        rightLabel="Delete" rightIcon={Trash2} rightColor="#ef4444"
+                        onSwipeLeft={() => setLocation(`/subjects/${subject.id}/exams/${exam.id}/edit`)}
+                        leftLabel="Edit" leftIcon={Pencil} leftColor="#6366f1"
+                      >
+                        <GlassCard className={`p-4 cursor-pointer transition-colors border-border/60 ${isChecked ? 'bg-secondary/20' : 'hover:bg-secondary/40'}`}>
+                          <div className="flex items-center gap-4">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border shadow-sm ${isChecked ? 'bg-primary/10 border-primary/20 text-primary' : 'bg-secondary border-border/50 text-muted-foreground'}`}>
+                              <FileText className="w-5 h-5" />
                             </div>
+                            <div className="flex-1 min-w-0">
+                              <p className={`font-semibold truncate ${isChecked ? 'text-muted-foreground' : 'text-foreground'}`}>{exam.name}</p>
+                              <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
+                                {exam.date && (
+                                  <span className="text-[11px] font-medium text-muted-foreground tracking-wide uppercase">
+                                    {format(new Date(exam.date), "MMM d, yyyy")}
+                                  </span>
+                                )}
+                                <span className="text-[11px] font-medium text-muted-foreground tracking-wide uppercase">
+                                  {(exam.questions || []).length} question{(exam.questions || []).length === 1 ? "" : "s"}
+                                </span>
+                              </div>
+                            </div>
+                            {exam.lastScore ? (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1.5 bg-background text-foreground shrink-0 border border-border/60 shadow-sm">
+                                <span className="w-1.5 h-1.5 rounded-full shadow-sm" style={{ backgroundColor: isChecked ? accentColor : "#eab308" }} />
+                                {exam.lastScore.percentage}%
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-secondary text-muted-foreground shrink-0 border border-border/50 uppercase tracking-wide">
+                                Not taken
+                              </span>
+                            )}
                           </div>
-                          {exam.lastScore ? (
-                            <span
-                              className="px-2.5 py-0.5 rounded-md text-xs font-bold text-white shrink-0"
-                              style={{ backgroundColor: isChecked ? accentColor : "#eab308" }}
-                            >
-                              {exam.lastScore.percentage}%
-                            </span>
-                          ) : (
-                            <span className="px-2.5 py-0.5 rounded-md text-xs font-medium bg-secondary text-muted-foreground shrink-0">
-                              Not taken
-                            </span>
-                          )}
-                        </div>
-                      </GlassCard>
-                    </SwipeRow>
-                  );
-                })
+                        </GlassCard>
+                      </SwipeRow>
+                    );
+                  })}
+                </div>
               )}
               <button
                 onClick={() => setIsAddExamOpen(true)}
-                className="w-full border-2 border-dashed border-border rounded-2xl p-4 text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-all flex items-center justify-center gap-2 font-medium"
+                className="w-full border-2 border-dashed border-border/60 rounded-2xl p-4 text-muted-foreground hover:text-foreground hover:border-foreground/30 hover:bg-secondary/20 transition-all flex items-center justify-center gap-2 font-semibold shadow-sm"
               >
                 <Plus className="w-4 h-4" /> Add {examTypeTab === "theoretical" ? "Theoretical" : "Practical"} Exam
               </button>
             </div>
           )}
 
-          {/* ── ATTACHMENTS ("Files") TAB ────────────────────────────────────── */}
+          {/* ATTACHMENTS TAB */}
           {activeTab === "attachments" && (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {(subject.attachments || []).length === 0 ? (
-                <GlassCard className="p-10 text-center text-muted-foreground border-dashed border-2 bg-transparent">
-                  <Paperclip className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                <GlassCard className="p-10 text-center text-muted-foreground border-dashed border-2 bg-transparent shadow-none">
+                  <div className="w-12 h-12 rounded-full bg-secondary/50 mx-auto flex items-center justify-center mb-4">
+                    <Paperclip className="w-6 h-6 opacity-40" />
+                  </div>
                   <p className="font-medium">No attachments yet</p>
-                  <p className="text-sm mt-1 opacity-70">Add Telegram links with tags</p>
+                  <p className="text-sm mt-1 opacity-70">Add links with tags</p>
                 </GlassCard>
               ) : (
-                (subject.attachments || []).map(att => (
-                  <SwipeRow
-                    key={att.id}
-                    onTap={() => setViewingAttachmentId(att.id)}
-                    onSwipeRight={() => setDeletingAttachmentId(att.id)}
-                    rightLabel="Delete"
-                    rightIcon={Trash2}
-                    rightColor="#ef4444"
-                    onSwipeLeft={() => openEditAttachment(att.id)}
-                    leftLabel="Edit"
-                    leftIcon={Pencil}
-                    leftColor="#6366f1"
-                  >
-                    <GlassCard className="p-4 cursor-pointer">
-                      <div className="flex items-start gap-3">
-                        <div
-                          className="w-8 h-8 rounded-lg shrink-0 flex items-center justify-center mt-0.5"
-                          style={{ backgroundColor: `${accentColor}20` }}
-                        >
-                          <Paperclip className="w-4 h-4" style={{ color: accentColor }} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          {att.name && (
-                            <p className="font-semibold text-sm truncate mb-0.5">{att.name}</p>
-                          )}
-                          <p className="text-xs truncate" style={{ color: accentColor }}>{att.url}</p>
-                          <div className="flex flex-wrap gap-1.5 mt-2">
-                            <span
-                              className="px-2 py-0.5 rounded-md text-xs font-medium text-white"
-                              style={{ backgroundColor: accentColor }}
-                            >
-                              {att.type}
-                            </span>
-                            <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-secondary text-foreground">
-                              {att.format}
-                            </span>
-                            <span
-                              className={`px-2 py-0.5 rounded-md text-xs font-medium ${
-                                att.priority === "Important"
-                                  ? "bg-orange-500/15 text-orange-600 dark:text-orange-400"
-                                  : "bg-secondary text-muted-foreground"
-                              }`}
-                            >
-                              {att.priority}
-                            </span>
+                <div className="space-y-3">
+                  {(subject.attachments || []).map(att => (
+                    <SwipeRow
+                      key={att.id}
+                      onTap={() => setViewingAttachmentId(att.id)}
+                      onSwipeRight={() => setDeletingAttachmentId(att.id)}
+                      rightLabel="Delete" rightIcon={Trash2} rightColor="#ef4444"
+                      onSwipeLeft={() => openEditAttachment(att.id)}
+                      leftLabel="Edit" leftIcon={Pencil} leftColor="#6366f1"
+                    >
+                      <GlassCard className="p-4 cursor-pointer hover:bg-secondary/40 transition-colors border-border/60">
+                        <div className="flex items-start gap-4">
+                          <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center shrink-0 border border-border/50 shadow-sm">
+                            <Paperclip className="w-5 h-5 text-muted-foreground" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            {att.name && <p className="font-semibold text-sm truncate mb-1 text-foreground">{att.name}</p>}
+                            <p className="text-xs truncate text-muted-foreground/70 font-medium">{att.url}</p>
+                            <div className="flex flex-wrap gap-2 mt-3">
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-secondary text-secondary-foreground border border-border/50 uppercase tracking-wide">
+                                {att.type}
+                              </span>
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-secondary text-secondary-foreground border border-border/50 uppercase tracking-wide">
+                                {att.format}
+                              </span>
+                              <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border border-border/50 uppercase tracking-wide flex items-center gap-1.5 ${att.priority === "Important" ? "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20" : "bg-secondary text-muted-foreground"}`}>
+                                {att.priority === "Important" && <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />}
+                                {att.priority}
+                              </span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </GlassCard>
-                  </SwipeRow>
-                ))
+                      </GlassCard>
+                    </SwipeRow>
+                  ))}
+                </div>
               )}
               <button
                 onClick={() => setIsAddAttachmentOpen(true)}
-                className="w-full border-2 border-dashed border-border rounded-2xl p-4 text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-all flex items-center justify-center gap-2 font-medium"
+                className="w-full border-2 border-dashed border-border/60 rounded-2xl p-4 text-muted-foreground hover:text-foreground hover:border-foreground/30 hover:bg-secondary/20 transition-all flex items-center justify-center gap-2 font-semibold shadow-sm"
               >
                 <Plus className="w-4 h-4" /> Add Attachment
               </button>
@@ -585,292 +493,156 @@ export function SubjectDetail() {
         </motion.div>
       </AnimatePresence>
 
-      {/* ═══════════════ MODALS ═══════════════ */}
-
-      {/* Add Lecture */}
+      {/* MODALS */}
       <BottomSheet isOpen={isAddLectureOpen} onClose={() => setIsAddLectureOpen(false)} title={`New ${lectureTypeTab === "theoretical" ? "Theoretical" : "Practical"} Lecture`}>
         <form onSubmit={lecForm.handleSubmit(onAddLecture)} className="space-y-5">
           <div>
             <label className="block text-sm font-medium mb-2">Lecture Name</label>
-            <input
-              {...lecForm.register("name", { required: true })}
-              className={inputCls}
-              placeholder="e.g. Chapter 3 — Neural Networks"
-              onKeyDown={focusNext}
-            />
+            <input {...lecForm.register("name", { required: true })} className={inputCls} placeholder="e.g. Chapter 3" onKeyDown={focusNext} />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-2">
-              Link <span className="text-muted-foreground font-normal">(optional)</span>
-            </label>
+            <label className="block text-sm font-medium mb-2">Link <span className="text-muted-foreground font-normal">(optional)</span></label>
             <input {...lecForm.register("link")} className={inputCls} placeholder="https://..." />
           </div>
-          <button
-            type="submit"
-            className="w-full text-white font-semibold rounded-xl py-3.5 transition-opacity hover:opacity-90"
-            style={{ backgroundColor: accentColor }}
-          >
-            Add Lecture
-          </button>
+          <button type="submit" className="w-full bg-primary text-primary-foreground font-semibold rounded-xl py-3.5 transition-opacity hover:opacity-90">Add Lecture</button>
         </form>
       </BottomSheet>
 
-      {/* Add Exam */}
       <BottomSheet isOpen={isAddExamOpen} onClose={() => setIsAddExamOpen(false)} title={`New ${examTypeTab === "theoretical" ? "Theoretical" : "Practical"} Exam`}>
         <form onSubmit={examForm.handleSubmit(onAddExam)} className="space-y-5">
           <div>
             <label className="block text-sm font-medium mb-2">Exam Name</label>
-            <input
-              {...examForm.register("name", { required: true })}
-              className={inputCls}
-              placeholder="e.g. Midterm Exam"
-              onKeyDown={focusNext}
-            />
+            <input {...examForm.register("name", { required: true })} className={inputCls} placeholder="e.g. Midterm" onKeyDown={focusNext} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-2">
-                Date <span className="text-muted-foreground font-normal">(opt.)</span>
-              </label>
-              <input type="date" {...examForm.register("date")} className={inputCls} />
+              <label className="block text-sm font-medium mb-2">Date (optional)</label>
+              <input type="date" {...examForm.register("date")} className={inputCls} onKeyDown={focusNext} />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-2">Weight %</label>
-              <input type="number" min="0" max="100" {...examForm.register("weight")} className={inputCls} />
+              <label className="block text-sm font-medium mb-2">Weight</label>
+              <input type="number" step="0.1" {...examForm.register("weight", { required: true, min: 0 })} className={inputCls} placeholder="1.0" />
             </div>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Add questions and lecture links afterward from the exam's edit page.
-          </p>
-          <button
-            type="submit"
-            className="w-full text-white font-semibold rounded-xl py-3.5 transition-opacity hover:opacity-90"
-            style={{ backgroundColor: accentColor }}
-          >
-            Add Exam
-          </button>
+          <button type="submit" className="w-full bg-primary text-primary-foreground font-semibold rounded-xl py-3.5 transition-opacity hover:opacity-90">Add Exam</button>
         </form>
       </BottomSheet>
 
-      {/* Add Attachment */}
-      <BottomSheet
-        isOpen={isAddAttachmentOpen}
-        onClose={() => setIsAddAttachmentOpen(false)}
-        title="New Attachment"
-      >
+      <ConfirmSheet
+        isOpen={!!deletingExamId} onClose={() => setDeletingExamId(null)}
+        onConfirm={() => { if (deletingExamId) { deleteExam(subject.id, deletingExamId); setDeletingExamId(null); } }}
+        title="Delete exam?" message="This will permanently delete this exam and its score." confirmLabel="Delete Exam"
+      />
+
+      <BottomSheet isOpen={isAddAttachmentOpen} onClose={() => setIsAddAttachmentOpen(false)} title="Add Attachment">
         <form onSubmit={attachForm.handleSubmit(onAddAttachment)} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium mb-2">Telegram Link</label>
-            <input
-              {...attachForm.register("url", { required: true })}
-              className={inputCls}
-              placeholder="https://t.me/..."
-              onKeyDown={focusNext}
-            />
+            <label className="block text-sm font-medium mb-2">URL or Link</label>
+            <input {...attachForm.register("url", { required: true })} className={inputCls} placeholder="https://..." onKeyDown={focusNext} />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-2">
-              Label <span className="text-muted-foreground font-normal">(optional)</span>
-            </label>
-            <input
-              {...attachForm.register("name")}
-              className={inputCls}
-              placeholder="e.g. Chapter 5 notes"
-            />
+            <label className="block text-sm font-medium mb-2">Name <span className="text-muted-foreground font-normal">(optional)</span></label>
+            <input {...attachForm.register("name")} className={inputCls} placeholder="e.g. Formulas PDF" />
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-2">Type</label>
-            <div className="flex flex-wrap gap-2">
-              {ATTACHMENT_TYPES.map(t => (
-                <TagButton key={t} active={attachType === t} onClick={() => setAttachType(t)}>
-                  {t}
-                </TagButton>
-              ))}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">Type</label>
+              <select value={attachType} onChange={e => setAttachType(e.target.value as any)} className={`${inputCls} appearance-none`}>
+                {ATTACHMENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
             </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-2">Format</label>
-            <div className="flex gap-2">
-              {ATTACHMENT_FORMATS.map(f => (
-                <TagButton key={f} active={attachFormat === f} onClick={() => setAttachFormat(f)}>
-                  {f}
-                </TagButton>
-              ))}
+            <div>
+              <label className="block text-sm font-medium mb-2">Format</label>
+              <select value={attachFormat} onChange={e => setAttachFormat(e.target.value as any)} className={`${inputCls} appearance-none`}>
+                {ATTACHMENT_FORMATS.map(f => <option key={f} value={f}>{f}</option>)}
+              </select>
             </div>
           </div>
           <div>
             <label className="block text-sm font-medium mb-2">Priority</label>
-            <div className="flex gap-2">
-              {ATTACHMENT_PRIORITIES.map(p => (
-                <TagButton key={p} active={attachPriority === p} onClick={() => setAttachPriority(p)}>
-                  {p}
-                </TagButton>
-              ))}
-            </div>
+            <select value={attachPriority} onChange={e => setAttachPriority(e.target.value as any)} className={`${inputCls} appearance-none`}>
+              {ATTACHMENT_PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
           </div>
-          <button
-            type="submit"
-            className="w-full text-white font-semibold rounded-xl py-3.5 transition-opacity hover:opacity-90"
-            style={{ backgroundColor: accentColor }}
-          >
-            Save Attachment
-          </button>
+          <button type="submit" className="w-full bg-primary text-primary-foreground font-semibold rounded-xl py-3.5 transition-opacity hover:opacity-90">Add Attachment</button>
         </form>
       </BottomSheet>
 
-      {/* Edit Attachment (swipe right-to-left) */}
-      <BottomSheet
-        isOpen={!!editingAttachmentId}
-        onClose={() => setEditingAttachmentId(null)}
-        title="Edit Attachment"
-      >
+      <BottomSheet isOpen={!!editingAttachmentId} onClose={() => setEditingAttachmentId(null)} title="Edit Attachment">
         <form onSubmit={editAttachForm.handleSubmit(onEditAttachment)} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium mb-2">Telegram Link</label>
+            <label className="block text-sm font-medium mb-2">URL or Link</label>
             <input {...editAttachForm.register("url", { required: true })} className={inputCls} onKeyDown={focusNext} />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-2">
-              Label <span className="text-muted-foreground font-normal">(optional)</span>
-            </label>
+            <label className="block text-sm font-medium mb-2">Name <span className="text-muted-foreground font-normal">(optional)</span></label>
             <input {...editAttachForm.register("name")} className={inputCls} />
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-2">Type</label>
-            <div className="flex flex-wrap gap-2">
-              {ATTACHMENT_TYPES.map(t => (
-                <TagButton key={t} active={attachType === t} onClick={() => setAttachType(t)}>
-                  {t}
-                </TagButton>
-              ))}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">Type</label>
+              <select value={attachType} onChange={e => setAttachType(e.target.value as any)} className={`${inputCls} appearance-none`}>
+                {ATTACHMENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
             </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-2">Format</label>
-            <div className="flex gap-2">
-              {ATTACHMENT_FORMATS.map(f => (
-                <TagButton key={f} active={attachFormat === f} onClick={() => setAttachFormat(f)}>
-                  {f}
-                </TagButton>
-              ))}
+            <div>
+              <label className="block text-sm font-medium mb-2">Format</label>
+              <select value={attachFormat} onChange={e => setAttachFormat(e.target.value as any)} className={`${inputCls} appearance-none`}>
+                {ATTACHMENT_FORMATS.map(f => <option key={f} value={f}>{f}</option>)}
+              </select>
             </div>
           </div>
           <div>
             <label className="block text-sm font-medium mb-2">Priority</label>
-            <div className="flex gap-2">
-              {ATTACHMENT_PRIORITIES.map(p => (
-                <TagButton key={p} active={attachPriority === p} onClick={() => setAttachPriority(p)}>
-                  {p}
-                </TagButton>
-              ))}
-            </div>
+            <select value={attachPriority} onChange={e => setAttachPriority(e.target.value as any)} className={`${inputCls} appearance-none`}>
+              {ATTACHMENT_PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
           </div>
-          <button
-            type="submit"
-            className="w-full text-white font-semibold rounded-xl py-3.5 transition-opacity hover:opacity-90"
-            style={{ backgroundColor: accentColor }}
-          >
-            Save Changes
-          </button>
+          <button type="submit" className="w-full bg-primary text-primary-foreground font-semibold rounded-xl py-3.5 transition-opacity hover:opacity-90">Save Changes</button>
         </form>
       </BottomSheet>
 
-      {/* View Attachment (tap) */}
-      <BottomSheet
-        isOpen={!!viewingAttachmentId}
-        onClose={() => setViewingAttachmentId(null)}
-        title="Attachment"
-      >
-        {(() => {
-          const att = (subject.attachments || []).find(a => a.id === viewingAttachmentId);
-          if (!att) return null;
-          return (
-            <div className="space-y-4">
-              {att.name && <p className="font-semibold text-lg">{att.name}</p>}
-              <a
-                href={att.url}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-2 text-sm font-medium hover:underline break-all"
-                style={{ color: accentColor }}
-              >
-                <ExternalLink className="w-4 h-4 shrink-0" /> {att.url}
-              </a>
-              <div className="flex flex-wrap gap-1.5">
-                <span className="px-2 py-0.5 rounded-md text-xs font-medium text-white" style={{ backgroundColor: accentColor }}>
-                  {att.type}
-                </span>
-                <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-secondary text-foreground">{att.format}</span>
-                <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-secondary text-muted-foreground">{att.priority}</span>
-              </div>
-              <p className="text-xs text-muted-foreground pt-2">Swipe left to edit &middot; swipe right to delete</p>
-            </div>
-          );
-        })()}
+      <ConfirmSheet
+        isOpen={!!deletingAttachmentId} onClose={() => setDeletingAttachmentId(null)}
+        onConfirm={() => { if (deletingAttachmentId) { deleteAttachment(subject.id, deletingAttachmentId); setDeletingAttachmentId(null); } }}
+        title="Delete attachment?" message="This will permanently remove the link." confirmLabel="Delete Attachment"
+      />
+
+      <BottomSheet isOpen={!!viewingAttachmentId} onClose={() => setViewingAttachmentId(null)} title="View Attachment">
+        <div className="space-y-6 pt-2 pb-4">
+          <p className="text-center text-muted-foreground text-sm">To open this link, tap below. The app will open it in a new tab or the native app if supported.</p>
+          <button
+            onClick={() => {
+              const att = (subject.attachments || []).find(a => a.id === viewingAttachmentId);
+              if (att && att.url) {
+                let url = att.url;
+                if (!url.startsWith('http')) url = 'https://' + url;
+                window.open(url, "_blank", "noopener,noreferrer");
+              }
+              setViewingAttachmentId(null);
+            }}
+            className="w-full bg-primary text-primary-foreground font-semibold rounded-xl py-3.5 flex items-center justify-center gap-2"
+          >
+            Open Link <ExternalLink className="w-4 h-4" />
+          </button>
+        </div>
       </BottomSheet>
 
-      {/* Edit Drive Link */}
-      <BottomSheet
-        isOpen={isEditDriveLinkOpen}
-        onClose={() => setIsEditDriveLinkOpen(false)}
-        title="Edit Drive Folder Link"
-      >
+      <BottomSheet isOpen={isEditDriveLinkOpen} onClose={() => setIsEditDriveLinkOpen(false)} title="Google Drive Folder">
         <form onSubmit={driveLinkForm.handleSubmit(onEditDriveLink)} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium mb-2">Google Drive Folder Link</label>
-            <input
-              {...driveLinkForm.register("driveLink")}
-              className={inputCls}
-              placeholder="https://drive.google.com/..."
-
-            />
+            <label className="block text-sm font-medium mb-2">Folder Link</label>
+            <input {...driveLinkForm.register("driveLink")} className={inputCls} placeholder="https://drive.google.com/..." />
+            <p className="text-xs text-muted-foreground mt-2">Leave blank to remove the connection.</p>
           </div>
-          <button
-            type="submit"
-            className="w-full text-white font-semibold rounded-xl py-3.5 transition-opacity hover:opacity-90"
-            style={{ backgroundColor: accentColor }}
-          >
-            Save Link
-          </button>
+          <button type="submit" className="w-full bg-primary text-primary-foreground font-semibold rounded-xl py-3.5">Save Link</button>
         </form>
       </BottomSheet>
 
-      {/* Confirm delete subject */}
       <ConfirmSheet
-        isOpen={isDeletingSubject}
-        onClose={() => setIsDeletingSubject(false)}
+        isOpen={isDeletingSubject} onClose={() => setIsDeletingSubject(false)}
         onConfirm={handleDeleteSubject}
-        title="Delete subject?"
-        message="This will move the subject, its lectures, exams, and linked tasks to the Archive."
-        confirmLabel="Move to Archive"
-      />
-
-      {/* Confirm delete exam (swipe left-to-right) */}
-      <ConfirmSheet
-        isOpen={!!deletingExamId}
-        onClose={() => setDeletingExamId(null)}
-        onConfirm={() => {
-          if (deletingExamId) {
-            deleteExam(subject.id, deletingExamId);
-            setDeletingExamId(null);
-          }
-        }}
-        title="Delete exam?"
-        message="This exam and its results will be permanently removed."
-      />
-
-      {/* Confirm delete attachment (swipe right-to-left) */}
-      <ConfirmSheet
-        isOpen={!!deletingAttachmentId}
-        onClose={() => setDeletingAttachmentId(null)}
-        onConfirm={() => {
-          if (deletingAttachmentId) {
-            deleteAttachment(subject.id, deletingAttachmentId);
-            setDeletingAttachmentId(null);
-          }
-        }}
-        title="Delete attachment?"
-        message="This attachment will be permanently removed."
+        title="Delete subject?" message="This will move the subject, along with its lectures, exams, and linked tasks, to the Archive." confirmLabel="Move to Archive"
       />
     </div>
   );

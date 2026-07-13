@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { useStudyData, SUBJECT_WALLPAPERS } from "@/hooks/useStudyData";
+import { useStudyData } from "@/hooks/useStudyData";
 import { GlassCard } from "@/components/shared/GlassCard";
 import { BottomSheet } from "@/components/shared/BottomSheet";
 import { ConfirmSheet } from "@/components/shared/ConfirmSheet";
 import { FabPortal } from "@/components/shared/FabPortal";
 import { SwipeableRow } from "@/components/shared/SwipeableRow";
-import { Plus, ChevronRight, BookOpen, Pencil, Trash2 } from "lucide-react";
+import { Plus, BookOpen, Pencil, Trash2 } from "lucide-react";
 import { Link } from "wouter";
 import { useForm } from "react-hook-form";
 
@@ -61,10 +61,10 @@ export function Subjects() {
 
       {subjects.length === 0 ? (
         <GlassCard className="p-12 text-center flex flex-col items-center justify-center border-dashed border-2 bg-transparent mt-12">
-          <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-6">
-            <BookOpen className="w-8 h-8 text-primary" />
+          <div className="w-16 h-16 bg-secondary/50 rounded-full flex items-center justify-center mb-6 border border-border/50">
+            <BookOpen className="w-8 h-8 text-muted-foreground" />
           </div>
-          <h2 className="text-2xl font-semibold mb-2">No subjects yet</h2>
+          <h2 className="text-2xl font-semibold mb-2 tracking-tight">No subjects yet</h2>
           <p className="text-muted-foreground mb-8 max-w-md mx-auto">Create your first subject to start organizing your lectures, exams, and tasks.</p>
         </GlassCard>
       ) : (
@@ -80,44 +80,40 @@ export function Subjects() {
                 onDelete={() => setDeletingId(subject.id)}
                 className="h-full"
               >
-                <Link href={`/subjects/${subject.id}`}>
-                  <GlassCard className="p-6 hover:scale-[1.02] transition-transform cursor-pointer relative overflow-hidden group h-full flex flex-col justify-between">
-                    <div className="absolute top-0 left-0 w-full h-1.5 rounded-t-[inherit]" style={{ background: subject.wallpaper ?? subject.color }} />
+                <Link href={`/subjects/${subject.id}`} className="block h-full">
+                  <GlassCard className="p-6 hover:-translate-y-1 transition-all duration-300 cursor-pointer relative overflow-hidden group h-full flex flex-col justify-between bg-card hover:shadow-lg border-border/50">
+                    {/* Subtle color indicator */}
+                    <div className="absolute left-0 top-0 bottom-0 w-1.5" style={{ backgroundColor: subject.color }} />
 
                     {/* Edit / Delete — hover-only, top-right (desktop/mouse fallback for swipe) */}
-                    <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                    <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                       <button
                         onClick={(e) => openEdit(e, subject.id)}
-                        className="w-8 h-8 rounded-full bg-background/80 backdrop-blur flex items-center justify-center hover:bg-secondary transition-colors"
+                        className="w-8 h-8 rounded-full bg-background/90 backdrop-blur flex items-center justify-center hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors border border-border/50 shadow-sm"
                         title="Edit subject"
                       >
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={(e) => openDelete(e, subject.id)}
-                        className="w-8 h-8 rounded-full bg-background/80 backdrop-blur flex items-center justify-center hover:bg-destructive/10 hover:text-destructive transition-colors"
+                        className="w-8 h-8 rounded-full bg-background/90 backdrop-blur flex items-center justify-center hover:bg-destructive/10 hover:text-destructive text-muted-foreground transition-colors border border-border/50 shadow-sm"
                         title="Delete subject"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
 
-                    <div>
-                      <h3 className="text-2xl font-bold mb-4 mt-2">{subject.name}</h3>
-                      <div className="flex gap-4">
-                        <div className="bg-secondary/50 rounded-xl p-3 flex-1">
-                          <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider mb-1">Avg Grade</p>
-                          <p className="text-xl font-semibold">{avg !== null ? `${avg}%` : '—'}</p>
+                    <div className="pl-3">
+                      <h3 className="text-2xl font-bold mb-5 mt-1 text-foreground tracking-tight pr-16">{subject.name}</h3>
+                      <div className="flex gap-3">
+                        <div className="bg-secondary/40 border border-border/40 rounded-2xl p-3.5 flex-1 flex flex-col justify-center">
+                          <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mb-1.5">Avg Grade</p>
+                          <p className="text-xl font-semibold text-foreground">{avg !== null ? `${avg}%` : '—'}</p>
                         </div>
-                        <div className="bg-secondary/50 rounded-xl p-3 flex-1">
-                          <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider mb-1">Exams</p>
-                          <p className="text-xl font-semibold">{subject.exams.length}</p>
+                        <div className="bg-secondary/40 border border-border/40 rounded-2xl p-3.5 flex-1 flex flex-col justify-center">
+                          <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mb-1.5">Exams</p>
+                          <p className="text-xl font-semibold text-foreground">{subject.exams.length}</p>
                         </div>
-                      </div>
-                    </div>
-                    <div className="mt-6 flex justify-end">
-                      <div className="w-8 h-8 rounded-full bg-background flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <ChevronRight className="w-5 h-5" />
                       </div>
                     </div>
                   </GlassCard>

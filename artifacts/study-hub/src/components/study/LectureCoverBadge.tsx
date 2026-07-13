@@ -7,17 +7,14 @@ interface LectureCoverBadgeProps {
 
 /**
  * Small colored status badge reflecting the lecture's most recent Flashcards
- * Reader session. Only the color + label are shown — never the raw
- * percentage — and nothing renders until at least one session exists.
+ * Reader session. Refined style with neutral background and a colored dot.
  */
 export function LectureCoverBadge({ percentage }: LectureCoverBadgeProps) {
   if (percentage === undefined || percentage === null) return null;
   const band = getScoreBand(percentage);
   return (
-    <span
-      className="px-2 py-0.5 rounded-md text-[11px] font-bold text-white shrink-0"
-      style={{ backgroundColor: band.color }}
-    >
+    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1.5 bg-secondary text-secondary-foreground shrink-0 border border-border/60 shadow-sm">
+      <span className="w-1.5 h-1.5 rounded-full shadow-sm" style={{ backgroundColor: band.color }} />
       {band.label}
     </span>
   );
