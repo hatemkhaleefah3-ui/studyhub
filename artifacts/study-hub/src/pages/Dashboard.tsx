@@ -6,7 +6,7 @@ import { Flame, Calendar as CalendarIcon, Settings as SettingsIcon } from "lucid
 import { Link } from "wouter";
 
 export function Dashboard() {
-  const { subjects, schedule, checklist } = useStudyData();
+  const { subjects, schedule, checklist, schedulePlans } = useStudyData();
 
   // Streak logic
   const doneItems = checklist.filter(item => item.done && item.doneAt);
@@ -42,10 +42,12 @@ export function Dashboard() {
     }
   }
 
-  // Upcoming Exams
-  const allExams = subjects.flatMap(s => s.exams.map(e => ({ ...e, subject: s })));
-  const upcomingExams = allExams
-    .filter(e => e.date && new Date(e.date) >= new Date(new Date().setHours(0,0,0,0)))
+  // Upcoming Exams — sourced from Exam Schedule plans
+  const _now = new Date(); _now.setHours(0, 0, 0, 0);
+  const upcomingExams = schedulePlans
+    .filter(p => p.type === 'exam')
+    .flatMap(p => p.items.map(item => ({ ...item, planTitle: p.title })))
+    .filter(item => item.date && new Date(item.date) >= _now)
     .sort((a, b) => new Date(a.date!).getTime() - new Date(b.date!).getTime())
     .slice(0, 4);
 
@@ -99,27 +101,28 @@ export function Dashboard() {
              </GlassCard>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-4">
-              {upcomingExams.map(exam => {
-                const days = differenceInDays(new Date(exam.date!), new Date());
+              {upcomingExams.map(item => {
+                const subject = subjects.find(s => s.name === item.subjectName || s.id === item.subjectId);
+                const accentColor = subject?.color ?? '#007aff';
+                const days = differenceInDays(new Date(item.date!), new Date());
                 const isUrgent = days <= 3;
                 const isCritical = days <= 1;
-                
                 return (
-                  <GlassCard key={exam.id} className="p-5 flex flex-col gap-3 relative overflow-hidden group border-border/60 hover:shadow-md transition-shadow">
-                    <div className="absolute top-0 left-0 w-1.5 h-full" style={{ backgroundColor: exam.subject.color }} />
+                  <GlassCard key={item.id} className="p-5 flex flex-col gap-3 relative overflow-hidden group border-border/60 hover:shadow-md transition-shadow">
+                    <div className="absolute top-0 left-0 w-1.5 h-full" style={{ backgroundColor: accentColor }} />
                     <div className="pl-3">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: exam.subject.color }} />
-                        <p className="text-xs font-bold text-muted-foreground tracking-wide uppercase">{exam.subject.name}</p>
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: accentColor }} />
+                        <p className="text-xs font-bold text-muted-foreground tracking-wide uppercase">{item.subjectName}</p>
                       </div>
-                      <h3 className="font-bold text-lg leading-tight mt-1">{exam.name}</h3>
+                      <h3 className="font-bold text-lg leading-tight mt-1">{item.planTitle}</h3>
                       <div className="mt-4 inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold bg-secondary text-secondary-foreground border border-border/50 uppercase tracking-wide">
-                        {isToday(new Date(exam.date!)) ? "Today" : isTomorrow(new Date(exam.date!)) ? "Tomorrow" : `In ${days} days`}
+                        {isToday(new Date(item.date!)) ? "Today" : isTomorrow(new Date(item.date!)) ? "Tomorrow" : `In ${days} days`}
                         {isUrgent && <span className={`ml-2 w-1.5 h-1.5 rounded-full ${isCritical ? 'bg-destructive' : 'bg-orange-500'}`} />}
                       </div>
                     </div>
                   </GlassCard>
-                )
+                );
               })}
             </div>
           )}

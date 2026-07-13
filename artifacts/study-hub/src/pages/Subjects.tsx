@@ -170,19 +170,9 @@ export function Subjects() {
                     </div>
 
                     <div className="relative z-10 flex-1 flex flex-col">
-                      {/* Emoji icon */}
-                      <div
-                        className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4 text-3xl border shadow-sm shrink-0"
-                        style={{
-                          backgroundColor: `${subject.color}18`,
-                          borderColor: `${subject.color}30`,
-                        }}
-                      >
-                        {subject.emoji ?? "📚"}
-                      </div>
-
-                      <h3 className="text-xl font-bold mb-4 text-foreground tracking-tight pr-12 leading-snug line-clamp-2">
-                        {subject.name}
+                      <h3 className="text-xl font-bold mb-4 text-foreground tracking-tight pr-12 leading-snug line-clamp-2 flex items-start gap-2">
+                        <span className="text-2xl leading-tight shrink-0">{subject.emoji ?? "📚"}</span>
+                        <span>{subject.name}</span>
                       </h3>
                     </div>
 

@@ -514,15 +514,9 @@ export function SubjectDetail() {
             <label className="block text-sm font-medium mb-2">Exam Name</label>
             <input {...examForm.register("name", { required: true })} className={inputCls} placeholder="e.g. Midterm" onKeyDown={focusNext} />
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">Date (optional)</label>
-              <input type="date" {...examForm.register("date")} className={inputCls} onKeyDown={focusNext} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">Weight</label>
-              <input type="number" step="0.1" {...examForm.register("weight", { required: true, min: 0 })} className={inputCls} placeholder="1.0" />
-            </div>
+          <div>
+            <label className="block text-sm font-medium mb-2">Weight</label>
+            <input type="number" step="0.1" {...examForm.register("weight", { required: true, min: 0 })} className={inputCls} placeholder="1.0" />
           </div>
           <button type="submit" className="w-full bg-primary text-primary-foreground font-semibold rounded-xl py-3.5 transition-opacity hover:opacity-90">Add Exam</button>
         </form>

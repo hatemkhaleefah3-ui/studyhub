@@ -111,15 +111,9 @@ export function ExamEdit() {
             <label className="block text-sm font-medium mb-2">Exam Name</label>
             <input {...form.register("name", { required: true })} className={inputCls} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium mb-2">Date</label>
-              <input type="date" {...form.register("date")} className={inputCls} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">Weight %</label>
-              <input type="number" min="0" max="100" {...form.register("weight")} className={inputCls} />
-            </div>
+          <div>
+            <label className="block text-sm font-medium mb-2">Weight %</label>
+            <input type="number" min="0" max="100" {...form.register("weight")} className={inputCls} />
           </div>
           <button
             type="submit"

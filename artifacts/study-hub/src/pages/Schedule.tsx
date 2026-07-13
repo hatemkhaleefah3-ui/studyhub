@@ -15,13 +15,12 @@ import { ConfirmSheet } from "@/components/shared/ConfirmSheet";
 import { SwipeableRow } from "@/components/shared/SwipeableRow";
 import { FabPortal } from "@/components/shared/FabPortal";
 import {
-  format, isSameDay, parseISO, isPast, isToday as dateFnsIsToday,
+  format, isSameDay, parseISO,
   getYear, getMonth, getDaysInMonth, getDay, startOfWeek, addDays,
-  differenceInCalendarDays,
 } from "date-fns";
 import {
-  Plus, CalendarDays, BookOpen, Clock, ChevronLeft, ChevronRight,
-  Trash2, Pencil, CheckCircle2, Circle, XCircle, RotateCcw, AlertCircle,
+  Plus, CalendarDays, Clock, ChevronLeft, ChevronRight,
+  Trash2, CheckCircle2, Circle, XCircle,
   GraduationCap, BookMarked,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -29,6 +28,7 @@ import { motion, AnimatePresence } from "framer-motion";
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type ViewLevel = "day" | "month" | "year";
+type CreateType = ScheduleType | "quickExam" | null;
 
 const YEAR_RANGE_START = 1990;
 const YEAR_RANGE_END   = 2039;
@@ -41,7 +41,8 @@ const IMPORTANCE_META: Record<ImportanceLevel, { label: string; color: string; d
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-const inputCls = "w-full bg-background border border-border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 text-foreground";
+const inputCls =
+  "w-full bg-background border border-border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 text-foreground";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -75,7 +76,6 @@ function resolveConflicts(plans: SchedulePlan[]) {
   return { visible, hidden: sorted.filter((p) => hiddenIds.has(p.id)) };
 }
 
-// Check if a given date falls on a study plan session day
 function isStudyPlanDay(plan: SchedulePlan, date: Date): boolean {
   if (plan.type !== "study") return false;
   const d = format(date, "yyyy-MM-dd");
@@ -97,8 +97,14 @@ function hasEntriesOnDate(
   if (schedule.some((e) => isSameDay(new Date(e.datetime), date))) return true;
   if (checklist.some((c) => !!c.dueDate && isSameDay(parseISO(c.dueDate), date))) return true;
   if (plans.some((p) => isStudyPlanDay(p, date))) return true;
-  const today0 = new Date(); today0.setHours(0,0,0,0);
-  if (subjects.some((s: any) => (s.exams ?? []).some((e: any) => e.date && isSameDay(new Date(e.date), date)))) return true;
+  if (subjects.some((s: any) =>
+    (s.exams ?? []).some((e: any) => e.date && isSameDay(new Date(e.date), date))
+  )) return true;
+  // Also mark exam plan item dates
+  if (plans.some((p) =>
+    p.type === "exam" &&
+    p.items.some((i) => i.date && isSameDay(new Date(i.date), date))
+  )) return true;
   return false;
 }
 
@@ -109,16 +115,19 @@ function countEntriesInMonth(
   month: number
 ): number {
   return (
-    schedule.filter((e) => { const d = new Date(e.datetime); return getYear(d) === year && getMonth(d) === month; }).length +
-    checklist.filter((c) => { if (!c.dueDate) return false; const d = parseISO(c.dueDate); return getYear(d) === year && getMonth(d) === month; }).length
+    schedule.filter((e) => {
+      const d = new Date(e.datetime);
+      return getYear(d) === year && getMonth(d) === month;
+    }).length +
+    checklist.filter((c) => {
+      if (!c.dueDate) return false;
+      const d = parseISO(c.dueDate);
+      return getYear(d) === year && getMonth(d) === month;
+    }).length
   );
 }
 
-function newItem(): SchedulePlanItem {
-  return { id: crypto.randomUUID(), subjectName: "" };
-}
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ─── Section Header ───────────────────────────────────────────────────────────
 
 function SectionHeader({ title, action }: { title: string; action?: React.ReactNode }) {
   return (
@@ -129,89 +138,76 @@ function SectionHeader({ title, action }: { title: string; action?: React.ReactN
   );
 }
 
-// ── Next Exam Section ─────────────────────────────────────────────────────────
+// ─── Next Exam Section (from SchedulePlans) ───────────────────────────────────
 
-function NextExamSection({ subjects }: { subjects: any[] }) {
+function NextExamSection({ plans }: { plans: SchedulePlan[] }) {
   const now = new Date(); now.setHours(0, 0, 0, 0);
-  const upcoming = subjects
-    .flatMap((s) => (s.exams ?? [])
-      .filter((e: any) => e.date && new Date(e.date) >= now)
-      .map((e: any) => ({ ...e, subject: s }))
-    )
+  const examItems = plans
+    .filter((p) => p.type === "exam")
+    .flatMap((p) => p.items.filter((i) => i.date && new Date(i.date) >= now))
     .sort((a, b) => new Date(a.date!).getTime() - new Date(b.date!).getTime());
 
-  if (upcoming.length === 0) {
-    return (
-      <section>
-        <SectionHeader title="Next Exam" />
-        <GlassCard className="p-8 text-center border-dashed border-2 bg-transparent text-muted-foreground">
-          <GraduationCap className="w-8 h-8 mx-auto mb-3 opacity-30" />
-          <p className="font-medium">No upcoming exams.</p>
-          <p className="text-sm mt-1 opacity-70">Add exam dates in Subjects to see them here.</p>
-        </GlassCard>
-      </section>
-    );
-  }
+  if (examItems.length === 0) return null;
 
-  const featured = upcoming[0];
-  const rest = upcoming.slice(1, 5);
+  const featured = examItems[0];
+  const rest = examItems.slice(1, 5);
   const featuredDays = daysUntil(featured.date!);
 
   return (
     <section>
       <SectionHeader title="Next Exam" />
       <div className="space-y-3">
-        {/* Featured — most urgent */}
-        <GlassCard
-          className="p-5 relative overflow-hidden border-l-4 border-border/60"
-          style={{ borderLeftColor: featured.subject.color }}
-        >
-          <div
-            className="absolute inset-0 opacity-[0.04] pointer-events-none"
-            style={{ background: `linear-gradient(135deg, ${featured.subject.color}, transparent)` }}
-          />
+        {/* Featured */}
+        <GlassCard className="p-5 relative overflow-hidden border-l-4 border-destructive/60">
+          <div className="absolute inset-0 opacity-[0.03] bg-destructive pointer-events-none" />
           <div className="relative z-10 flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: featured.subject.color }} />
-                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  {featured.subject.name}
-                </span>
-              </div>
-              <h3 className="text-lg font-bold text-foreground leading-tight truncate">{featured.name}</h3>
-              {featured.date && (
-                <p className="text-sm text-muted-foreground mt-1">
-                  {format(new Date(featured.date), "EEEE, MMMM d, yyyy")}
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">
+                {featured.subjectName}
+              </p>
+              {featured.time && (
+                <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5" /> {featured.time}
                 </p>
               )}
+              <p className="text-sm text-muted-foreground mt-1">
+                {format(new Date(featured.date!), "EEEE, MMMM d, yyyy")}
+              </p>
             </div>
             <div className="shrink-0 text-center min-w-[64px]">
               <p
                 className="text-3xl font-black leading-none"
                 style={{ color: featuredDays <= 3 ? "hsl(var(--destructive))" : "hsl(var(--primary))" }}
               >
-                {featuredDays === 0 ? "TODAY" : featuredDays === 1 ? "1" : featuredDays}
+                {featuredDays === 0 ? "TODAY" : featuredDays < 0 ? "PAST" : String(featuredDays)}
               </p>
-              {featuredDays > 1 && <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mt-0.5">days left</p>}
+              {featuredDays > 0 && (
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mt-0.5">
+                  days left
+                </p>
+              )}
             </div>
           </div>
         </GlassCard>
 
-        {/* Remaining upcoming */}
         {rest.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {rest.map((exam) => {
-              const days = daysUntil(exam.date!);
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {rest.map((item) => {
+              const days = daysUntil(item.date!);
               return (
-                <GlassCard key={exam.id} className="p-4 border-border/60 relative overflow-hidden">
-                  <div className="absolute top-0 left-0 w-1 h-full rounded-l" style={{ backgroundColor: exam.subject.color }} />
+                <GlassCard key={item.id} className="p-4 border-border/60 relative overflow-hidden">
+                  <div className="absolute top-0 left-0 w-1 h-full rounded-l bg-destructive/40" />
                   <div className="pl-2">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1 truncate">
-                      {exam.subject.name}
+                      {item.subjectName}
                     </p>
-                    <p className="font-bold text-sm text-foreground leading-tight line-clamp-2">{exam.name}</p>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      {days === 0 ? "Today" : days === 1 ? "Tomorrow" : `In ${days} days`}
+                    {item.date && (
+                      <p className="text-xs font-semibold text-foreground">
+                        {format(new Date(item.date), "MMM d")}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {days === 0 ? "Today" : days === 1 ? "Tomorrow" : days < 0 ? "Past" : `${days}d`}
                     </p>
                   </div>
                 </GlassCard>
@@ -224,10 +220,76 @@ function NextExamSection({ subjects }: { subjects: any[] }) {
   );
 }
 
-// ── Schedule Plan Card ────────────────────────────────────────────────────────
+// ─── Exams Section (all exam items from plans, sorted by date) ────────────────
+
+function ExamsSection({ plans }: { plans: SchedulePlan[] }) {
+  const allItems = plans
+    .filter((p) => p.type === "exam")
+    .flatMap((p) =>
+      p.items.map((item) => ({ ...item, planTitle: p.title }))
+    )
+    .sort((a, b) => {
+      if (!a.date) return 1;
+      if (!b.date) return -1;
+      return new Date(a.date).getTime() - new Date(b.date).getTime();
+    });
+
+  if (allItems.length === 0) return null;
+
+  return (
+    <section>
+      <SectionHeader title="Exams" />
+      <div className="space-y-2">
+        {allItems.map((item) => {
+          const days = item.date ? daysUntil(item.date) : null;
+          const isPast = days !== null && days < 0;
+          return (
+            <GlassCard
+              key={item.id}
+              className={`p-4 flex items-center gap-4 border-border/60 ${isPast ? "opacity-50" : ""}`}
+            >
+              <div
+                className={`w-2 h-2 rounded-full shrink-0 ${
+                  days === null ? "bg-muted-foreground/30"
+                  : isPast ? "bg-muted-foreground/30"
+                  : days <= 2 ? "bg-destructive"
+                  : days <= 7 ? "bg-amber-500"
+                  : "bg-primary"
+                }`}
+              />
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm text-foreground truncate">{item.subjectName}</p>
+                {item.date && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {format(new Date(item.date), "EEE, MMM d")}
+                    {item.time && ` · ${item.time}`}
+                  </p>
+                )}
+              </div>
+              {days !== null && (
+                <p
+                  className={`text-sm font-bold shrink-0 ${
+                    isPast ? "text-muted-foreground"
+                    : days <= 2 ? "text-destructive"
+                    : days <= 7 ? "text-amber-500"
+                    : "text-foreground"
+                  }`}
+                >
+                  {isPast ? "Past" : days === 0 ? "Today" : days === 1 ? "Tomorrow" : `${days}d`}
+                </p>
+              )}
+            </GlassCard>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+// ─── Schedule Plan Card ───────────────────────────────────────────────────────
 
 function SchedulePlanCard({ plan, onClick }: { plan: SchedulePlan; onClick?: () => void }) {
-  const isExam = plan.type === "exam";
+  const isExam   = plan.type === "exam";
   const daysStart = daysUntil(plan.startDate);
   const daysEnd   = daysUntil(plan.endDate);
   const isActive  = daysStart <= 0 && daysEnd >= 0;
@@ -241,7 +303,7 @@ function SchedulePlanCard({ plan, onClick }: { plan: SchedulePlan; onClick?: () 
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
             <span
               className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${
                 isExam
@@ -253,7 +315,7 @@ function SchedulePlanCard({ plan, onClick }: { plan: SchedulePlan; onClick?: () 
               {isExam ? "Exam" : "Study"}
             </span>
             {isActive && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+              <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
                 Active
               </span>
             )}
@@ -268,7 +330,10 @@ function SchedulePlanCard({ plan, onClick }: { plan: SchedulePlan; onClick?: () 
             {format(new Date(plan.startDate), "MMM d")} → {format(new Date(plan.endDate), "MMM d, yyyy")}
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {plan.items.length} {isExam ? (plan.items.length === 1 ? "exam" : "exams") : (plan.items.length === 1 ? "subject" : "subjects")}
+            {plan.items.length}{" "}
+            {isExam
+              ? plan.items.length === 1 ? "exam" : "exams"
+              : plan.items.length === 1 ? "subject" : "subjects"}
             {!isExam && plan.items[0]?.repeatPattern && ` · ${plan.items[0].repeatPattern}`}
           </p>
         </div>
@@ -283,7 +348,7 @@ function SchedulePlanCard({ plan, onClick }: { plan: SchedulePlan; onClick?: () 
   );
 }
 
-// ── Schedules Section ─────────────────────────────────────────────────────────
+// ─── Schedules Section ────────────────────────────────────────────────────────
 
 function SchedulesSection({
   visiblePlans,
@@ -300,18 +365,7 @@ function SchedulesSection({
   onDetail: (p: SchedulePlan) => void;
   onShowHidden: () => void;
 }) {
-  if (visiblePlans.length === 0 && hiddenPlans.length === 0) {
-    return (
-      <section>
-        <SectionHeader title="Schedules" />
-        <GlassCard className="p-8 text-center border-dashed border-2 bg-transparent text-muted-foreground">
-          <CalendarDays className="w-8 h-8 mx-auto mb-3 opacity-30" />
-          <p className="font-medium">No schedules yet.</p>
-          <p className="text-sm mt-1 opacity-70">Tap + to create an exam or study schedule.</p>
-        </GlassCard>
-      </section>
-    );
-  }
+  if (visiblePlans.length === 0 && hiddenPlans.length === 0) return null;
 
   return (
     <section>
@@ -348,20 +402,24 @@ function SchedulesSection({
   );
 }
 
-// ── Plan Detail Sheet ─────────────────────────────────────────────────────────
+// ─── Plan Detail Sheet ────────────────────────────────────────────────────────
 
 function SchedulePlanDetail({ plan }: { plan: SchedulePlan }) {
   const isExam = plan.type === "exam";
-  const days   = daysUntil(plan.startDate);
+  const daysS  = daysUntil(plan.startDate);
   const daysE  = daysUntil(plan.endDate);
-  const isActive = days <= 0 && daysE >= 0;
+  const isActive = daysS <= 0 && daysE >= 0;
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center gap-2">
-        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider border ${
-          isExam ? "bg-destructive/10 text-destructive border-destructive/20" : "bg-primary/10 text-primary border-primary/20"
-        }`}>
+      <div className="flex items-center gap-2 flex-wrap">
+        <span
+          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider border ${
+            isExam
+              ? "bg-destructive/10 text-destructive border-destructive/20"
+              : "bg-primary/10 text-primary border-primary/20"
+          }`}
+        >
           {isExam ? <GraduationCap className="w-3.5 h-3.5" /> : <BookMarked className="w-3.5 h-3.5" />}
           {isExam ? "Exam Schedule" : "Study Schedule"}
         </span>
@@ -372,18 +430,18 @@ function SchedulePlanDetail({ plan }: { plan: SchedulePlan }) {
         )}
       </div>
 
-      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-        <span className="flex items-center gap-1.5">
-          <CalendarDays className="w-4 h-4" />
-          {format(new Date(plan.startDate), "MMM d, yyyy")} → {format(new Date(plan.endDate), "MMM d, yyyy")}
-        </span>
-      </div>
+      <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+        <CalendarDays className="w-4 h-4" />
+        {format(new Date(plan.startDate), "MMM d, yyyy")} → {format(new Date(plan.endDate), "MMM d, yyyy")}
+      </p>
 
-      {!isActive && days > 0 && (
+      {!isActive && daysS > 0 && (
         <GlassCard className="p-4 flex items-center gap-3 bg-secondary/30">
           <Clock className="w-5 h-5 text-muted-foreground shrink-0" />
           <div>
-            <p className="text-sm font-bold">{days === 1 ? "Starts tomorrow" : `Starts in ${days} days`}</p>
+            <p className="text-sm font-bold">
+              {daysS === 1 ? "Starts tomorrow" : `Starts in ${daysS} days`}
+            </p>
             <p className="text-xs text-muted-foreground">{format(new Date(plan.startDate), "EEEE, MMMM d")}</p>
           </div>
         </GlassCard>
@@ -402,7 +460,10 @@ function SchedulePlanDetail({ plan }: { plan: SchedulePlan }) {
                 {item.time && ` at ${item.time}`}
                 {" · "}
                 <span className={daysUntil(item.date) <= 2 ? "text-destructive font-semibold" : ""}>
-                  {daysUntil(item.date) === 0 ? "Today" : daysUntil(item.date) === 1 ? "Tomorrow" : `${daysUntil(item.date)} days`}
+                  {daysUntil(item.date) === 0 ? "Today"
+                    : daysUntil(item.date) === 1 ? "Tomorrow"
+                    : daysUntil(item.date) < 0 ? "Past"
+                    : `${daysUntil(item.date)} days`}
                 </span>
               </p>
             )}
@@ -411,8 +472,7 @@ function SchedulePlanDetail({ plan }: { plan: SchedulePlan }) {
                 {item.startTime && item.endTime ? `${item.startTime} – ${item.endTime}` : item.startTime ?? ""}
                 {item.repeatPattern && ` · ${item.repeatPattern}`}
                 {item.repeatPattern === "weekly" && item.weekDays && item.weekDays.length > 0 &&
-                  ` (${item.weekDays.map((d) => DAY_NAMES[d]).join(", ")})`
-                }
+                  ` (${item.weekDays.map((d) => DAY_NAMES[d]).join(", ")})`}
               </p>
             )}
           </GlassCard>
@@ -422,7 +482,445 @@ function SchedulePlanDetail({ plan }: { plan: SchedulePlan }) {
   );
 }
 
-// ── Creation Forms ────────────────────────────────────────────────────────────
+// ─── Tasks Section ────────────────────────────────────────────────────────────
+
+function TasksSection({
+  tasks,
+  onToggle,
+  onRemove,
+  onCycle,
+}: {
+  tasks: ChecklistItem[];
+  onToggle: (id: string) => void;
+  onRemove: (id: string) => void;
+  onCycle: (id: string) => void;
+}) {
+  if (tasks.length === 0) return null;
+
+  const todayStr   = format(new Date(), "yyyy-MM-dd");
+  const todayTasks    = tasks.filter((t) => t.dueDate === todayStr);
+  const upcomingTasks = tasks.filter((t) => t.dueDate && t.dueDate > todayStr).slice(0, 8);
+  const overdueTasks  = tasks.filter((t) => t.dueDate && t.dueDate < todayStr && !t.done);
+
+  return (
+    <section>
+      <SectionHeader title="Tasks" />
+      <div className="space-y-5">
+        {overdueTasks.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-bold uppercase tracking-wider text-destructive px-0.5">Overdue</p>
+            {overdueTasks.slice(0, 4).map((t) => (
+              <MiniTaskCard
+                key={t.id}
+                task={t}
+                onToggle={() => onToggle(t.id)}
+                onRemove={() => onRemove(t.id)}
+                onCycle={() => onCycle(t.id)}
+              />
+            ))}
+          </div>
+        )}
+        {todayTasks.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground px-0.5">Today</p>
+            {todayTasks.map((t) => (
+              <MiniTaskCard
+                key={t.id}
+                task={t}
+                onToggle={() => onToggle(t.id)}
+                onRemove={() => onRemove(t.id)}
+                onCycle={() => onCycle(t.id)}
+              />
+            ))}
+          </div>
+        )}
+        {upcomingTasks.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground px-0.5">Upcoming</p>
+            {upcomingTasks.map((t) => (
+              <MiniTaskCard
+                key={t.id}
+                task={t}
+                onToggle={() => onToggle(t.id)}
+                onRemove={() => onRemove(t.id)}
+                onCycle={() => onCycle(t.id)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function MiniTaskCard({
+  task,
+  onToggle,
+  onRemove,
+  onCycle,
+}: {
+  task: ChecklistItem;
+  onToggle: () => void;
+  onRemove: () => void;
+  onCycle: () => void;
+}) {
+  const isOverdue =
+    !task.done && !task.didNotDo && task.dueDate && task.dueDate < format(new Date(), "yyyy-MM-dd");
+  const imp = task.importance ? IMPORTANCE_META[task.importance] : null;
+
+  return (
+    <GlassCard
+      className={`p-3.5 flex gap-3 border-border/60 ${task.done || task.didNotDo ? "opacity-50" : ""}`}
+    >
+      <button onClick={onToggle} className="shrink-0 hover:scale-110 transition-transform mt-0.5">
+        {task.done ? (
+          <CheckCircle2 className="w-5 h-5 text-primary" />
+        ) : task.didNotDo ? (
+          <XCircle className="w-5 h-5 text-muted-foreground" />
+        ) : (
+          <Circle className="w-5 h-5 text-muted-foreground hover:text-primary transition-colors" />
+        )}
+      </button>
+      <div className="flex-1 min-w-0">
+        <p
+          className={`font-semibold text-sm text-foreground ${task.done ? "line-through text-muted-foreground" : ""}`}
+        >
+          {task.text}
+        </p>
+        <div className="flex items-center gap-2 mt-1 flex-wrap">
+          {task.dueDate && (
+            <span
+              className={`text-[10px] font-bold ${isOverdue ? "text-destructive" : "text-muted-foreground"}`}
+            >
+              {task.dueDate === format(new Date(), "yyyy-MM-dd")
+                ? "Today"
+                : format(parseISO(task.dueDate), "MMM d")}
+              {task.dueTime && ` ${task.dueTime}`}
+            </span>
+          )}
+          {imp && (
+            <span className={`text-[10px] font-bold flex items-center gap-1 ${imp.color}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${imp.dot}`} />
+              {imp.label}
+            </span>
+          )}
+          {isOverdue && (
+            <span className="text-[10px] font-bold uppercase text-destructive">Overdue</span>
+          )}
+        </div>
+      </div>
+      <button
+        onClick={onRemove}
+        className="shrink-0 p-1 text-muted-foreground hover:text-destructive transition-colors"
+      >
+        <Trash2 className="w-3.5 h-3.5" />
+      </button>
+    </GlassCard>
+  );
+}
+
+// ─── Calendar sub-components ──────────────────────────────────────────────────
+
+function ViewToggle({ level, onChange }: { level: ViewLevel; onChange: (l: ViewLevel) => void }) {
+  const OPTIONS: { value: ViewLevel; label: string }[] = [
+    { value: "day", label: "Day" },
+    { value: "month", label: "Month" },
+    { value: "year", label: "Year" },
+  ];
+  return (
+    <div className="inline-flex p-1 rounded-xl bg-secondary/60 border border-border/50 self-start">
+      {OPTIONS.map((opt) => {
+        const active = level === opt.value;
+        return (
+          <button
+            key={opt.value}
+            onClick={() => onChange(opt.value)}
+            className={`relative px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              active ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {active && (
+              <motion.div
+                layoutId="sched-view-pill"
+                className="absolute inset-0 bg-primary rounded-lg"
+                transition={{ type: "spring", stiffness: 380, damping: 32 }}
+              />
+            )}
+            <span className="relative z-10">{opt.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function SliderSelector<T extends string | number>({
+  items,
+  selected,
+  onSelect,
+  getLabel,
+}: {
+  items: T[];
+  selected: T;
+  onSelect: (v: T) => void;
+  getLabel: (v: T) => string;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = scrollRef.current?.querySelector('[data-selected="true"]') as HTMLElement | null;
+    el?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+  }, [selected]);
+
+  return (
+    <div
+      ref={scrollRef}
+      className="flex gap-2 overflow-x-auto scrollbar-hide py-1 -mx-2 px-2 snap-x snap-mandatory"
+    >
+      {items.map((item) => {
+        const isSel = item === selected;
+        return (
+          <button
+            key={String(item)}
+            data-selected={isSel ? "true" : undefined}
+            onClick={() => onSelect(item)}
+            className={`snap-center flex-shrink-0 px-5 py-2.5 rounded-xl text-sm font-bold transition-all border shadow-sm ${
+              isSel
+                ? "bg-primary text-primary-foreground border-primary shadow-primary/20 scale-105"
+                : "bg-card border-border/50 hover:bg-secondary/60 text-muted-foreground"
+            }`}
+          >
+            {getLabel(item)}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function MonthView({
+  anchor,
+  schedule,
+  checklist,
+  plans,
+  subjects,
+  onSelectDay,
+  onBackToYear,
+  onChangeMonth,
+}: {
+  anchor: Date;
+  schedule: ScheduleEvent[];
+  checklist: ChecklistItem[];
+  plans: SchedulePlan[];
+  subjects: any[];
+  onSelectDay: (d: Date) => void;
+  onBackToYear: () => void;
+  onChangeMonth: (y: number, m: number) => void;
+}) {
+  const year     = getYear(anchor);
+  const month    = getMonth(anchor);
+  const today    = new Date();
+  const daysInM  = getDaysInMonth(new Date(year, month, 1));
+  const leading  = getDay(new Date(year, month, 1));
+  const cells: (Date | null)[] = [];
+  for (let i = 0; i < leading; i++) cells.push(null);
+  for (let d = 1; d <= daysInM; d++) cells.push(new Date(year, month, d));
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <button
+          onClick={onBackToYear}
+          className="inline-flex items-center gap-1.5 text-sm font-bold text-muted-foreground hover:text-foreground transition-colors bg-secondary/50 px-3 py-1.5 rounded-lg border border-border/50"
+        >
+          <ChevronLeft className="w-4 h-4" /> {year}
+        </button>
+      </div>
+      <SliderSelector
+        items={Array.from({ length: 12 }, (_, i) => i)}
+        selected={month}
+        onSelect={(m) => onChangeMonth(year, m)}
+        getLabel={(m) => format(new Date(2000, m, 1), "MMMM")}
+      />
+      <GlassCard className="p-4 md:p-6 border-border/60">
+        <div className="grid grid-cols-7 gap-1.5 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 mb-3">
+          {["S", "M", "T", "W", "T", "F", "S"].map((l, i) => (
+            <span key={i}>{l}</span>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 gap-1.5">
+          {cells.map((date, i) => {
+            if (!date)
+              return (
+                <div
+                  key={i}
+                  className="aspect-square rounded-xl bg-secondary/10 border border-dashed border-border/20"
+                />
+              );
+            const isNow  = isSameDay(date, today);
+            const isAnch = isSameDay(date, anchor) && !isNow;
+            const hasEnt = hasEntriesOnDate(schedule, checklist, plans, subjects, date);
+            return (
+              <button
+                key={i}
+                onClick={() => onSelectDay(date)}
+                className={`aspect-square rounded-xl flex flex-col items-center justify-center gap-0.5 text-sm font-bold transition-all border shadow-sm ${
+                  isNow
+                    ? "bg-primary text-primary-foreground border-primary shadow-primary/30 scale-105 z-10"
+                    : isAnch
+                    ? "bg-secondary border-border text-foreground"
+                    : "bg-card border-border/40 hover:bg-secondary/60 text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {format(date, "d")}
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    hasEnt
+                      ? isNow
+                        ? "bg-primary-foreground/80"
+                        : "bg-primary"
+                      : "bg-transparent"
+                  }`}
+                />
+              </button>
+            );
+          })}
+        </div>
+      </GlassCard>
+    </div>
+  );
+}
+
+function YearView({
+  anchor,
+  schedule,
+  checklist,
+  onSelectMonth,
+  onChangeYear,
+}: {
+  anchor: Date;
+  schedule: ScheduleEvent[];
+  checklist: ChecklistItem[];
+  onSelectMonth: (y: number, m: number) => void;
+  onChangeYear: (y: number) => void;
+}) {
+  const year  = getYear(anchor);
+  const today = new Date();
+  const years = Array.from(
+    { length: YEAR_RANGE_END - YEAR_RANGE_START + 1 },
+    (_, i) => YEAR_RANGE_START + i
+  );
+
+  return (
+    <div className="space-y-4">
+      <SliderSelector
+        items={years}
+        selected={year}
+        onSelect={onChangeYear}
+        getLabel={(y) => String(y)}
+      />
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+        {Array.from({ length: 12 }, (_, m) => {
+          const isNow  = year === getYear(today) && m === getMonth(today);
+          const count  = countEntriesInMonth(schedule, checklist, year, m);
+          return (
+            <button
+              key={m}
+              onClick={() => onSelectMonth(year, m)}
+              className={`p-5 rounded-2xl border text-left transition-all shadow-sm ${
+                isNow
+                  ? "bg-primary text-primary-foreground border-primary shadow-primary/20 scale-[1.02]"
+                  : "bg-card border-border/50 hover:bg-secondary/60 hover:-translate-y-1"
+              }`}
+            >
+              <span
+                className={`block font-bold text-lg mb-1 ${
+                  isNow ? "text-primary-foreground" : "text-foreground"
+                }`}
+              >
+                {format(new Date(year, m, 1), "MMM")}
+              </span>
+              {count > 0 && (
+                <span
+                  className={`text-[11px] font-bold uppercase tracking-wider ${
+                    isNow ? "text-primary-foreground/80" : "text-muted-foreground"
+                  }`}
+                >
+                  {count} item{count !== 1 ? "s" : ""}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Creation Forms ───────────────────────────────────────────────────────────
+
+function QuickExamForm({
+  onSubmit,
+  onBack,
+}: {
+  onSubmit: (plan: Omit<SchedulePlan, "id" | "createdAt">) => void;
+  onBack: () => void;
+}) {
+  const [subjectName, setSubjectName] = useState("");
+  const [date, setDate]               = useState("");
+  const [time, setTime]               = useState("");
+
+  const handleSubmit = () => {
+    if (!subjectName.trim() || !date) return;
+    onSubmit({
+      type: "exam",
+      title: subjectName.trim(),
+      startDate: date,
+      endDate: date,
+      items: [{ id: crypto.randomUUID(), subjectName: subjectName.trim(), date, time: time || undefined }],
+    });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium mb-2">Subject Name</label>
+        <input
+          className={inputCls}
+          value={subjectName}
+          onChange={(e) => setSubjectName(e.target.value)}
+          placeholder="e.g. Biochemistry"
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium mb-2">Date</label>
+        <input type="date" className={inputCls} value={date} onChange={(e) => setDate(e.target.value)} />
+      </div>
+      <div>
+        <label className="block text-sm font-medium mb-2">
+          Time <span className="text-muted-foreground font-normal">(optional)</span>
+        </label>
+        <input type="time" className={inputCls} value={time} onChange={(e) => setTime(e.target.value)} />
+      </div>
+      <div className="flex gap-3 pt-2">
+        <button
+          type="button"
+          onClick={onBack}
+          className="flex-none px-5 py-3.5 rounded-xl border border-border/50 text-muted-foreground font-semibold hover:bg-secondary/50 transition-colors"
+        >
+          Back
+        </button>
+        <button
+          type="button"
+          onClick={handleSubmit}
+          className="flex-1 bg-primary text-primary-foreground font-semibold rounded-xl py-3.5 hover:opacity-90 transition-opacity"
+        >
+          Add Exam
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function ExamScheduleForm({
   initial,
@@ -435,10 +933,12 @@ function ExamScheduleForm({
 }) {
   const [title, setTitle] = useState(initial?.title ?? "");
   const [items, setItems] = useState<SchedulePlanItem[]>(
-    initial?.items.length ? initial.items : [{ id: crypto.randomUUID(), subjectName: "", date: "", time: "" }]
+    initial?.items.length
+      ? initial.items
+      : [{ id: crypto.randomUUID(), subjectName: "", date: "", time: "" }]
   );
 
-  const addItem = () => setItems((p) => [...p, { id: crypto.randomUUID(), subjectName: "", date: "", time: "" }]);
+  const addItem   = () => setItems((p) => [...p, { id: crypto.randomUUID(), subjectName: "", date: "", time: "" }]);
   const removeItem = (id: string) => setItems((p) => p.filter((i) => i.id !== id));
   const updateItem = (id: string, patch: Partial<SchedulePlanItem>) =>
     setItems((p) => p.map((i) => (i.id === id ? { ...i, ...patch } : i)));
@@ -467,7 +967,6 @@ function ExamScheduleForm({
           placeholder="e.g. Mid-term Exams Week"
         />
       </div>
-
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <p className="text-sm font-medium">Exams</p>
@@ -482,9 +981,15 @@ function ExamScheduleForm({
         {items.map((item, i) => (
           <GlassCard key={item.id} className="p-4 space-y-3 border-border/50">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Exam {i + 1}</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Exam {i + 1}
+              </span>
               {items.length > 1 && (
-                <button type="button" onClick={() => removeItem(item.id)} className="text-muted-foreground hover:text-destructive transition-colors">
+                <button
+                  type="button"
+                  onClick={() => removeItem(item.id)}
+                  className="text-muted-foreground hover:text-destructive transition-colors"
+                >
                   <Trash2 className="w-4 h-4" />
                 </button>
               )}
@@ -512,7 +1017,6 @@ function ExamScheduleForm({
           </GlassCard>
         ))}
       </div>
-
       <div className="flex gap-3 pt-2">
         {!initial && (
           <button
@@ -544,19 +1048,31 @@ function StudyScheduleForm({
   onSubmit: (plan: Omit<SchedulePlan, "id" | "createdAt">) => void;
   onBack: () => void;
 }) {
-  const [title, setTitle] = useState(initial?.title ?? "");
+  const [title, setTitle]         = useState(initial?.title ?? "");
   const [startDate, setStartDate] = useState(initial?.startDate ?? "");
-  const [endDate, setEndDate] = useState(initial?.endDate ?? "");
+  const [endDate, setEndDate]     = useState(initial?.endDate ?? "");
   const [items, setItems] = useState<SchedulePlanItem[]>(
     initial?.items.length
       ? initial.items
-      : [{ id: crypto.randomUUID(), subjectName: "", startTime: "", endTime: "", repeatPattern: "weekly", weekDays: [1] }]
+      : [
+          {
+            id: crypto.randomUUID(),
+            subjectName: "",
+            startTime: "",
+            endTime: "",
+            repeatPattern: "weekly",
+            weekDays: [1],
+          },
+        ]
   );
 
-  const addItem = () =>
-    setItems((p) => [...p, { id: crypto.randomUUID(), subjectName: "", startTime: "", endTime: "", repeatPattern: "weekly", weekDays: [1] }]);
-  const removeItem = (id: string) => setItems((p) => p.filter((i) => i.id !== id));
-  const updateItem = (id: string, patch: Partial<SchedulePlanItem>) =>
+  const addItem    = () =>
+    setItems((p) => [
+      ...p,
+      { id: crypto.randomUUID(), subjectName: "", startTime: "", endTime: "", repeatPattern: "weekly", weekDays: [1] },
+    ]);
+  const removeItem  = (id: string) => setItems((p) => p.filter((i) => i.id !== id));
+  const updateItem  = (id: string, patch: Partial<SchedulePlanItem>) =>
     setItems((p) => p.map((i) => (i.id === id ? { ...i, ...patch } : i)));
 
   const toggleWeekDay = (itemId: string, day: number) => {
@@ -587,7 +1103,6 @@ function StudyScheduleForm({
           placeholder="e.g. Semester 2 Timetable"
         />
       </div>
-
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-sm font-medium mb-2">Start Date</label>
@@ -598,20 +1113,29 @@ function StudyScheduleForm({
           <input type="date" className={inputCls} value={endDate} onChange={(e) => setEndDate(e.target.value)} />
         </div>
       </div>
-
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <p className="text-sm font-medium">Subjects</p>
-          <button type="button" onClick={addItem} className="text-xs font-bold text-primary flex items-center gap-1 hover:opacity-80">
+          <button
+            type="button"
+            onClick={addItem}
+            className="text-xs font-bold text-primary flex items-center gap-1 hover:opacity-80"
+          >
             <Plus className="w-3.5 h-3.5" /> Add Subject
           </button>
         </div>
         {items.map((item, i) => (
           <GlassCard key={item.id} className="p-4 space-y-3 border-border/50">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Subject {i + 1}</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Subject {i + 1}
+              </span>
               {items.length > 1 && (
-                <button type="button" onClick={() => removeItem(item.id)} className="text-muted-foreground hover:text-destructive transition-colors">
+                <button
+                  type="button"
+                  onClick={() => removeItem(item.id)}
+                  className="text-muted-foreground hover:text-destructive transition-colors"
+                >
                   <Trash2 className="w-4 h-4" />
                 </button>
               )}
@@ -625,11 +1149,21 @@ function StudyScheduleForm({
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium mb-1.5 text-muted-foreground">Start time</label>
-                <input type="time" className={inputCls} value={item.startTime ?? ""} onChange={(e) => updateItem(item.id, { startTime: e.target.value })} />
+                <input
+                  type="time"
+                  className={inputCls}
+                  value={item.startTime ?? ""}
+                  onChange={(e) => updateItem(item.id, { startTime: e.target.value })}
+                />
               </div>
               <div>
                 <label className="block text-xs font-medium mb-1.5 text-muted-foreground">End time</label>
-                <input type="time" className={inputCls} value={item.endTime ?? ""} onChange={(e) => updateItem(item.id, { endTime: e.target.value })} />
+                <input
+                  type="time"
+                  className={inputCls}
+                  value={item.endTime ?? ""}
+                  onChange={(e) => updateItem(item.id, { endTime: e.target.value })}
+                />
               </div>
             </div>
             <div>
@@ -675,7 +1209,6 @@ function StudyScheduleForm({
           </GlassCard>
         ))}
       </div>
-
       <div className="flex gap-3 pt-2">
         {!initial && (
           <button
@@ -698,290 +1231,26 @@ function StudyScheduleForm({
   );
 }
 
-// ── Tasks Section ─────────────────────────────────────────────────────────────
-
-function TasksSection({
-  tasks,
-  onToggle,
-  onRemove,
-  onCycle,
-}: {
-  tasks: ChecklistItem[];
-  onToggle: (id: string) => void;
-  onRemove: (id: string) => void;
-  onCycle: (id: string) => void;
-}) {
-  const today = new Date(); today.setHours(0,0,0,0);
-  const todayStr = format(today, "yyyy-MM-dd");
-
-  const todayTasks     = tasks.filter((t) => t.dueDate === todayStr);
-  const upcomingTasks  = tasks.filter((t) => t.dueDate && t.dueDate > todayStr).slice(0, 8);
-  const overdueTasks   = tasks.filter((t) => t.dueDate && t.dueDate < todayStr && !t.done);
-
-  if (tasks.length === 0) {
-    return (
-      <section>
-        <SectionHeader title="Tasks" />
-        <GlassCard className="p-6 text-center border-dashed border-2 bg-transparent text-muted-foreground">
-          <Circle className="w-6 h-6 mx-auto mb-2 opacity-30" />
-          <p className="font-medium text-sm">No tasks with due dates.</p>
-        </GlassCard>
-      </section>
-    );
-  }
-
-  return (
-    <section>
-      <SectionHeader title="Tasks" />
-      <div className="space-y-5">
-        {overdueTasks.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-xs font-bold uppercase tracking-wider text-destructive px-0.5">Overdue</p>
-            {overdueTasks.slice(0, 4).map((t) => <MiniTaskCard key={t.id} task={t} onToggle={() => onToggle(t.id)} onRemove={() => onRemove(t.id)} onCycle={() => onCycle(t.id)} />)}
-          </div>
-        )}
-        {todayTasks.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground px-0.5">Today</p>
-            {todayTasks.map((t) => <MiniTaskCard key={t.id} task={t} onToggle={() => onToggle(t.id)} onRemove={() => onRemove(t.id)} onCycle={() => onCycle(t.id)} />)}
-          </div>
-        )}
-        {upcomingTasks.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground px-0.5">Upcoming</p>
-            {upcomingTasks.map((t) => <MiniTaskCard key={t.id} task={t} onToggle={() => onToggle(t.id)} onRemove={() => onRemove(t.id)} onCycle={() => onCycle(t.id)} />)}
-          </div>
-        )}
-      </div>
-    </section>
-  );
-}
-
-function MiniTaskCard({
-  task,
-  onToggle,
-  onRemove,
-  onCycle,
-}: {
-  task: ChecklistItem;
-  onToggle: () => void;
-  onRemove: () => void;
-  onCycle: () => void;
-}) {
-  const isOverdue = !task.done && !task.didNotDo && task.dueDate && task.dueDate < format(new Date(), "yyyy-MM-dd");
-  const imp = task.importance ? IMPORTANCE_META[task.importance] : null;
-
-  return (
-    <GlassCard className={`p-3.5 flex gap-3 border-border/60 ${task.done || task.didNotDo ? "opacity-50" : ""}`}>
-      <button onClick={onToggle} className="shrink-0 hover:scale-110 transition-transform mt-0.5">
-        {task.done
-          ? <CheckCircle2 className="w-5 h-5 text-primary" />
-          : task.didNotDo
-          ? <XCircle className="w-5 h-5 text-muted-foreground" />
-          : <Circle className="w-5 h-5 text-muted-foreground hover:text-primary transition-colors" />
-        }
-      </button>
-      <div className="flex-1 min-w-0">
-        <p className={`font-semibold text-sm text-foreground ${task.done ? "line-through text-muted-foreground" : ""}`}>{task.text}</p>
-        <div className="flex items-center gap-2 mt-1 flex-wrap">
-          {task.dueDate && (
-            <span className={`text-[10px] font-bold ${isOverdue ? "text-destructive" : "text-muted-foreground"}`}>
-              {task.dueDate === format(new Date(), "yyyy-MM-dd") ? "Today" : format(parseISO(task.dueDate), "MMM d")}
-              {task.dueTime && ` ${task.dueTime}`}
-            </span>
-          )}
-          {imp && (
-            <span className={`text-[10px] font-bold flex items-center gap-1 ${imp.color}`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${imp.dot}`} />{imp.label}
-            </span>
-          )}
-          {isOverdue && <span className="text-[10px] font-bold uppercase text-destructive">Overdue</span>}
-        </div>
-      </div>
-      <button onClick={onRemove} className="shrink-0 p-1 text-muted-foreground hover:text-destructive transition-colors">
-        <Trash2 className="w-3.5 h-3.5" />
-      </button>
-    </GlassCard>
-  );
-}
-
-// ── Calendar sub-components (kept from existing) ───────────────────────────────
-
-function ViewToggle({ level, onChange }: { level: ViewLevel; onChange: (l: ViewLevel) => void }) {
-  const OPTIONS: { value: ViewLevel; label: string }[] = [
-    { value: "day", label: "Day" }, { value: "month", label: "Month" }, { value: "year", label: "Year" },
-  ];
-  return (
-    <div className="inline-flex p-1 rounded-xl bg-secondary/60 border border-border/50 self-start">
-      {OPTIONS.map((opt) => {
-        const active = level === opt.value;
-        return (
-          <button
-            key={opt.value}
-            onClick={() => onChange(opt.value)}
-            className={`relative px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-              active ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {active && (
-              <motion.div
-                layoutId="sched-view-pill"
-                className="absolute inset-0 bg-primary rounded-lg"
-                transition={{ type: "spring", stiffness: 380, damping: 32 }}
-              />
-            )}
-            <span className="relative z-10">{opt.label}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function SliderSelector<T extends string | number>({
-  items, selected, onSelect, getLabel,
-}: {
-  items: T[]; selected: T; onSelect: (v: T) => void; getLabel: (v: T) => string;
-}) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = scrollRef.current?.querySelector('[data-selected="true"]') as HTMLElement | null;
-    el?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
-  }, [selected]);
-
-  return (
-    <div ref={scrollRef} className="flex gap-2 overflow-x-auto scrollbar-hide py-1 -mx-2 px-2 snap-x snap-mandatory">
-      {items.map((item) => {
-        const isSel = item === selected;
-        return (
-          <button
-            key={String(item)}
-            data-selected={isSel ? "true" : undefined}
-            onClick={() => onSelect(item)}
-            className={`snap-center flex-shrink-0 px-5 py-2.5 rounded-xl text-sm font-bold transition-all border shadow-sm ${
-              isSel
-                ? "bg-primary text-primary-foreground border-primary shadow-primary/20 scale-105"
-                : "bg-card border-border/50 hover:bg-secondary/60 text-muted-foreground"
-            }`}
-          >
-            {getLabel(item)}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function MonthView({
-  anchor, schedule, checklist, plans, subjects, onSelectDay, onBackToYear, onChangeMonth,
-}: {
-  anchor: Date; schedule: ScheduleEvent[]; checklist: ChecklistItem[];
-  plans: SchedulePlan[]; subjects: any[];
-  onSelectDay: (d: Date) => void; onBackToYear: () => void; onChangeMonth: (y: number, m: number) => void;
-}) {
-  const year  = getYear(anchor);
-  const month = getMonth(anchor);
-  const today = new Date();
-  const daysInM  = getDaysInMonth(new Date(year, month, 1));
-  const leading  = getDay(new Date(year, month, 1));
-  const cells: (Date | null)[] = [];
-  for (let i = 0; i < leading; i++) cells.push(null);
-  for (let d = 1; d <= daysInM; d++) cells.push(new Date(year, month, d));
-  while (cells.length % 7 !== 0) cells.push(null);
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <button onClick={onBackToYear} className="inline-flex items-center gap-1.5 text-sm font-bold text-muted-foreground hover:text-foreground transition-colors bg-secondary/50 px-3 py-1.5 rounded-lg border border-border/50">
-          <ChevronLeft className="w-4 h-4" /> {year}
-        </button>
-      </div>
-      <SliderSelector items={Array.from({ length: 12 }, (_, i) => i)} selected={month} onSelect={(m) => onChangeMonth(year, m)} getLabel={(m) => format(new Date(2000, m, 1), "MMMM")} />
-      <GlassCard className="p-4 md:p-6 border-border/60">
-        <div className="grid grid-cols-7 gap-1.5 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 mb-3">
-          {["S","M","T","W","T","F","S"].map((l, i) => <span key={i}>{l}</span>)}
-        </div>
-        <div className="grid grid-cols-7 gap-1.5">
-          {cells.map((date, i) => {
-            if (!date) return <div key={i} className="aspect-square rounded-xl bg-secondary/10 border border-dashed border-border/20" />;
-            const isNow   = isSameDay(date, today);
-            const isAnch  = isSameDay(date, anchor) && !isNow;
-            const hasEnt  = hasEntriesOnDate(schedule, checklist, plans, subjects, date);
-            return (
-              <button
-                key={i}
-                onClick={() => onSelectDay(date)}
-                className={`aspect-square rounded-xl flex flex-col items-center justify-center gap-0.5 text-sm font-bold transition-all border shadow-sm ${
-                  isNow ? "bg-primary text-primary-foreground border-primary shadow-primary/30 scale-105 z-10"
-                  : isAnch ? "bg-secondary border-border text-foreground"
-                  : "bg-card border-border/40 hover:bg-secondary/60 text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {format(date, "d")}
-                <span className={`w-1.5 h-1.5 rounded-full ${hasEnt ? (isNow ? "bg-primary-foreground/80" : "bg-primary") : "bg-transparent"}`} />
-              </button>
-            );
-          })}
-        </div>
-      </GlassCard>
-    </div>
-  );
-}
-
-function YearView({
-  anchor, schedule, checklist, onSelectMonth, onChangeYear,
-}: {
-  anchor: Date; schedule: ScheduleEvent[]; checklist: ChecklistItem[];
-  onSelectMonth: (y: number, m: number) => void; onChangeYear: (y: number) => void;
-}) {
-  const year  = getYear(anchor);
-  const today = new Date();
-  const years = Array.from({ length: YEAR_RANGE_END - YEAR_RANGE_START + 1 }, (_, i) => YEAR_RANGE_START + i);
-
-  return (
-    <div className="space-y-4">
-      <SliderSelector items={years} selected={year} onSelect={onChangeYear} getLabel={(y) => String(y)} />
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-        {Array.from({ length: 12 }, (_, m) => {
-          const isNow  = year === getYear(today) && m === getMonth(today);
-          const count  = countEntriesInMonth(schedule, checklist, year, m);
-          return (
-            <button
-              key={m}
-              onClick={() => onSelectMonth(year, m)}
-              className={`p-5 rounded-2xl border text-left transition-all shadow-sm ${
-                isNow ? "bg-primary text-primary-foreground border-primary shadow-primary/20 scale-[1.02]"
-                : "bg-card border-border/50 hover:bg-secondary/60 hover:-translate-y-1"
-              }`}
-            >
-              <span className={`block font-bold text-lg mb-1 ${isNow ? "text-primary-foreground" : "text-foreground"}`}>
-                {format(new Date(year, m, 1), "MMM")}
-              </span>
-              {count > 0 && (
-                <span className={`text-[11px] font-bold uppercase tracking-wider ${isNow ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
-                  {count} item{count !== 1 ? "s" : ""}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function Schedule() {
   const {
-    subjects, schedule, checklist,
-    schedulePlans, addSchedulePlan, updateSchedulePlan, deleteSchedulePlan,
-    toggleChecklistItem, skipChecklistItem, deleteChecklistItem, setCascadeChecklistStatus,
+    subjects,
+    schedule,
+    checklist,
+    schedulePlans,
+    addSchedulePlan,
+    updateSchedulePlan,
+    deleteSchedulePlan,
+    toggleChecklistItem,
+    skipChecklistItem,
+    deleteChecklistItem,
+    setCascadeChecklistStatus,
   } = useStudyData();
 
-  // Sheet state
+  // Sheet / dialog state
   const [isCreating,     setIsCreating]     = useState(false);
-  const [createType,     setCreateType]     = useState<ScheduleType | null>(null);
+  const [createType,     setCreateType]     = useState<CreateType>(null);
   const [editingPlan,    setEditingPlan]    = useState<SchedulePlan | null>(null);
   const [detailPlan,     setDetailPlan]     = useState<SchedulePlan | null>(null);
   const [deletingPlanId, setDeletingPlanId] = useState<string | null>(null);
@@ -1001,19 +1270,7 @@ export function Schedule() {
     return () => clearTimeout(t);
   }, [viewLevel]);
 
-  const upcomingExams = useMemo(() => {
-    const now = new Date(); now.setHours(0,0,0,0);
-    return subjects
-      .flatMap((s) => (s.exams ?? []).filter((e: any) => e.date && new Date(e.date) >= now).map((e: any) => ({ ...e, subject: s })))
-      .sort((a, b) => new Date(a.date!).getTime() - new Date(b.date!).getTime());
-  }, [subjects]);
-
-  const taskEntries = useMemo(() =>
-    checklist
-      .filter((c) => !!c.dueDate && !c.isTaskList)
-      .sort((a, b) => (a.dueDate! + (a.dueTime ?? "23:59")).localeCompare(b.dueDate! + (b.dueTime ?? "23:59"))),
-    [checklist]
-  );
+  // ── Derived data ────────────────────────────────────────────────────────────
 
   const startDate = startOfWeek(selectedDate, { weekStartsOn: 1 });
   const weekDays  = Array.from({ length: 7 }).map((_, i) => addDays(startDate, i));
@@ -1031,7 +1288,23 @@ export function Schedule() {
     return [...events, ...tasks].sort((a, b) => a.sortTime - b.sortTime);
   }, [schedule, checklist, selectedDate]);
 
-  const { visible: visiblePlans, hidden: hiddenPlans } = useMemo(() => resolveConflicts(schedulePlans), [schedulePlans]);
+  const taskEntries = useMemo(
+    () =>
+      checklist
+        .filter((c) => !!c.dueDate && !c.isTaskList)
+        .sort(
+          (a, b) =>
+            (a.dueDate! + (a.dueTime ?? "23:59")).localeCompare(b.dueDate! + (b.dueTime ?? "23:59"))
+        ),
+    [checklist]
+  );
+
+  const { visible: visiblePlans, hidden: hiddenPlans } = useMemo(
+    () => resolveConflicts(schedulePlans),
+    [schedulePlans]
+  );
+
+  // ── Handlers ────────────────────────────────────────────────────────────────
 
   const removeTask = (id: string) => {
     const item = checklist.find((c) => c.id === id);
@@ -1048,7 +1321,12 @@ export function Schedule() {
     else setCascadeChecklistStatus(id, false, false);
   };
 
-  const closeCreate = () => { setIsCreating(false); setCreateType(null); };
+  const closeCreate = () => {
+    setIsCreating(false);
+    setCreateType(null);
+  };
+
+  // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-10 pb-28 max-w-4xl mx-auto">
@@ -1058,23 +1336,7 @@ export function Schedule() {
         <p className="text-lg text-muted-foreground font-medium">{format(new Date(), "EEEE, MMMM do")}</p>
       </div>
 
-      {/* 1. Next Exam */}
-      <NextExamSection subjects={subjects} />
-
-      {/* 2. Schedules */}
-      <SchedulesSection
-        visiblePlans={visiblePlans}
-        hiddenPlans={hiddenPlans}
-        onEdit={setEditingPlan}
-        onDelete={setDeletingPlanId}
-        onDetail={setDetailPlan}
-        onShowHidden={() => setShowHidden(true)}
-      />
-
-      {/* 3. Tasks */}
-      <TasksSection tasks={taskEntries} onToggle={toggleChecklistItem} onRemove={removeTask} onCycle={cycleTask} />
-
-      {/* 4. Calendar */}
+      {/* ── 1. CALENDAR (top) ── */}
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold tracking-tight">Calendar</h2>
@@ -1083,7 +1345,11 @@ export function Schedule() {
 
         {viewLevel === "day" && (
           <>
-            <div ref={scrollAreaRef} className="flex gap-2 overflow-x-auto scrollbar-hide py-2 -mx-2 px-2 snap-x snap-mandatory">
+            {/* Week strip */}
+            <div
+              ref={scrollAreaRef}
+              className="flex gap-2 overflow-x-auto scrollbar-hide py-2 -mx-2 px-2 snap-x snap-mandatory"
+            >
               {weekDays.map((date, i) => {
                 const isNow  = isSameDay(date, new Date());
                 const isSel  = isSameDay(date, selectedDate);
@@ -1099,10 +1365,16 @@ export function Schedule() {
                         : "bg-card border-border/50 hover:bg-secondary/60 text-muted-foreground"
                     }`}
                   >
-                    <span className="text-[10px] uppercase font-bold tracking-wider leading-none mb-1">{format(date, "EEE")}</span>
+                    <span className="text-[10px] uppercase font-bold tracking-wider leading-none mb-1">
+                      {format(date, "EEE")}
+                    </span>
                     <span className="text-xl font-bold leading-none">{format(date, "d")}</span>
                     {!isSel && (isNow || hasEnt) && (
-                      <div className={`w-1.5 h-1.5 rounded-full mt-2 ${isNow ? "bg-primary" : "bg-muted-foreground/30"}`} />
+                      <div
+                        className={`w-1.5 h-1.5 rounded-full mt-2 ${
+                          isNow ? "bg-primary" : "bg-muted-foreground/30"
+                        }`}
+                      />
                     )}
                     {isSel && hasEnt && <div className="w-1.5 h-1.5 rounded-full mt-2 bg-primary-foreground/80" />}
                   </button>
@@ -1110,32 +1382,54 @@ export function Schedule() {
               })}
             </div>
 
+            {/* Day agenda */}
             <div className="space-y-3 pt-1">
               <h3 className="text-base font-bold tracking-tight text-foreground/90 px-0.5">
-                {isSameDay(selectedDate, new Date()) ? "Today's Agenda" : format(selectedDate, "EEEE, MMMM d")}
+                {isSameDay(selectedDate, new Date())
+                  ? "Today's Agenda"
+                  : format(selectedDate, "EEEE, MMMM d")}
               </h3>
               {dayEntries.length === 0 ? (
-                <GlassCard className="p-10 text-center border-dashed border-2 bg-transparent text-muted-foreground shadow-none text-sm">
+                <GlassCard className="p-8 text-center border-dashed border-2 bg-transparent text-muted-foreground shadow-none text-sm">
                   Nothing on this day
                 </GlassCard>
               ) : (
                 <AnimatePresence initial={false}>
                   {dayEntries.map((entry) => {
                     if (entry.kind === "event") {
-                      const ev = schedule.find((e) => e.id === entry.id);
+                      const ev  = schedule.find((e) => e.id === entry.id);
                       if (!ev) return null;
                       const sub = subjects.find((s: any) => s.id === ev.subjectId);
                       return (
-                        <motion.div key={`ev-${entry.id}`} layout initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.97 }}>
+                        <motion.div
+                          key={`ev-${entry.id}`}
+                          layout
+                          initial={{ opacity: 0, y: 6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.97 }}
+                        >
                           <GlassCard className="p-4 flex gap-4 border-border/60">
                             <div className="w-14 shrink-0 text-center flex flex-col items-center justify-center border-r border-border/50 pr-3">
-                              <span className="text-base font-bold leading-tight">{format(new Date(ev.datetime), "HH:mm")}</span>
+                              <span className="text-base font-bold leading-tight">
+                                {format(new Date(ev.datetime), "HH:mm")}
+                              </span>
                             </div>
-                            <div className="w-1.5 rounded-full shrink-0 self-stretch" style={{ backgroundColor: sub?.color ?? "hsl(var(--primary))" }} />
+                            <div
+                              className="w-1.5 rounded-full shrink-0 self-stretch"
+                              style={{ backgroundColor: sub?.color ?? "hsl(var(--primary))" }}
+                            />
                             <div className="flex-1 py-0.5">
                               <p className="font-bold text-foreground text-sm">{ev.title}</p>
-                              {sub && <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mt-1">{sub.name}</p>}
-                              {ev.note && <p className="text-[11px] mt-2 text-muted-foreground/80 bg-secondary/50 px-2.5 py-1.5 rounded-lg border border-border/40 inline-block">{ev.note}</p>}
+                              {sub && (
+                                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mt-1">
+                                  {sub.name}
+                                </p>
+                              )}
+                              {ev.note && (
+                                <p className="text-[11px] mt-2 text-muted-foreground/80 bg-secondary/50 px-2.5 py-1.5 rounded-lg border border-border/40 inline-block">
+                                  {ev.note}
+                                </p>
+                              )}
                             </div>
                           </GlassCard>
                         </motion.div>
@@ -1144,8 +1438,19 @@ export function Schedule() {
                     const task = checklist.find((c) => c.id === entry.id);
                     if (!task) return null;
                     return (
-                      <motion.div key={`task-${entry.id}`} layout initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.97 }}>
-                        <MiniTaskCard task={task} onToggle={() => toggleChecklistItem(task.id)} onRemove={() => removeTask(task.id)} onCycle={() => cycleTask(task.id)} />
+                      <motion.div
+                        key={`task-${entry.id}`}
+                        layout
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.97 }}
+                      >
+                        <MiniTaskCard
+                          task={task}
+                          onToggle={() => toggleChecklistItem(task.id)}
+                          onRemove={() => removeTask(task.id)}
+                          onCycle={() => cycleTask(task.id)}
+                        />
                       </motion.div>
                     );
                   })}
@@ -1179,7 +1484,31 @@ export function Schedule() {
         )}
       </section>
 
-      {/* FAB */}
+      {/* ── 2. NEXT EXAM (hidden when empty) ── */}
+      <NextExamSection plans={schedulePlans} />
+
+      {/* ── 3. EXAMS (hidden when empty) ── */}
+      <ExamsSection plans={schedulePlans} />
+
+      {/* ── 4. SCHEDULES (hidden when empty) ── */}
+      <SchedulesSection
+        visiblePlans={visiblePlans}
+        hiddenPlans={hiddenPlans}
+        onEdit={setEditingPlan}
+        onDelete={setDeletingPlanId}
+        onDetail={setDetailPlan}
+        onShowHidden={() => setShowHidden(true)}
+      />
+
+      {/* ── 5. TASKS (hidden when empty) ── */}
+      <TasksSection
+        tasks={taskEntries}
+        onToggle={toggleChecklistItem}
+        onRemove={removeTask}
+        onCycle={cycleTask}
+      />
+
+      {/* ── FAB ── */}
       <FabPortal>
         <button
           onClick={() => setIsCreating(true)}
@@ -1189,23 +1518,40 @@ export function Schedule() {
         </button>
       </FabPortal>
 
-      {/* Type picker */}
-      <BottomSheet isOpen={isCreating && !createType} onClose={closeCreate} title="New Schedule">
+      {/* ── Type picker ── */}
+      <BottomSheet isOpen={isCreating && !createType} onClose={closeCreate} title="Add to Schedule">
         <div className="space-y-3">
+          {/* Add Exam (quick) */}
           <button
-            onClick={() => setCreateType("exam")}
+            onClick={() => setCreateType("quickExam")}
             className="w-full flex items-center gap-4 p-5 rounded-2xl bg-destructive/5 border border-destructive/20 hover:bg-destructive/10 transition-colors text-left"
           >
             <div className="w-12 h-12 rounded-2xl bg-destructive/10 flex items-center justify-center shrink-0 border border-destructive/20">
               <GraduationCap className="w-6 h-6 text-destructive" />
             </div>
             <div>
-              <p className="font-bold text-foreground">Exam Schedule</p>
-              <p className="text-sm text-muted-foreground mt-0.5">Group multiple exams with their dates &amp; times</p>
+              <p className="font-bold text-foreground">Add Exam</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Quick-add a single upcoming exam</p>
             </div>
             <ChevronRight className="w-5 h-5 text-muted-foreground ml-auto shrink-0" />
           </button>
 
+          {/* Exam Schedule */}
+          <button
+            onClick={() => setCreateType("exam")}
+            className="w-full flex items-center gap-4 p-5 rounded-2xl bg-secondary/40 border border-border/50 hover:bg-secondary/60 transition-colors text-left"
+          >
+            <div className="w-12 h-12 rounded-2xl bg-secondary flex items-center justify-center shrink-0 border border-border/50">
+              <CalendarDays className="w-6 h-6 text-foreground/70" />
+            </div>
+            <div>
+              <p className="font-bold text-foreground">Exam Schedule</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Group multiple exams in one schedule</p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-muted-foreground ml-auto shrink-0" />
+          </button>
+
+          {/* Study Schedule */}
           <button
             onClick={() => setCreateType("study")}
             className="w-full flex items-center gap-4 p-5 rounded-2xl bg-primary/5 border border-primary/20 hover:bg-primary/10 transition-colors text-left"
@@ -1215,14 +1561,22 @@ export function Schedule() {
             </div>
             <div>
               <p className="font-bold text-foreground">Study Schedule</p>
-              <p className="text-sm text-muted-foreground mt-0.5">Recurring sessions with days, times &amp; repeat pattern</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Recurring sessions with times &amp; days</p>
             </div>
             <ChevronRight className="w-5 h-5 text-muted-foreground ml-auto shrink-0" />
           </button>
         </div>
       </BottomSheet>
 
-      {/* Exam creation form */}
+      {/* ── Quick Exam form ── */}
+      <BottomSheet isOpen={isCreating && createType === "quickExam"} onClose={closeCreate} title="Add Exam">
+        <QuickExamForm
+          onSubmit={(plan) => { addSchedulePlan(plan); closeCreate(); }}
+          onBack={() => setCreateType(null)}
+        />
+      </BottomSheet>
+
+      {/* ── Exam Schedule form ── */}
       <BottomSheet isOpen={isCreating && createType === "exam"} onClose={closeCreate} title="New Exam Schedule">
         <ExamScheduleForm
           onSubmit={(plan) => { addSchedulePlan(plan); closeCreate(); }}
@@ -1230,7 +1584,7 @@ export function Schedule() {
         />
       </BottomSheet>
 
-      {/* Study creation form */}
+      {/* ── Study Schedule form ── */}
       <BottomSheet isOpen={isCreating && createType === "study"} onClose={closeCreate} title="New Study Schedule">
         <StudyScheduleForm
           onSubmit={(plan) => { addSchedulePlan(plan); closeCreate(); }}
@@ -1238,8 +1592,12 @@ export function Schedule() {
         />
       </BottomSheet>
 
-      {/* Edit exam */}
-      <BottomSheet isOpen={!!editingPlan && editingPlan.type === "exam"} onClose={() => setEditingPlan(null)} title="Edit Exam Schedule">
+      {/* ── Edit Exam Schedule ── */}
+      <BottomSheet
+        isOpen={!!editingPlan && editingPlan.type === "exam"}
+        onClose={() => setEditingPlan(null)}
+        title="Edit Exam Schedule"
+      >
         {editingPlan?.type === "exam" && (
           <ExamScheduleForm
             initial={editingPlan}
@@ -1249,8 +1607,12 @@ export function Schedule() {
         )}
       </BottomSheet>
 
-      {/* Edit study */}
-      <BottomSheet isOpen={!!editingPlan && editingPlan.type === "study"} onClose={() => setEditingPlan(null)} title="Edit Study Schedule">
+      {/* ── Edit Study Schedule ── */}
+      <BottomSheet
+        isOpen={!!editingPlan && editingPlan.type === "study"}
+        onClose={() => setEditingPlan(null)}
+        title="Edit Study Schedule"
+      >
         {editingPlan?.type === "study" && (
           <StudyScheduleForm
             initial={editingPlan}
@@ -1260,26 +1622,42 @@ export function Schedule() {
         )}
       </BottomSheet>
 
-      {/* Detail */}
-      <BottomSheet isOpen={!!detailPlan} onClose={() => setDetailPlan(null)} title={detailPlan?.title ?? "Schedule"}>
+      {/* ── Detail sheet ── */}
+      <BottomSheet
+        isOpen={!!detailPlan}
+        onClose={() => setDetailPlan(null)}
+        title={detailPlan?.title ?? "Schedule"}
+      >
         {detailPlan && <SchedulePlanDetail plan={detailPlan} />}
       </BottomSheet>
 
-      {/* Hidden (overlapping) plans */}
-      <BottomSheet isOpen={showHidden} onClose={() => setShowHidden(false)} title={`${hiddenPlans.length} Overlapping Schedule${hiddenPlans.length !== 1 ? "s" : ""}`}>
+      {/* ── Hidden / overlapping plans ── */}
+      <BottomSheet
+        isOpen={showHidden}
+        onClose={() => setShowHidden(false)}
+        title={`${hiddenPlans.length} Overlapping Schedule${hiddenPlans.length !== 1 ? "s" : ""}`}
+      >
         <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">These schedules overlap with a higher-priority one and are hidden from the main list.</p>
+          <p className="text-sm text-muted-foreground">
+            These schedules overlap with a higher-priority one and are hidden from the main list.
+          </p>
           {hiddenPlans.map((plan) => (
-            <SchedulePlanCard key={plan.id} plan={plan} onClick={() => { setDetailPlan(plan); setShowHidden(false); }} />
+            <SchedulePlanCard
+              key={plan.id}
+              plan={plan}
+              onClick={() => { setDetailPlan(plan); setShowHidden(false); }}
+            />
           ))}
         </div>
       </BottomSheet>
 
-      {/* Delete confirm */}
+      {/* ── Delete confirm ── */}
       <ConfirmSheet
         isOpen={!!deletingPlanId}
         onClose={() => setDeletingPlanId(null)}
-        onConfirm={() => { if (deletingPlanId) { deleteSchedulePlan(deletingPlanId); setDeletingPlanId(null); } }}
+        onConfirm={() => {
+          if (deletingPlanId) { deleteSchedulePlan(deletingPlanId); setDeletingPlanId(null); }
+        }}
         title="Delete schedule?"
         message="This schedule will be permanently deleted."
         confirmLabel="Delete"
