@@ -59,7 +59,26 @@ export interface SubTask {
   id: string;
   text: string;
   done: boolean;
+  /** Optional "info link" — a button is shown only when this is set. */
+  link?: string;
 }
+
+export type Importance = 'low' | 'medium' | 'high';
+
+// Default applied to any task that predates the importance field.
+export const DEFAULT_IMPORTANCE: Importance = 'medium';
+
+export type RepeatFrequency = 'none' | 'daily' | 'weekly' | 'monthly';
+
+export interface RepeatRule {
+  frequency: RepeatFrequency;
+  /** Weekly only — 0=Sun..6=Sat, one or more selected weekdays. */
+  weekdays?: number[];
+  /** Monthly only — day of month (1-31). */
+  dayOfMonth?: number;
+}
+
+export type ChecklistStatus = 'checked' | 'unchecked' | 'did-not-do';
 
 export interface ChecklistItem {
   id: string;
@@ -70,6 +89,63 @@ export interface ChecklistItem {
   doneAt?: string;
   isTaskList?: boolean;
   subTasks?: SubTask[];
+  /** Absent = treated as DEFAULT_IMPORTANCE ('medium'). */
+  importance?: Importance;
+  /** ISO datetime. Absent/null = no due date (never counts as "did not do"). */
+  dueAt?: string | null;
+  /** Absent or frequency:'none' = one-off task (current behavior). */
+  repeat?: RepeatRule;
+  /** Shared by every occurrence generated from the same repeating task. */
+  seriesId?: string;
+}
+
+/**
+ * Derived status — "did not do" is never persisted, it's computed from
+ * done + dueAt so it can't drift out of sync (Phase 3.2, Global Rule 8
+ * assumption: did-not-do = unchecked AND due date/time has passed).
+ */
+export function getChecklistItemStatus(item: ChecklistItem): ChecklistStatus {
+  if (item.done) return 'checked';
+  if (item.dueAt && new Date(item.dueAt).getTime() < Date.now()) return 'did-not-do';
+  return 'unchecked';
+}
+
+/**
+ * Expands a repeat rule into concrete occurrence dates starting at `startDate`.
+ * There's no calendar/background job yet (Phase 4), so occurrences are
+ * generated up front for a bounded window when the task is created:
+ *   - daily   -> next 14 days (inclusive of start)
+ *   - weekly  -> matching weekdays over the next 8 weeks
+ *   - monthly -> the chosen day-of-month over the next 6 months
+ * This window is a stated assumption (Global Rule 8), not a spec requirement.
+ */
+export function generateRepeatOccurrenceDates(rule: RepeatRule, startDate: Date): Date[] {
+  const dates: Date[] = [];
+  const start = new Date(startDate);
+  start.setHours(0, 0, 0, 0);
+
+  if (rule.frequency === 'daily') {
+    for (let i = 0; i < 14; i++) {
+      const d = new Date(start);
+      d.setDate(d.getDate() + i);
+      dates.push(d);
+    }
+  } else if (rule.frequency === 'weekly') {
+    const weekdays = rule.weekdays && rule.weekdays.length ? rule.weekdays : [start.getDay()];
+    for (let i = 0; i < 7 * 8; i++) {
+      const d = new Date(start);
+      d.setDate(d.getDate() + i);
+      if (weekdays.includes(d.getDay())) dates.push(d);
+    }
+  } else if (rule.frequency === 'monthly') {
+    const dayOfMonth = rule.dayOfMonth || start.getDate();
+    for (let i = 0; i < 6; i++) {
+      const d = new Date(start.getFullYear(), start.getMonth() + i, dayOfMonth);
+      dates.push(d);
+    }
+  }
+
+  return dates;
 }
 
 export interface Settings {
@@ -107,6 +183,8 @@ interface StudyDataContextType {
   updateChecklistItem: (id: string, i: Partial<ChecklistItem>) => void;
   toggleChecklistItem: (id: string) => void;
   deleteChecklistItem: (id: string) => void;
+  /** Deletes every occurrence sharing the given seriesId (soft-deleted, same as a single delete). */
+  deleteChecklistSeries: (seriesId: string) => void;
 
   addSubTask: (itemId: string, text: string) => void;
   updateSubTask: (itemId: string, subTaskId: string, data: Partial<SubTask>) => void;
@@ -414,6 +492,23 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
 
   // ─── Checklist ─────────────────────────────────────────────────────────────
   const addChecklistItem = useCallback((i: Omit<ChecklistItem, 'id'>) => {
+    const repeat = i.repeat;
+    if (repeat && repeat.frequency !== 'none') {
+      // Repeated tasks generate independent occurrences up front, each
+      // individually checkable/deletable, sharing one seriesId.
+      const seriesId = crypto.randomUUID();
+      const startDate = i.dueAt ? new Date(i.dueAt) : new Date();
+      const occurrenceDates = generateRepeatOccurrenceDates(repeat, startDate);
+      const newItems: ChecklistItem[] = occurrenceDates.map((d) => ({
+        ...i,
+        id: crypto.randomUUID(),
+        seriesId,
+        dueAt: d.toISOString(),
+      }));
+      setChecklist((prev) => [...prev, ...newItems]);
+      newItems.forEach((item) => api.createChecklistItem(item).catch(console.error));
+      return;
+    }
     const newItem: ChecklistItem = { ...i, id: crypto.randomUUID() };
     setChecklist((prev) => [...prev, newItem]);
     api.createChecklistItem(newItem).catch(console.error);
@@ -451,6 +546,14 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
   const deleteChecklistItem = useCallback((id: string) => {
     setChecklist((prev) => prev.filter((item) => item.id !== id));
     api.deleteChecklistItem(id).catch(console.error);
+  }, []);
+
+  const deleteChecklistSeries = useCallback((seriesId: string) => {
+    setChecklist((prev) => {
+      const idsToDelete = prev.filter((item) => item.seriesId === seriesId).map((item) => item.id);
+      idsToDelete.forEach((id) => api.deleteChecklistItem(id).catch(console.error));
+      return prev.filter((item) => item.seriesId !== seriesId);
+    });
   }, []);
 
   // ─── SubTasks ──────────────────────────────────────────────────────────────
@@ -564,6 +667,7 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
         updateChecklistItem,
         toggleChecklistItem,
         deleteChecklistItem,
+        deleteChecklistSeries,
         addSubTask,
         updateSubTask,
         toggleSubTask,
