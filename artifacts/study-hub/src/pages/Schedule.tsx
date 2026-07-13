@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useStudyData } from "@/hooks/useStudyData";
-import { type ImportanceLevel, type RepeatInterval } from "@/hooks/useStudyData";
+import { type ImportanceLevel, type RepeatInterval, type ScheduleEvent, type ChecklistItem } from "@/hooks/useStudyData";
 import { GlassCard } from "@/components/shared/GlassCard";
 import { BottomSheet } from "@/components/shared/BottomSheet";
 import { ConfirmSheet } from "@/components/shared/ConfirmSheet";
@@ -8,10 +8,11 @@ import { SwipeableRow, type SwipeAction } from "@/components/shared/SwipeableRow
 import {
   format, startOfWeek, addDays, isSameDay, parseISO,
   isPast, isToday as dateFnsIsToday,
+  getYear, getMonth, getDaysInMonth, getDay,
 } from "date-fns";
 import {
   CheckCircle2, Circle, XCircle, Link2, Pencil, Trash2,
-  Clock, Repeat, CheckSquare, RotateCcw,
+  Clock, Repeat, CheckSquare, RotateCcw, ChevronLeft,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { motion, AnimatePresence } from "framer-motion";
@@ -22,6 +23,8 @@ type ScheduleEntry =
   | { kind: "event"; id: string; sortTime: number }
   | { kind: "task";  id: string; sortTime: number };
 
+type ViewLevel = "day" | "month" | "year";
+
 const IMPORTANCE_META: Record<ImportanceLevel, { label: string; color: string; dot: string }> = {
   high:   { label: "High",   color: "text-rose-500",    dot: "bg-rose-500"    },
   medium: { label: "Medium", color: "text-amber-500",   dot: "bg-amber-500"   },
@@ -31,6 +34,30 @@ const IMPORTANCE_META: Record<ImportanceLevel, { label: string; color: string; d
 const REPEAT_LABEL: Record<RepeatInterval, string> = {
   none: "", daily: "Daily", weekly: "Weekly", monthly: "Monthly",
 };
+
+const YEAR_RANGE_START = 1990;
+const YEAR_RANGE_END   = 2039;
+
+// ── Shared date-entry helpers (used by Day / Month / Year views alike) ────────
+
+function hasEntriesOnDate(schedule: ScheduleEvent[], checklist: ChecklistItem[], date: Date): boolean {
+  const hasEvent = schedule.some(e => isSameDay(new Date(e.datetime), date));
+  const hasTask  = checklist.some(c => !!c.dueDate && isSameDay(parseISO(c.dueDate), date));
+  return hasEvent || hasTask;
+}
+
+function countEntriesInMonth(schedule: ScheduleEvent[], checklist: ChecklistItem[], year: number, month: number): number {
+  const eventCount = schedule.filter(e => {
+    const d = new Date(e.datetime);
+    return getYear(d) === year && getMonth(d) === month;
+  }).length;
+  const taskCount = checklist.filter(c => {
+    if (!c.dueDate) return false;
+    const d = parseISO(c.dueDate);
+    return getYear(d) === year && getMonth(d) === month;
+  }).length;
+  return eventCount + taskCount;
+}
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
@@ -43,7 +70,8 @@ export function Schedule() {
   } = useStudyData();
 
   // Left→Right swipe on schedule task:
-  // repeated task → skip for today + spawn next occurrence (stays in checklist for future days)
+  // repeated task → skip for today (stays in checklist, resets automatically once
+  //                 the next occurrence's date/time is reached)
   // non-repeated task → fully delete from schedule + checklist
   const removeFromSchedule = (id: string) => {
     const it = checklist.find(c => c.id === id);
@@ -67,14 +95,16 @@ export function Schedule() {
   const [editingId, setEditingId]   = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [viewLevel, setViewLevel] = useState<ViewLevel>("day");
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   const { register: regEdit, handleSubmit: handleEditSubmit, reset: resetEdit } = useForm({
     defaultValues: { title: "", subjectId: "", date: "", time: "", note: "" },
   });
 
-  // Auto-scroll to today on mount
+  // Auto-scroll to today on mount (Day view week strip)
   useEffect(() => {
+    if (viewLevel !== "day") return;
     const timer = setTimeout(() => {
       if (scrollAreaRef.current) {
         const btn = scrollAreaRef.current.querySelector('[data-today="true"]') as HTMLElement | null;
@@ -82,7 +112,7 @@ export function Schedule() {
       }
     }, 80);
     return () => clearTimeout(timer);
-  }, []);
+  }, [viewLevel]);
 
   const openEdit = (id: string) => {
     const ev = schedule.find(e => e.id === id);
@@ -109,7 +139,7 @@ export function Schedule() {
     setEditingId(null);
   };
 
-  // ── Week strip ─────────────────────────────────────────────────────────────
+  // ── Week strip (Day view) ────────────────────────────────────────────────────
 
   const startDate = startOfWeek(selectedDate, { weekStartsOn: 1 });
   const weekDays  = Array.from({ length: 7 }).map((_, i) => addDays(startDate, i));
@@ -136,12 +166,18 @@ export function Schedule() {
     return [...events, ...tasks].sort((a, b) => a.sortTime - b.sortTime);
   }, [schedule, checklist, selectedDate]);
 
-  // ── Day dot: does a day have any entries? ──────────────────────────────────
+  const dayHasEntries = (date: Date) => hasEntriesOnDate(schedule, checklist, date);
 
-  const dayHasEntries = (date: Date) => {
-    const hasEvent  = schedule.some(e => isSameDay(new Date(e.datetime), date));
-    const hasTask   = checklist.some(c => !!c.dueDate && isSameDay(parseISO(c.dueDate), date));
-    return hasEvent || hasTask;
+  // ── Drill-down navigation ────────────────────────────────────────────────────
+
+  const goToDay = (date: Date) => {
+    setSelectedDate(date);
+    setViewLevel("day");
+  };
+
+  const goToMonth = (year: number, month: number) => {
+    setSelectedDate(new Date(year, month, Math.min(selectedDate.getDate(), 28)));
+    setViewLevel("month");
   };
 
   const inputCls =
@@ -150,91 +186,124 @@ export function Schedule() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-8 pb-20">
+    <div className="space-y-6 pb-20">
 
       {/* Header — no add button */}
-      <div>
-        <h1 className="text-4xl font-bold tracking-tight mb-1">Schedule</h1>
-        <p className="text-muted-foreground text-lg">{format(startDate, "MMMM yyyy")}</p>
+      <div className="flex flex-col gap-4">
+        <div>
+          <h1 className="text-4xl font-bold tracking-tight mb-1">Schedule</h1>
+          <p className="text-muted-foreground text-lg">
+            {viewLevel === "day" && format(startDate, "MMMM yyyy")}
+            {viewLevel === "month" && format(selectedDate, "MMMM yyyy")}
+            {viewLevel === "year" && getYear(selectedDate)}
+          </p>
+        </div>
+
+        <ViewToggle level={viewLevel} onChange={setViewLevel} />
       </div>
 
-      {/* Day picker */}
-      <div
-        ref={scrollAreaRef}
-        className="relative z-10 flex gap-2 overflow-x-auto overflow-y-visible py-2 -my-2 scrollbar-hide snap-x snap-mandatory"
-      >
-        {weekDays.map((date, i) => {
-          const isToday    = isSameDay(date, new Date());
-          const isSelected = isSameDay(date, selectedDate);
-          const hasEntries = dayHasEntries(date);
+      {viewLevel === "day" && (
+        <>
+          {/* Day picker */}
+          <div
+            ref={scrollAreaRef}
+            className="relative z-10 flex gap-2 overflow-x-auto overflow-y-visible py-2 -my-2 scrollbar-hide snap-x snap-mandatory"
+          >
+            {weekDays.map((date, i) => {
+              const isToday    = isSameDay(date, new Date());
+              const isSelected = isSameDay(date, selectedDate);
+              const hasEntries = dayHasEntries(date);
 
-          return (
-            <button
-              key={i}
-              data-today={isToday ? "true" : undefined}
-              onClick={() => setSelectedDate(date)}
-              className={`snap-center flex-shrink-0 flex flex-col items-center justify-center w-[4.5rem] h-[4.75rem] rounded-2xl transition-all duration-200 ${
-                isSelected
-                  ? "bg-primary text-primary-foreground shadow-md shadow-primary/25 ring-2 ring-primary/30"
-                  : "bg-card/60 backdrop-blur border border-border hover:bg-card text-muted-foreground"
-              }`}
-              data-testid={`btn-day-${format(date, "yyyy-MM-dd")}`}
-            >
-              <span className="text-[10px] uppercase font-bold tracking-wider leading-none">
-                {format(date, "EEE")}
-              </span>
-              <span className="text-xl font-bold mt-1 leading-none">{format(date, "d")}</span>
-              {/* Dot: today indicator OR entry indicator */}
-              {!isSelected && (isToday || hasEntries) && (
-                <div className={`w-1.5 h-1.5 rounded-full mt-1.5 ${isToday ? "bg-primary" : "bg-muted-foreground/40"}`} />
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Day content */}
-      <div className="space-y-3">
-        <h2 className="text-xl font-semibold">
-          {isSameDay(selectedDate, new Date()) ? "Today" : format(selectedDate, "EEEE, MMM d")}
-        </h2>
-
-        {dayEntries.length === 0 ? (
-          <GlassCard className="p-12 text-center border-dashed border-2 bg-transparent text-muted-foreground">
-            Nothing scheduled — add due dates to checklist tasks to see them here.
-          </GlassCard>
-        ) : (
-          <AnimatePresence initial={false}>
-            {dayEntries.map(entry => {
-              if (entry.kind === "event") {
-                return (
-                  <EventCard
-                    key={`event-${entry.id}`}
-                    eventId={entry.id}
-                    schedule={schedule}
-                    subjects={subjects}
-                    checklist={checklist}
-                    onEdit={() => openEdit(entry.id)}
-                    onDelete={() => setDeletingId(entry.id)}
-                    onToggle={(cid) => toggleChecklistItem(cid)}
-                  />
-                );
-              }
               return (
-                <TaskCard
-                  key={`task-${entry.id}`}
-                  taskId={entry.id}
-                  checklist={checklist}
-                  subjects={subjects}
-                  onToggle={() => toggleChecklistItem(entry.id)}
-                  onRemove={() => removeFromSchedule(entry.id)}
-                  onCycleStatus={() => cycleChecklistStatus(entry.id)}
-                />
+                <button
+                  key={i}
+                  data-today={isToday ? "true" : undefined}
+                  onClick={() => setSelectedDate(date)}
+                  className={`snap-center flex-shrink-0 flex flex-col items-center justify-center w-[4.5rem] h-[4.75rem] rounded-2xl transition-all duration-200 ${
+                    isSelected
+                      ? "bg-primary text-primary-foreground shadow-md shadow-primary/25 ring-2 ring-primary/30"
+                      : "bg-card/60 backdrop-blur border border-border hover:bg-card text-muted-foreground"
+                  }`}
+                  data-testid={`btn-day-${format(date, "yyyy-MM-dd")}`}
+                >
+                  <span className="text-[10px] uppercase font-bold tracking-wider leading-none">
+                    {format(date, "EEE")}
+                  </span>
+                  <span className="text-xl font-bold mt-1 leading-none">{format(date, "d")}</span>
+                  {/* Dot: today indicator OR entry indicator */}
+                  {!isSelected && (isToday || hasEntries) && (
+                    <div className={`w-1.5 h-1.5 rounded-full mt-1.5 ${isToday ? "bg-primary" : "bg-muted-foreground/40"}`} />
+                  )}
+                </button>
               );
             })}
-          </AnimatePresence>
-        )}
-      </div>
+          </div>
+
+          {/* Day content */}
+          <div className="space-y-3">
+            <h2 className="text-xl font-semibold">
+              {isSameDay(selectedDate, new Date()) ? "Today" : format(selectedDate, "EEEE, MMM d")}
+            </h2>
+
+            {dayEntries.length === 0 ? (
+              <GlassCard className="p-12 text-center border-dashed border-2 bg-transparent text-muted-foreground">
+                Nothing scheduled — add due dates to checklist tasks to see them here.
+              </GlassCard>
+            ) : (
+              <AnimatePresence initial={false}>
+                {dayEntries.map(entry => {
+                  if (entry.kind === "event") {
+                    return (
+                      <EventCard
+                        key={`event-${entry.id}`}
+                        eventId={entry.id}
+                        schedule={schedule}
+                        subjects={subjects}
+                        checklist={checklist}
+                        onEdit={() => openEdit(entry.id)}
+                        onDelete={() => setDeletingId(entry.id)}
+                        onToggle={(cid) => toggleChecklistItem(cid)}
+                      />
+                    );
+                  }
+                  return (
+                    <TaskCard
+                      key={`task-${entry.id}`}
+                      taskId={entry.id}
+                      checklist={checklist}
+                      subjects={subjects}
+                      onToggle={() => toggleChecklistItem(entry.id)}
+                      onRemove={() => removeFromSchedule(entry.id)}
+                      onCycleStatus={() => cycleChecklistStatus(entry.id)}
+                    />
+                  );
+                })}
+              </AnimatePresence>
+            )}
+          </div>
+        </>
+      )}
+
+      {viewLevel === "month" && (
+        <MonthView
+          anchor={selectedDate}
+          schedule={schedule}
+          checklist={checklist}
+          onSelectDay={goToDay}
+          onBackToYear={() => setViewLevel("year")}
+          onChangeMonth={(year, month) => setSelectedDate(new Date(year, month, 1))}
+        />
+      )}
+
+      {viewLevel === "year" && (
+        <YearView
+          anchor={selectedDate}
+          schedule={schedule}
+          checklist={checklist}
+          onSelectMonth={goToMonth}
+          onChangeYear={(year) => setSelectedDate(new Date(year, getMonth(selectedDate), 1))}
+        />
+      )}
 
       {/* Edit event sheet (schedule events only — tasks are edited from Checklist) */}
       <BottomSheet isOpen={!!editingId} onClose={() => setEditingId(null)} title="Edit Event">
@@ -279,6 +348,239 @@ export function Schedule() {
         message="This event will be moved to the Archive. You can restore it later from Settings."
         confirmLabel="Move to Archive"
       />
+    </div>
+  );
+}
+
+// ── View toggle (Day / Month / Year) ───────────────────────────────────────────
+
+function ViewToggle({ level, onChange }: { level: ViewLevel; onChange: (l: ViewLevel) => void }) {
+  const OPTIONS: { value: ViewLevel; label: string }[] = [
+    { value: "day",   label: "Day" },
+    { value: "month", label: "Month" },
+    { value: "year",  label: "Year" },
+  ];
+
+  return (
+    <div className="inline-flex p-1 rounded-full bg-secondary/60 border border-border self-start">
+      {OPTIONS.map(opt => {
+        const active = level === opt.value;
+        return (
+          <button
+            key={opt.value}
+            onClick={() => onChange(opt.value)}
+            data-testid={`btn-view-${opt.value}`}
+            className={`relative px-5 py-1.5 rounded-full text-sm font-semibold transition-colors ${
+              active ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {active && (
+              <motion.div
+                layoutId="schedule-view-toggle-pill"
+                className="absolute inset-0 bg-primary rounded-full"
+                transition={{ type: "spring", stiffness: 380, damping: 32 }}
+              />
+            )}
+            <span className="relative z-10">{opt.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Shared horizontal slider selector (years / months) ─────────────────────────
+
+function SliderSelector<T extends string | number>({
+  items, selected, onSelect, getLabel, testIdPrefix,
+}: {
+  items: T[];
+  selected: T;
+  onSelect: (v: T) => void;
+  getLabel: (v: T) => string;
+  testIdPrefix?: string;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = scrollRef.current?.querySelector('[data-selected="true"]') as HTMLElement | null;
+    el?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+  }, [selected]);
+
+  return (
+    <div
+      ref={scrollRef}
+      className="flex gap-2 overflow-x-auto scrollbar-hide py-1 -my-1 snap-x snap-mandatory"
+    >
+      {items.map((item) => {
+        const isSelected = item === selected;
+        return (
+          <button
+            key={String(item)}
+            data-selected={isSelected ? "true" : undefined}
+            data-testid={testIdPrefix ? `${testIdPrefix}-${item}` : undefined}
+            onClick={() => onSelect(item)}
+            className={`snap-center flex-shrink-0 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+              isSelected
+                ? "bg-primary text-primary-foreground shadow-sm shadow-primary/25"
+                : "bg-card/60 backdrop-blur border border-border hover:bg-card text-muted-foreground"
+            }`}
+          >
+            {getLabel(item)}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Month view: full grid with correct blank cells + leap-year-safe day count ──
+
+function MonthView({
+  anchor, schedule, checklist, onSelectDay, onBackToYear, onChangeMonth,
+}: {
+  anchor: Date;
+  schedule: ScheduleEvent[];
+  checklist: ChecklistItem[];
+  onSelectDay: (d: Date) => void;
+  onBackToYear: () => void;
+  onChangeMonth: (year: number, month: number) => void;
+}) {
+  const year  = getYear(anchor);
+  const month = getMonth(anchor);
+  const today = new Date();
+
+  // date-fns getDaysInMonth already accounts for leap years correctly.
+  const daysInMonth   = getDaysInMonth(new Date(year, month, 1));
+  const leadingBlanks = getDay(new Date(year, month, 1)); // 0 = Sunday
+  const cells: (Date | null)[] = [];
+  for (let i = 0; i < leadingBlanks; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(year, month, d));
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const monthItems = Array.from({ length: 12 }, (_, i) => i);
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <button
+          onClick={onBackToYear}
+          className="inline-flex items-center gap-1 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors"
+          data-testid="btn-back-to-year"
+        >
+          <ChevronLeft className="w-4 h-4" /> {year}
+        </button>
+      </div>
+
+      <SliderSelector
+        items={monthItems}
+        selected={month}
+        onSelect={(m) => onChangeMonth(year, m)}
+        getLabel={(m) => format(new Date(2000, m, 1), "MMM")}
+        testIdPrefix="btn-month"
+      />
+
+      <div className="grid grid-cols-7 gap-1.5 text-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+        {["S", "M", "T", "W", "T", "F", "S"].map((l, i) => <span key={i}>{l}</span>)}
+      </div>
+
+      <div className="grid grid-cols-7 gap-1.5">
+        {cells.map((date, i) => {
+          if (!date) return <div key={i} className="aspect-square" />;
+
+          const isCurrentDay = isSameDay(date, today);
+          const isAnchorDay  = isSameDay(date, anchor) && !isCurrentDay;
+          const hasEntries   = hasEntriesOnDate(schedule, checklist, date);
+
+          return (
+            <button
+              key={i}
+              onClick={() => onSelectDay(date)}
+              data-testid={`btn-month-day-${format(date, "yyyy-MM-dd")}`}
+              className={`aspect-square rounded-xl flex flex-col items-center justify-center gap-0.5 text-sm font-medium transition-all ${
+                isCurrentDay
+                  ? "bg-primary text-primary-foreground font-bold shadow-sm shadow-primary/30"
+                  : isAnchorDay
+                  ? "border-2 border-primary/60 text-foreground"
+                  : "bg-card/60 border border-border hover:bg-card"
+              }`}
+            >
+              {format(date, "d")}
+              <span
+                className={`w-1 h-1 rounded-full ${
+                  hasEntries ? (isCurrentDay ? "bg-primary-foreground" : "bg-primary") : "bg-transparent"
+                }`}
+              />
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── Year view: 12-month grid ────────────────────────────────────────────────────
+
+function YearView({
+  anchor, schedule, checklist, onSelectMonth, onChangeYear,
+}: {
+  anchor: Date;
+  schedule: ScheduleEvent[];
+  checklist: ChecklistItem[];
+  onSelectMonth: (year: number, month: number) => void;
+  onChangeYear: (year: number) => void;
+}) {
+  const year  = getYear(anchor);
+  const month = getMonth(anchor);
+  const today = new Date();
+
+  const years = Array.from(
+    { length: YEAR_RANGE_END - YEAR_RANGE_START + 1 },
+    (_, i) => YEAR_RANGE_START + i
+  );
+  const months = Array.from({ length: 12 }, (_, i) => i);
+
+  return (
+    <div className="space-y-5">
+      <SliderSelector
+        items={years}
+        selected={year}
+        onSelect={onChangeYear}
+        getLabel={(y) => String(y)}
+        testIdPrefix="btn-year"
+      />
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {months.map((m) => {
+          const isCurrentMonth = year === getYear(today) && m === getMonth(today);
+          const isAnchorMonth  = m === month && !isCurrentMonth;
+          const entryCount     = countEntriesInMonth(schedule, checklist, year, m);
+
+          return (
+            <button
+              key={m}
+              onClick={() => onSelectMonth(year, m)}
+              data-testid={`btn-year-month-${m}`}
+              className={`p-4 rounded-2xl border text-left transition-all ${
+                isCurrentMonth
+                  ? "bg-primary text-primary-foreground border-primary shadow-md shadow-primary/25"
+                  : isAnchorMonth
+                  ? "border-primary/60 bg-primary/5"
+                  : "border-border bg-card/60 hover:bg-card"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-semibold">{format(new Date(year, m, 1), "MMMM")}</span>
+              </div>
+              {entryCount > 0 && (
+                <span className={`text-xs mt-1 block ${isCurrentMonth ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
+                  {entryCount} {entryCount === 1 ? "item" : "items"}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -250,6 +250,55 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
     document.documentElement.style.setProperty('--primary', ACCENT_COLORS[settings.accentColor]);
   }, [settings.accentColor]);
 
+  // ─── Repeat rollover ─────────────────────────────────────────────────────────
+  // Repeated tasks/lists do NOT spawn a new occurrence the moment they're
+  // checked or skipped. They stay marked done/didNotDo — visibly completed —
+  // until the actual next occurrence's date + time is reached, at which point
+  // this same item resets in place (dueDate advances, done/didNotDo clears).
+  const rolloverRepeats = useCallback(() => {
+    setChecklist((prev) => {
+      const now = new Date();
+      let changed = false;
+
+      const next = prev.map((item) => {
+        if (!item.repeat || item.repeat === 'none') return item;
+        if (!item.done && !item.didNotDo) return item;
+        if (!item.dueDate) return item;
+
+        const nextDueDate = getNextDueDate(item.dueDate, item.repeat);
+        const nextDueAt   = parseISO(`${nextDueDate}T${item.dueTime || '00:00'}`);
+        if (now < nextDueAt) return item;
+
+        changed = true;
+        const resetSubTasks = item.subTasks?.map((st) => ({
+          ...st, done: false, didNotDo: false, doneAt: undefined,
+        }));
+        const updated: ChecklistItem = {
+          ...item,
+          dueDate: nextDueDate,
+          done: false,
+          didNotDo: false,
+          doneAt: undefined,
+          subTasks: resetSubTasks ?? item.subTasks,
+        };
+        api.updateChecklistItem(item.id, {
+          dueDate: nextDueDate, done: false, didNotDo: false, doneAt: undefined,
+          subTasks: updated.subTasks,
+        }).catch(console.error);
+        return updated;
+      });
+
+      return changed ? next : prev;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    rolloverRepeats();
+    const id = setInterval(rolloverRepeats, 60_000);
+    return () => clearInterval(id);
+  }, [isLoaded, rolloverRepeats]);
+
   // ─── Subjects ──────────────────────────────────────────────────────────────
   const addSubject = useCallback((s: Omit<Subject, 'id' | 'lectures' | 'exams' | 'color' | 'wallpaper' | 'attachments'>) => {
     const colors       = Object.values(ACCENT_HEX);
@@ -417,23 +466,7 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
         api.updateScheduleEvent(item.linkedScheduleId, { done }).catch(console.error);
       }
 
-      let next = prev.map((i) => (i.id === id ? updated : i));
-
-      // Real repeat: spawn next occurrence on completion
-      if (done && item.repeat && item.repeat !== 'none' && item.dueDate) {
-        const nextDue     = getNextDueDate(item.dueDate, item.repeat);
-        const occurrence: ChecklistItem = {
-          ...item,
-          id: crypto.randomUUID(),
-          done: false,
-          didNotDo: false,
-          doneAt: undefined,
-          dueDate: nextDue,
-        };
-        api.createChecklistItem(occurrence).catch(console.error);
-        next = [...next, occurrence];
-      }
-
+      const next = prev.map((i) => (i.id === id ? updated : i));
       return next;
     });
   }, []);
@@ -443,9 +476,10 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
     api.deleteChecklistItem(id).catch(console.error);
   }, []);
 
-  // Mark as skipped-for-the-day (didNotDo). For repeated tasks, also spawns the
-  // next occurrence so future days still see it. For non-repeated tasks, fully
-  // deletes the item from both schedule and checklist.
+  // Mark as skipped-for-the-day (didNotDo). Repeated tasks stay in place —
+  // marked skipped — until rolloverRepeats() resets them once the next
+  // occurrence's date/time actually arrives. Non-repeated tasks are fully
+  // deleted from both schedule and checklist.
   const skipChecklistItem = useCallback((id: string) => {
     setChecklist((prev) => {
       const item = prev.find(i => i.id === id);
@@ -457,27 +491,17 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
         return prev.filter(i => i.id !== id);
       }
 
-      // Repeated: mark didNotDo + spawn next occurrence
+      // Repeated: mark didNotDo in place; rolloverRepeats() will reset it later.
       const updated = { ...item, done: false, didNotDo: true, doneAt: undefined };
       api.updateChecklistItem(id, { done: false, didNotDo: true, doneAt: undefined }).catch(console.error);
 
-      const nextDue = getNextDueDate(item.dueDate!, item.repeat);
-      const occurrence: ChecklistItem = {
-        ...item,
-        id: crypto.randomUUID(),
-        done: false,
-        didNotDo: false,
-        doneAt: undefined,
-        dueDate: nextDue,
-      };
-      api.createChecklistItem(occurrence).catch(console.error);
-
-      return [...prev.map(i => i.id === id ? updated : i), occurrence];
+      return prev.map(i => i.id === id ? updated : i);
     });
   }, []);
 
   // Set a checklist item's done/didNotDo status and cascade the same status to
-  // all sub-tasks (for task lists). Also handles repeat-spawn when going done.
+  // all sub-tasks (for task lists). Repeated items are reset in place later by
+  // rolloverRepeats() once the next occurrence's date/time actually arrives.
   const setCascadeChecklistStatus = useCallback((id: string, done: boolean, didNotDo: boolean) => {
     setChecklist((prev) => {
       const item = prev.find(i => i.id === id);
@@ -495,25 +519,7 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
       const updated = { ...item, done, didNotDo, doneAt, subTasks: newSubTasks ?? item.subTasks };
       api.updateChecklistItem(id, { done, didNotDo, doneAt, subTasks: updated.subTasks }).catch(console.error);
 
-      let next = prev.map(i => i.id === id ? updated : i);
-
-      // Spawn next occurrence when marking done on a repeated task
-      if (done && item.repeat && item.repeat !== 'none' && item.dueDate) {
-        const nextDue = getNextDueDate(item.dueDate, item.repeat);
-        const occurrence: ChecklistItem = {
-          ...item,
-          id: crypto.randomUUID(),
-          done: false,
-          didNotDo: false,
-          doneAt: undefined,
-          dueDate: nextDue,
-          subTasks: item.subTasks?.map(st => ({ ...st, done: false, didNotDo: false, doneAt: undefined })),
-        };
-        api.createChecklistItem(occurrence).catch(console.error);
-        next = [...next, occurrence];
-      }
-
-      return next;
+      return prev.map(i => i.id === id ? updated : i);
     });
   }, []);
 
