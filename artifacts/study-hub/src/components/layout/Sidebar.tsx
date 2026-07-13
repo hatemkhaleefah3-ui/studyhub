@@ -1,13 +1,14 @@
-import { Home, BookOpen, Calendar, CheckSquare, BarChart2 } from 'lucide-react';
+import { Home, BookOpen, CheckSquare, BarChart2 } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { motion, useAnimate } from 'framer-motion';
 import { useRef, useState } from 'react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
+// Calendar/Schedule intentionally lives off the main nav — it's reached via
+// the mini calendar card on the Dashboard instead (see components/dashboard/MiniCalendar).
 export const NAV_ITEMS = [
   { href: '/', icon: Home, label: 'Dashboard' },
   { href: '/subjects', icon: BookOpen, label: 'Subjects' },
-  { href: '/schedule', icon: Calendar, label: 'Schedule' },
   { href: '/checklist', icon: CheckSquare, label: 'Checklist' },
   { href: '/progress', icon: BarChart2, label: 'Progress' },
 ];
@@ -199,10 +200,12 @@ export function Sidebar() {
         style={{ ...glassStyle, boxShadow: sidebarShadow }}
       >
         {logo}
-        {/* Nav container — this is what pulses on long-press */}
+        {/* Nav container — this is what pulses on long-press.
+            flex-1 + justify-center distributes the (now 4) icons evenly
+            across the remaining height instead of clumping under the logo. */}
         <div
           ref={ipad.scope}
-          className="flex flex-col gap-3 w-full px-3 touch-none select-none"
+          className="flex flex-1 flex-col justify-center gap-8 w-full px-3 touch-none select-none"
           {...ipad.handlers}
         >
           <NavItems
@@ -221,10 +224,12 @@ export function Sidebar() {
         style={{ ...glassStyle, boxShadow: sidebarShadow }}
       >
         {logo}
-        {/* Nav container — this is what pulses on long-press */}
+        {/* Nav container — this is what pulses on long-press.
+            flex-1 + justify-center distributes the (now 4) icons evenly
+            across the remaining height instead of clumping under the logo. */}
         <div
           ref={desktop.scope}
-          className="flex flex-col gap-3 w-full px-3 touch-none select-none"
+          className="flex flex-1 flex-col justify-center gap-8 w-full px-3 touch-none select-none"
           {...desktop.handlers}
         >
           <NavItems

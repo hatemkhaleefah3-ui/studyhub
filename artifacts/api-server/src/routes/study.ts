@@ -109,7 +109,7 @@ router.put("/subjects/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const existing = await db.select().from(studySubjects).where(eq(studySubjects.id, id)).limit(1);
-    if (!existing.length) return res.status(404).json({ error: "Not found" });
+    if (!existing.length) { res.status(404).json({ error: "Not found" }); return; }
     const updated = { ...(existing[0].data as object), ...req.body };
     await db.update(studySubjects).set({ data: updated }).where(eq(studySubjects.id, id));
     res.json(updated);
@@ -144,7 +144,7 @@ router.post("/subjects/:subjectId/lectures", async (req, res) => {
   try {
     const { subjectId } = req.params;
     const existing = await db.select().from(studySubjects).where(eq(studySubjects.id, subjectId)).limit(1);
-    if (!existing.length) return res.status(404).json({ error: "Subject not found" });
+    if (!existing.length) { res.status(404).json({ error: "Subject not found" }); return; }
     const subject = existing[0].data as any;
     subject.lectures = [...(subject.lectures || []), req.body];
     await db.update(studySubjects).set({ data: subject }).where(eq(studySubjects.id, subjectId));
@@ -158,7 +158,7 @@ router.put("/subjects/:subjectId/lectures/:id", async (req, res) => {
   try {
     const { subjectId, id } = req.params;
     const existing = await db.select().from(studySubjects).where(eq(studySubjects.id, subjectId)).limit(1);
-    if (!existing.length) return res.status(404).json({ error: "Subject not found" });
+    if (!existing.length) { res.status(404).json({ error: "Subject not found" }); return; }
     const subject = existing[0].data as any;
     subject.lectures = (subject.lectures || []).map((l: any) =>
       l.id === id ? { ...l, ...req.body } : l
@@ -174,7 +174,7 @@ router.delete("/subjects/:subjectId/lectures/:id", async (req, res) => {
   try {
     const { subjectId, id } = req.params;
     const existing = await db.select().from(studySubjects).where(eq(studySubjects.id, subjectId)).limit(1);
-    if (!existing.length) return res.status(404).json({ error: "Subject not found" });
+    if (!existing.length) { res.status(404).json({ error: "Subject not found" }); return; }
     const subject = existing[0].data as any;
     subject.lectures = (subject.lectures || []).filter((l: any) => l.id !== id);
     await db.update(studySubjects).set({ data: subject }).where(eq(studySubjects.id, subjectId));
@@ -189,7 +189,7 @@ router.post("/subjects/:subjectId/exams", async (req, res) => {
   try {
     const { subjectId } = req.params;
     const existing = await db.select().from(studySubjects).where(eq(studySubjects.id, subjectId)).limit(1);
-    if (!existing.length) return res.status(404).json({ error: "Subject not found" });
+    if (!existing.length) { res.status(404).json({ error: "Subject not found" }); return; }
     const subject = existing[0].data as any;
     subject.exams = [...(subject.exams || []), req.body];
     await db.update(studySubjects).set({ data: subject }).where(eq(studySubjects.id, subjectId));
@@ -203,7 +203,7 @@ router.put("/subjects/:subjectId/exams/:id", async (req, res) => {
   try {
     const { subjectId, id } = req.params;
     const existing = await db.select().from(studySubjects).where(eq(studySubjects.id, subjectId)).limit(1);
-    if (!existing.length) return res.status(404).json({ error: "Subject not found" });
+    if (!existing.length) { res.status(404).json({ error: "Subject not found" }); return; }
     const subject = existing[0].data as any;
     subject.exams = (subject.exams || []).map((e: any) =>
       e.id === id ? { ...e, ...req.body } : e
@@ -219,7 +219,7 @@ router.delete("/subjects/:subjectId/exams/:id", async (req, res) => {
   try {
     const { subjectId, id } = req.params;
     const existing = await db.select().from(studySubjects).where(eq(studySubjects.id, subjectId)).limit(1);
-    if (!existing.length) return res.status(404).json({ error: "Subject not found" });
+    if (!existing.length) { res.status(404).json({ error: "Subject not found" }); return; }
     const subject = existing[0].data as any;
     subject.exams = (subject.exams || []).filter((e: any) => e.id !== id);
     await db.update(studySubjects).set({ data: subject }).where(eq(studySubjects.id, subjectId));
@@ -261,7 +261,7 @@ router.put("/schedule/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const existing = await db.select().from(studySchedule).where(eq(studySchedule.id, id)).limit(1);
-    if (!existing.length) return res.status(404).json({ error: "Not found" });
+    if (!existing.length) { res.status(404).json({ error: "Not found" }); return; }
     const updated = { ...(existing[0].data as object), ...req.body };
     await db.update(studySchedule).set({ data: updated }).where(eq(studySchedule.id, id));
     res.json({ ok: true });
@@ -294,7 +294,7 @@ router.put("/checklist/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const existing = await db.select().from(studyChecklist).where(eq(studyChecklist.id, id)).limit(1);
-    if (!existing.length) return res.status(404).json({ error: "Not found" });
+    if (!existing.length) { res.status(404).json({ error: "Not found" }); return; }
     const updated = { ...(existing[0].data as object), ...req.body };
     await db.update(studyChecklist).set({ data: updated }).where(eq(studyChecklist.id, id));
     res.json({ ok: true });
@@ -332,11 +332,11 @@ router.post("/archive/:id/restore", async (req, res) => {
   try {
     const { id } = req.params;
     const existing = await db.select().from(studyArchive).where(eq(studyArchive.id, id)).limit(1);
-    if (!existing.length) return res.status(404).json({ error: "Not found" });
+    if (!existing.length) { res.status(404).json({ error: "Not found" }); return; }
     const row = existing[0];
     const category = row.category as ArchiveCategory;
     const table = TABLES[category];
-    if (!table) return res.status(400).json({ error: "Unknown category" });
+    if (!table) { res.status(400).json({ error: "Unknown category" }); return; }
     await db.insert(table as any).values({ id: row.originalId, data: row.data });
     await db.delete(studyArchive).where(eq(studyArchive.id, id));
     res.json({ ok: true, category, item: row.data });
@@ -359,7 +359,7 @@ router.post("/checklist/:id/subtasks", async (req, res) => {
   try {
     const { id } = req.params;
     const existing = await db.select().from(studyChecklist).where(eq(studyChecklist.id, id)).limit(1);
-    if (!existing.length) return res.status(404).json({ error: "Not found" });
+    if (!existing.length) { res.status(404).json({ error: "Not found" }); return; }
     const item = existing[0].data as any;
     const newSubTask = { id: crypto.randomUUID(), text: req.body.text, done: false };
     item.subTasks = [...(item.subTasks || []), newSubTask];
@@ -374,7 +374,7 @@ router.put("/checklist/:id/subtasks/:sid", async (req, res) => {
   try {
     const { id, sid } = req.params;
     const existing = await db.select().from(studyChecklist).where(eq(studyChecklist.id, id)).limit(1);
-    if (!existing.length) return res.status(404).json({ error: "Not found" });
+    if (!existing.length) { res.status(404).json({ error: "Not found" }); return; }
     const item = existing[0].data as any;
     item.subTasks = (item.subTasks || []).map((st: any) =>
       st.id === sid ? { ...st, ...req.body } : st
@@ -390,7 +390,7 @@ router.delete("/checklist/:id/subtasks/:sid", async (req, res) => {
   try {
     const { id, sid } = req.params;
     const existing = await db.select().from(studyChecklist).where(eq(studyChecklist.id, id)).limit(1);
-    if (!existing.length) return res.status(404).json({ error: "Not found" });
+    if (!existing.length) { res.status(404).json({ error: "Not found" }); return; }
     const item = existing[0].data as any;
     item.subTasks = (item.subTasks || []).filter((st: any) => st.id !== sid);
     await db.update(studyChecklist).set({ data: item }).where(eq(studyChecklist.id, id));

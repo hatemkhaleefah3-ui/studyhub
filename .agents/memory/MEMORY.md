@@ -1,1 +1,2 @@
-- [Study Hub dual backend](study-hub-dual-backend.md) — every /api/study/* change must be mirrored in both the Express server (dev) and Cloudflare Pages Functions (prod, D1) or they diverge.
+- [Study Hub repo sync](study-hub-repo-sync.md) — this workspace mirrors an external GitHub repo (studyhub); sync/PR conventions and gotchas.
+- [Study Hub dual backend](study-hub-dual-backend.md) — /api/study/* routes exist in two places (Express + Cloudflare Functions) and must be changed together.

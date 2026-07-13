@@ -12,9 +12,10 @@ import {
 import {
   Plus, CheckCircle2, Circle, XCircle, Trash2,
   List, ListChecks, ChevronRight,
-  SlidersHorizontal, RotateCcw, Link as LinkIcon,
+  SlidersHorizontal, RotateCcw,
   Clock, Repeat,
 } from "lucide-react";
+import { LinkChip } from "@/components/shared/LinkChip";
 import { motion, AnimatePresence } from "framer-motion";
 import { format, isToday, isPast, parseISO } from "date-fns";
 
@@ -135,11 +136,13 @@ export function Checklist() {
       subjectId: data.subjectId || null,
       done: false,
       didNotDo: false,
-      importance: null,
-      dueDate: null,
-      dueTime: null,
-      repeat: null,
-      link: null,
+      importance: (data.importance as ImportanceLevel) || null,
+      dueDate: data.dueDate || (data.repeat && data.repeat !== "none"
+        ? format(new Date(), "yyyy-MM-dd")
+        : null),
+      dueTime: data.dueTime || null,
+      repeat: (data.repeat !== "none" ? data.repeat : null) as RepeatInterval | null,
+      link: data.link || null,
       linkedScheduleId: null,
       isTaskList: true,
       subTasks: [],
@@ -396,17 +399,7 @@ export function Checklist() {
                                           {REPEAT_META[item.repeat]}
                                         </span>
                                       )}
-                                      {item.link && (
-                                        <a
-                                          href={item.link}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          onClick={e => e.stopPropagation()}
-                                          className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary"
-                                        >
-                                          <LinkIcon className="w-3 h-3" /> Link
-                                        </a>
-                                      )}
+                                      {item.link && <LinkChip href={item.link} />}
                                     </div>
                                   )}
                                 </div>
@@ -521,65 +514,21 @@ export function Checklist() {
           onSubmit={onAddList}
           onClose={() => setIsAddListOpen(false)}
           submitLabel="Create Task List"
-          hideRepeat
         />
       )}
 
       {/* ── Edit Task / Edit Task List ────────────────────────────────────────── */}
+      {/* Task lists share the same form as single tasks now, so they can be
+          given a due date/time and repeat interval just like regular tasks. */}
       {editingItemId && editingItem && (
-        editingItem.isTaskList ? (
-          // Simple title/description edit for list tasks
-          <BottomSheet isOpen onClose={() => setEditingItemId(null)} title="Edit Task List">
-            <form
-              className="space-y-5"
-              onSubmit={e => {
-                e.preventDefault();
-                const fd = new FormData(e.currentTarget);
-                updateChecklistItem(editingItemId, {
-                  text: (fd.get("text") as string).trim(),
-                  description: (fd.get("description") as string).trim() || undefined,
-                  subjectId: (fd.get("subjectId") as string) || null,
-                });
-                setEditingItemId(null);
-              }}
-            >
-              {(() => {
-                const fieldCls = "w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
-                return (
-                  <>
-                    <div>
-                      <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">List Title</label>
-                      <input name="text" defaultValue={editingItem.text} required autoFocus className={fieldCls} />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Description</label>
-                      <textarea name="description" defaultValue={editingItem.description || ""} className={`${fieldCls} resize-none min-h-[64px]`} />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Subject</label>
-                      <select name="subjectId" defaultValue={editingItem.subjectId || ""} className={`${fieldCls} appearance-none`}>
-                        <option value="">No subject</option>
-                        {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                      </select>
-                    </div>
-                    <button type="submit" className="w-full bg-primary text-primary-foreground font-semibold rounded-xl py-3.5">
-                      Save Changes
-                    </button>
-                  </>
-                );
-              })()}
-            </form>
-          </BottomSheet>
-        ) : (
-          <TaskForm
-            title="Edit Task"
-            defaultValues={getEditDefaults(editingItemId)}
-            subjects={subjects}
-            onSubmit={onEditTask}
-            onClose={() => setEditingItemId(null)}
-            submitLabel="Save Changes"
-          />
-        )
+        <TaskForm
+          title={editingItem.isTaskList ? "Edit Task List" : "Edit Task"}
+          defaultValues={getEditDefaults(editingItemId)}
+          subjects={subjects}
+          onSubmit={onEditTask}
+          onClose={() => setEditingItemId(null)}
+          submitLabel="Save Changes"
+        />
       )}
 
       {/* ── Filter sheet ─────────────────────────────────────────────────────── */}
