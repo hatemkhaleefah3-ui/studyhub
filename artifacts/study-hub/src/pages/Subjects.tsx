@@ -81,12 +81,11 @@ export function Subjects() {
                 className="h-full"
               >
                 <Link href={`/subjects/${subject.id}`} className="block h-full">
-                  <GlassCard className="p-6 hover:-translate-y-1 transition-all duration-300 cursor-pointer relative overflow-hidden group h-full flex flex-col justify-between bg-card hover:shadow-lg border-border/50">
-                    {/* Subtle color indicator */}
-                    <div className="absolute left-0 top-0 bottom-0 w-1.5" style={{ backgroundColor: subject.color }} />
-
+                  <GlassCard className="p-5 hover:-translate-y-1 transition-all duration-300 cursor-pointer relative group h-full flex flex-col bg-card/60 hover:bg-card hover:shadow-xl hover:shadow-primary/5 hover:border-primary/30 border border-border/50">
+                    <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                    
                     {/* Edit / Delete — hover-only, top-right (desktop/mouse fallback for swipe) */}
-                    <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                    <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
                       <button
                         onClick={(e) => openEdit(e, subject.id)}
                         className="w-8 h-8 rounded-full bg-background/90 backdrop-blur flex items-center justify-center hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors border border-border/50 shadow-sm"
@@ -103,17 +102,21 @@ export function Subjects() {
                       </button>
                     </div>
 
-                    <div className="pl-3">
-                      <h3 className="text-2xl font-bold mb-5 mt-1 text-foreground tracking-tight pr-16">{subject.name}</h3>
-                      <div className="flex gap-3">
-                        <div className="bg-secondary/40 border border-border/40 rounded-2xl p-3.5 flex-1 flex flex-col justify-center">
-                          <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mb-1.5">Avg Grade</p>
-                          <p className="text-xl font-semibold text-foreground">{avg !== null ? `${avg}%` : '—'}</p>
-                        </div>
-                        <div className="bg-secondary/40 border border-border/40 rounded-2xl p-3.5 flex-1 flex flex-col justify-center">
-                          <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mb-1.5">Exams</p>
-                          <p className="text-xl font-semibold text-foreground">{subject.exams.length}</p>
-                        </div>
+                    <div className="relative z-10 flex-1 flex flex-col">
+                      <div className="w-12 h-12 rounded-[16px] bg-primary/10 flex items-center justify-center mb-5 border border-primary/20 text-primary shadow-inner">
+                        <BookOpen className="w-6 h-6" />
+                      </div>
+                      <h3 className="text-xl font-bold mb-4 text-foreground tracking-tight pr-10 leading-snug line-clamp-2">{subject.name}</h3>
+                    </div>
+
+                    <div className="relative z-10 flex gap-2 mt-2 pt-4 border-t border-border/40">
+                      <div className="bg-secondary/40 border border-border/40 rounded-xl px-3 py-2.5 flex-1 flex flex-col justify-center transition-colors group-hover:bg-secondary/60">
+                        <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider mb-0.5">Avg Grade</p>
+                        <p className="text-sm font-bold text-foreground">{avg !== null ? `${avg}%` : '—'}</p>
+                      </div>
+                      <div className="bg-secondary/40 border border-border/40 rounded-xl px-3 py-2.5 flex-1 flex flex-col justify-center transition-colors group-hover:bg-secondary/60">
+                        <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider mb-0.5">Exams</p>
+                        <p className="text-sm font-bold text-foreground">{subject.exams.length}</p>
                       </div>
                     </div>
                   </GlassCard>

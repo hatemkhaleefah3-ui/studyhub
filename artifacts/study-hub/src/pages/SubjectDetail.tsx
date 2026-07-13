@@ -8,7 +8,7 @@ import { SwipeRow } from "@/components/shared/SwipeRow";
 import { LectureCoverBadge } from "@/components/study/LectureCoverBadge";
 import {
   Plus, Trash2, ArrowLeft, ExternalLink, BookOpen, FileText, Pencil,
-  FolderOpen, BarChart2, Link2, Paperclip, Info, Layers, Brain, ChevronRight,
+  FolderOpen, BarChart2, Link2, Paperclip, Info, Layers, Brain, ChevronRight, CheckSquare,
 } from "lucide-react";
 import { Link, useRoute, useLocation } from "wouter";
 import { useForm } from "react-hook-form";
@@ -63,8 +63,6 @@ export function SubjectDetail() {
   if (!subject) {
     return <div className="p-8 text-center text-muted-foreground">Subject not found</div>;
   }
-
-  const accentColor = subject.color;
 
   const lecturesByType = {
     theoretical: subject.lectures.filter(l => l.type === "theoretical"),
@@ -187,7 +185,7 @@ export function SubjectDetail() {
           <ArrowLeft className="w-5 h-5 text-muted-foreground" />
         </Link>
         <div className="flex-1 min-w-0 flex items-center gap-3">
-          <div className="w-3.5 h-3.5 rounded-full shadow-sm shrink-0" style={{ backgroundColor: accentColor }} />
+          <div className="w-3.5 h-3.5 rounded-full shadow-sm shrink-0 bg-primary" />
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight truncate text-foreground">
             {subject.name}
           </h1>
@@ -240,33 +238,33 @@ export function SubjectDetail() {
               >
                 {subject.driveLink ? (
                   <div className="block">
-                    <GlassCard className="p-5 border-border/60 hover:bg-secondary/20 transition-colors">
+                    <GlassCard className="p-5 border-border/60 hover:shadow-md transition-all bg-card">
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-4 min-w-0">
-                          <div className="w-11 h-11 rounded-xl bg-secondary flex items-center justify-center shrink-0 border border-border/50 shadow-sm">
-                            <FolderOpen className="w-5 h-5 text-muted-foreground" />
+                          <div className="w-11 h-11 rounded-[14px] bg-primary/10 flex items-center justify-center shrink-0 border border-primary/20 text-primary">
+                            <FolderOpen className="w-5 h-5" />
                           </div>
                           <div className="min-w-0">
                             <p className="font-semibold text-sm text-foreground">Google Drive Folder</p>
-                            <p className="text-xs font-bold mt-1 text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">Connected</p>
+                            <p className="text-[10px] font-bold mt-0.5 text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Connected</p>
                           </div>
                         </div>
-                        <ExternalLink className="w-4 h-4 shrink-0 text-muted-foreground/50" />
+                        <ExternalLink className="w-4 h-4 shrink-0 text-muted-foreground/40" />
                       </div>
-                      <p className="text-xs text-muted-foreground mt-4 text-center">← Swipe left to open · swipe right to change link</p>
+                      <p className="text-[10px] text-muted-foreground/60 font-bold uppercase tracking-wider mt-4 text-center">← Swipe left to open · swipe right to change link</p>
                     </GlassCard>
                   </div>
                 ) : (
                   <button className="w-full text-left" onClick={openEditDriveLink}>
-                    <GlassCard className="p-5 border-border/60 hover:bg-secondary/40 transition-colors group">
+                    <GlassCard className="p-5 border-border/60 hover:shadow-md transition-all group bg-card">
                       <div className="flex items-center gap-4">
-                        <div className="w-11 h-11 rounded-xl bg-secondary/50 group-hover:bg-secondary flex items-center justify-center shrink-0 border border-border/50 shadow-sm transition-colors">
+                        <div className="w-11 h-11 rounded-[14px] bg-secondary/50 group-hover:bg-secondary flex items-center justify-center shrink-0 border border-border/50 transition-colors">
                           <FolderOpen className="w-5 h-5 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
                         </div>
                         <div>
                           <p className="font-semibold text-sm text-foreground">Google Drive Folder</p>
-                          <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5 font-medium">
-                            <Link2 className="w-3.5 h-3.5" /> Tap to add a folder link
+                          <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1 font-medium">
+                            <Link2 className="w-3 h-3" /> Tap to add a folder link
                           </p>
                         </div>
                       </div>
@@ -275,10 +273,10 @@ export function SubjectDetail() {
                 )}
               </SwipeRow>
 
-              <GlassCard className="p-6 border-border/60">
+              <GlassCard className="p-6 border-border/60 bg-card">
                 <div className="flex items-center gap-3 mb-5">
-                  <div className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center shrink-0 border border-border/50 shadow-sm">
-                    <BarChart2 className="w-4 h-4 text-muted-foreground" />
+                  <div className="w-10 h-10 rounded-[14px] bg-secondary flex items-center justify-center shrink-0 border border-border/50">
+                    <BarChart2 className="w-5 h-5 text-muted-foreground" />
                   </div>
                   <span className="font-bold text-foreground">Progress</span>
                 </div>
@@ -286,25 +284,25 @@ export function SubjectDetail() {
                 <div className="mb-2">
                   <div className="flex items-end justify-between mb-3">
                     <span className="text-3xl font-bold tracking-tight text-foreground">{progress}%</span>
-                    <span className="text-sm font-medium text-muted-foreground">{finishedExams} / {totalExams} exams checked</span>
+                    <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{finishedExams} / {totalExams} exams checked</span>
                   </div>
-                  <div className="h-3 bg-secondary border border-border/40 rounded-full overflow-hidden shadow-inner">
-                    <div className="h-full rounded-full transition-all duration-500" style={{ width: `${progress}%`, backgroundColor: accentColor }} />
+                  <div className="h-3 bg-secondary/50 border border-border/40 rounded-full overflow-hidden shadow-inner">
+                    <div className="h-full rounded-full transition-all duration-500 bg-primary" style={{ width: `${progress}%` }} />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 mt-6">
-                  <div className="bg-secondary/40 border border-border/50 rounded-2xl p-4 flex flex-col justify-center">
-                    <p className="text-3xl font-bold text-center tracking-tight">{totalLectures}</p>
-                    <p className="text-[10px] text-muted-foreground mt-1.5 font-bold uppercase tracking-widest text-center">Lectures</p>
-                    <p className="text-[11px] text-muted-foreground/70 font-medium text-center mt-1.5">
+                  <div className="bg-secondary/40 border border-border/50 rounded-2xl p-4 flex flex-col justify-center text-center">
+                    <p className="text-3xl font-bold tracking-tight">{totalLectures}</p>
+                    <p className="text-[10px] text-muted-foreground mt-1.5 font-bold uppercase tracking-widest">Lectures</p>
+                    <p className="text-[10px] text-primary/80 font-medium mt-1">
                       {lecturesByType.theoretical.length} Theo / {lecturesByType.practical.length} Prac
                     </p>
                   </div>
-                  <div className="bg-secondary/40 border border-border/50 rounded-2xl p-4 flex flex-col justify-center">
-                    <p className="text-3xl font-bold text-center tracking-tight">{totalExams}</p>
-                    <p className="text-[10px] text-muted-foreground mt-1.5 font-bold uppercase tracking-widest text-center">Exams</p>
-                    <p className="text-[11px] text-muted-foreground/70 font-medium text-center mt-1.5">
+                  <div className="bg-secondary/40 border border-border/50 rounded-2xl p-4 flex flex-col justify-center text-center">
+                    <p className="text-3xl font-bold tracking-tight">{totalExams}</p>
+                    <p className="text-[10px] text-muted-foreground mt-1.5 font-bold uppercase tracking-widest">Exams</p>
+                    <p className="text-[10px] text-primary/80 font-medium mt-1">
                       {examsByType.theoretical.length} Theo / {examsByType.practical.length} Prac
                     </p>
                   </div>
@@ -320,7 +318,7 @@ export function SubjectDetail() {
 
               {visibleLectures.length === 0 ? (
                 <GlassCard className="p-10 text-center text-muted-foreground border-dashed border-2 bg-transparent shadow-none">
-                  <div className="w-12 h-12 rounded-full bg-secondary/50 mx-auto flex items-center justify-center mb-4">
+                  <div className="w-12 h-12 rounded-[16px] bg-secondary/50 mx-auto flex items-center justify-center mb-4">
                     <BookOpen className="w-6 h-6 opacity-40" />
                   </div>
                   <p className="font-medium">No {lectureTypeTab} lectures yet</p>
@@ -336,20 +334,20 @@ export function SubjectDetail() {
                       onSwipeLeft={() => setLocation(`/subjects/${subject.id}/lectures/${lec.id}/study`)}
                       leftLabel="Study" leftIcon={Brain} leftColor="#0ea5e9"
                     >
-                      <GlassCard className="p-4 flex items-center gap-4 cursor-pointer hover:bg-secondary/40 transition-colors border-border/60">
-                        <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center shrink-0 border border-border/50 shadow-sm">
-                          <BookOpen className="w-5 h-5 text-muted-foreground" />
+                      <GlassCard className="p-4 flex items-center gap-4 cursor-pointer hover:shadow-md transition-all border-border/60 hover:border-border bg-card group ">
+                        <div className="w-10 h-10 rounded-[14px] bg-secondary flex items-center justify-center shrink-0 border border-border/50 text-muted-foreground group-hover:text-foreground transition-colors">
+                          <BookOpen className="w-5 h-5" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-semibold truncate text-foreground">{lec.name}</p>
+                          <p className="font-semibold text-sm truncate text-foreground">{lec.name}</p>
                           {lec.link && (
-                            <span className="text-xs flex items-center gap-1.5 mt-1 text-muted-foreground font-medium">
-                              <ExternalLink className="w-3.5 h-3.5" /> Material attached
+                            <span className="text-[11px] flex items-center gap-1 mt-0.5 text-primary/80 font-medium">
+                              <Link2 className="w-3 h-3" /> External Link
                             </span>
                           )}
                         </div>
                         <LectureCoverBadge percentage={lec.readerLastPercentage} />
-                        <ChevronRight className="w-4 h-4 text-muted-foreground/50 shrink-0 ml-1" />
+                        <ChevronRight className="w-4 h-4 text-muted-foreground/40 shrink-0 ml-1" />
                       </GlassCard>
                     </SwipeRow>
                   ))}
@@ -389,33 +387,35 @@ export function SubjectDetail() {
                         onSwipeLeft={() => setLocation(`/subjects/${subject.id}/exams/${exam.id}/edit`)}
                         leftLabel="Edit" leftIcon={Pencil} leftColor="#6366f1"
                       >
-                        <GlassCard className={`p-4 cursor-pointer transition-colors border-border/60 ${isChecked ? 'bg-secondary/20' : 'hover:bg-secondary/40'}`}>
+                        <GlassCard className={`p-4 cursor-pointer transition-all border group  ${isChecked ? 'bg-secondary/10 border-border/40' : 'bg-card border-border/60 hover:border-border hover:shadow-md'}`}>
                           <div className="flex items-center gap-4">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border shadow-sm ${isChecked ? 'bg-primary/10 border-primary/20 text-primary' : 'bg-secondary border-border/50 text-muted-foreground'}`}>
-                              <FileText className="w-5 h-5" />
+                            <div className={`w-10 h-10 rounded-[14px] flex items-center justify-center shrink-0 border transition-colors ${isChecked ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 'bg-secondary border-border/50 text-muted-foreground group-hover:text-foreground'}`}>
+                              {isChecked ? <CheckSquare className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className={`font-semibold truncate ${isChecked ? 'text-muted-foreground' : 'text-foreground'}`}>{exam.name}</p>
-                              <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
+                              <p className={`font-semibold text-sm truncate ${isChecked ? 'text-foreground/70' : 'text-foreground'}`}>{exam.name}</p>
+                              <div className="flex items-center gap-2 mt-1">
                                 {exam.date && (
-                                  <span className="text-[11px] font-medium text-muted-foreground tracking-wide uppercase">
-                                    {format(new Date(exam.date), "MMM d, yyyy")}
-                                  </span>
+                                  <>
+                                    <span className="text-[10px] font-bold text-muted-foreground tracking-wider uppercase">
+                                      {format(new Date(exam.date), "MMM d, yyyy")}
+                                    </span>
+                                    <span className="w-1 h-1 rounded-full bg-border" />
+                                  </>
                                 )}
-                                <span className="text-[11px] font-medium text-muted-foreground tracking-wide uppercase">
-                                  {(exam.questions || []).length} question{(exam.questions || []).length === 1 ? "" : "s"}
+                                <span className="text-[10px] font-bold text-muted-foreground tracking-wider uppercase">
+                                  {(exam.questions || []).length} Qs
                                 </span>
                               </div>
                             </div>
                             {exam.lastScore ? (
-                              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1.5 bg-background text-foreground shrink-0 border border-border/60 shadow-sm">
-                                <span className="w-1.5 h-1.5 rounded-full shadow-sm" style={{ backgroundColor: isChecked ? accentColor : "#eab308" }} />
+                              <div className={`px-2.5 py-1 rounded-full text-[11px] font-bold flex items-center gap-1.5 border shadow-sm ${isChecked ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20" : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"}`}>
                                 {exam.lastScore.percentage}%
-                              </span>
+                              </div>
                             ) : (
-                              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-secondary text-muted-foreground shrink-0 border border-border/50 uppercase tracking-wide">
+                              <div className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-secondary text-muted-foreground shrink-0 border border-border/50 uppercase tracking-wider">
                                 Not taken
-                              </span>
+                              </div>
                             )}
                           </div>
                         </GlassCard>
@@ -455,23 +455,23 @@ export function SubjectDetail() {
                       onSwipeLeft={() => openEditAttachment(att.id)}
                       leftLabel="Edit" leftIcon={Pencil} leftColor="#6366f1"
                     >
-                      <GlassCard className="p-4 cursor-pointer hover:bg-secondary/40 transition-colors border-border/60">
+                      <GlassCard className="p-4 cursor-pointer hover:shadow-md transition-all border-border/60 hover:border-border bg-card ">
                         <div className="flex items-start gap-4">
-                          <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center shrink-0 border border-border/50 shadow-sm">
-                            <Paperclip className="w-5 h-5 text-muted-foreground" />
+                          <div className="w-10 h-10 rounded-[14px] bg-secondary flex items-center justify-center shrink-0 border border-border/50 text-muted-foreground">
+                            <Paperclip className="w-5 h-5" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            {att.name && <p className="font-semibold text-sm truncate mb-1 text-foreground">{att.name}</p>}
-                            <p className="text-xs truncate text-muted-foreground/70 font-medium">{att.url}</p>
-                            <div className="flex flex-wrap gap-2 mt-3">
-                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-secondary text-secondary-foreground border border-border/50 uppercase tracking-wide">
+                            {att.name && <p className="font-semibold text-sm truncate mb-0.5 text-foreground">{att.name}</p>}
+                            <p className="text-[11px] truncate text-primary/80 font-medium">{att.url}</p>
+                            <div className="flex flex-wrap gap-1.5 mt-2.5">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-secondary text-secondary-foreground border border-border/50 uppercase tracking-wider">
                                 {att.type}
                               </span>
-                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-secondary text-secondary-foreground border border-border/50 uppercase tracking-wide">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-secondary text-secondary-foreground border border-border/50 uppercase tracking-wider">
                                 {att.format}
                               </span>
-                              <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border border-border/50 uppercase tracking-wide flex items-center gap-1.5 ${att.priority === "Important" ? "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20" : "bg-secondary text-muted-foreground"}`}>
-                                {att.priority === "Important" && <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />}
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider flex items-center gap-1 ${att.priority === "Important" ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20" : "bg-secondary text-muted-foreground border-border/50"}`}>
+                                {att.priority === "Important" && <span className="w-1 h-1 rounded-full bg-rose-500" />}
                                 {att.priority}
                               </span>
                             </div>

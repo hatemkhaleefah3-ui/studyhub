@@ -33,7 +33,7 @@ export function FlashcardsMaker() {
     return <div className="p-8 text-center text-muted-foreground">Lecture not found</div>;
   }
 
-  const accentColor = subject.color;
+  // No per-subject color theming anymore
   const cards = lecture.flashcards || [];
 
   const inputCls =
@@ -86,7 +86,7 @@ export function FlashcardsMaker() {
           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground truncate">
             {lecture.name}
           </p>
-          <h1 className="text-2xl font-bold tracking-tight" style={{ color: accentColor }}>
+          <h1 className="text-2xl font-bold tracking-tight text-primary">
             Flashcards
           </h1>
         </div>
@@ -97,8 +97,7 @@ export function FlashcardsMaker() {
           {cards.length > 0 && (
             <button
               onClick={() => setLocation(`/subjects/${subject.id}/lectures/${lecture.id}/study`)}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-white text-sm font-semibold shadow-md transition-opacity hover:opacity-90 active:scale-95"
-              style={{ backgroundColor: accentColor }}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-primary-foreground bg-primary text-sm font-semibold shadow-md transition-opacity hover:opacity-90 active:scale-95"
             >
               <Brain className="w-4 h-4" /> Study
             </button>
@@ -110,13 +109,9 @@ export function FlashcardsMaker() {
       {cards.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 gap-5 text-center">
           <div
-            className="w-24 h-24 rounded-[28px] flex items-center justify-center shadow-lg"
-            style={{
-              background: `linear-gradient(135deg, ${accentColor}30, ${accentColor}10)`,
-              border: `2px solid ${accentColor}30`,
-            }}
+            className="w-24 h-24 rounded-[28px] flex items-center justify-center shadow-lg bg-primary/10 border-2 border-primary/20"
           >
-            <Layers className="w-12 h-12" style={{ color: accentColor }} />
+            <Layers className="w-12 h-12 text-primary" />
           </div>
           <div>
             <p className="text-lg font-bold">No cards yet</p>
@@ -126,8 +121,7 @@ export function FlashcardsMaker() {
           </div>
           <button
             onClick={() => setIsAddOpen(true)}
-            className="flex items-center gap-2 px-6 py-3 rounded-2xl text-white font-semibold text-sm shadow-md transition-opacity hover:opacity-90 active:scale-95"
-            style={{ backgroundColor: accentColor }}
+            className="flex items-center gap-2 px-6 py-3 rounded-2xl text-primary-foreground bg-primary font-semibold text-sm shadow-md transition-opacity hover:opacity-90 active:scale-95"
           >
             <Plus className="w-4 h-4" /> Add First Card
           </button>
@@ -157,19 +151,16 @@ export function FlashcardsMaker() {
                   <GlassCard className="overflow-hidden cursor-pointer">
                     {/* Card header strip */}
                     <div
-                      className="px-4 py-2.5 flex items-center justify-between"
-                      style={{ background: `linear-gradient(90deg, ${accentColor}18, ${accentColor}06)` }}
+                      className="px-4 py-2.5 flex items-center justify-between bg-primary/10"
                     >
                       <div className="flex items-center gap-2">
                         <span
-                          className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px] font-black text-white shadow-sm shrink-0"
-                          style={{ backgroundColor: accentColor }}
+                          className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px] font-black text-primary-foreground bg-primary shadow-sm shrink-0"
                         >
                           {i + 1}
                         </span>
                         <span
-                          className="text-[10px] font-black uppercase tracking-widest"
-                          style={{ color: accentColor }}
+                          className="text-[10px] font-black uppercase tracking-widest text-primary"
                         >
                           Flashcard
                         </span>
@@ -182,8 +173,7 @@ export function FlashcardsMaker() {
                     {/* Question */}
                     <div className="px-4 pt-3 pb-2">
                       <p
-                        className="text-[10px] font-black uppercase tracking-widest mb-1.5"
-                        style={{ color: accentColor }}
+                        className="text-[10px] font-black uppercase tracking-widest mb-1.5 text-primary"
                       >
                         Q
                       </p>
@@ -252,8 +242,7 @@ export function FlashcardsMaker() {
           </div>
           <button
             type="submit"
-            className="w-full text-white font-semibold rounded-xl py-3.5 transition-opacity hover:opacity-90 active:scale-[0.98]"
-            style={{ backgroundColor: accentColor }}
+            className="w-full text-primary-foreground bg-primary font-semibold rounded-xl py-3.5 transition-opacity hover:opacity-90 active:scale-[0.98]"
           >
             Add Card
           </button>
@@ -284,8 +273,7 @@ export function FlashcardsMaker() {
           </div>
           <button
             type="submit"
-            className="w-full text-white font-semibold rounded-xl py-3.5 transition-opacity hover:opacity-90 active:scale-[0.98]"
-            style={{ backgroundColor: accentColor }}
+            className="w-full text-primary-foreground bg-primary font-semibold rounded-xl py-3.5 transition-opacity hover:opacity-90 active:scale-[0.98]"
           >
             Save Changes
           </button>
