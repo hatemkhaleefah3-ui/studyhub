@@ -310,7 +310,7 @@ export function Schedule() {
         <form onSubmit={handleEditSubmit(onEditSubmit)} className="space-y-5">
           <div>
             <label className="block text-sm font-medium mb-2">Title</label>
-            <input {...regEdit("title", { required: true })} className={inputCls} autoFocus />
+            <input {...regEdit("title", { required: true })} className={inputCls} />
           </div>
           <div>
             <label className="block text-sm font-medium mb-2">Subject</label>

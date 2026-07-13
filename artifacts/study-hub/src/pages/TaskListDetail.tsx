@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { focusNext } from "@/lib/focusNext";
 import { useParams, useLocation } from "wouter";
 import { useStudyData } from "@/hooks/useStudyData";
 import { type ImportanceLevel, type SubTask } from "@/hooks/useStudyData";
@@ -364,9 +365,9 @@ export function TaskListDetail() {
               name="text"
               defaultValue={item.text}
               required
-              autoFocus
               className={fieldCls}
               placeholder="Task list name…"
+              onKeyDown={focusNext}
             />
           </div>
           <div>

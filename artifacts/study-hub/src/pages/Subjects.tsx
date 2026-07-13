@@ -148,7 +148,7 @@ export function Subjects() {
               {...register("name", { required: true })}
               className="w-full bg-background border border-border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50"
               placeholder="e.g. Advanced Mathematics"
-              autoFocus
+
             />
           </div>
           
@@ -170,7 +170,7 @@ export function Subjects() {
             <input 
               {...regEdit("name", { required: true })}
               className="w-full bg-background border border-border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50"
-              autoFocus
+
             />
           </div>
 

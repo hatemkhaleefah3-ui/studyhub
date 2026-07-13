@@ -119,7 +119,7 @@ export function FlashcardsMaker() {
         <form onSubmit={addForm.handleSubmit(onAdd)} className="space-y-5">
           <div>
             <label className="block text-sm font-medium mb-2">Front</label>
-            <textarea {...addForm.register("front", { required: true })} className={inputCls} rows={3} autoFocus />
+            <textarea {...addForm.register("front", { required: true })} className={inputCls} rows={3} />
           </div>
           <div>
             <label className="block text-sm font-medium mb-2">Back</label>
@@ -139,7 +139,7 @@ export function FlashcardsMaker() {
         <form onSubmit={editForm.handleSubmit(onEdit)} className="space-y-5">
           <div>
             <label className="block text-sm font-medium mb-2">Front</label>
-            <textarea {...editForm.register("front", { required: true })} className={inputCls} rows={3} autoFocus />
+            <textarea {...editForm.register("front", { required: true })} className={inputCls} rows={3} />
           </div>
           <div>
             <label className="block text-sm font-medium mb-2">Back</label>
