@@ -2,31 +2,71 @@ import { ReactNode, useState } from 'react';
 import { motion, useMotionValue, useTransform, PanInfo } from 'framer-motion';
 import { Pencil, Trash2 } from 'lucide-react';
 
+// ── Action config ─────────────────────────────────────────────────────────────
+
+export interface SwipeAction {
+  icon: React.ReactNode;
+  label?: string;
+  /** Tailwind bg class, e.g. "bg-primary/15" */
+  bg: string;
+  /** Tailwind text class, e.g. "text-primary" */
+  color: string;
+}
+
+const DEFAULT_EDIT_ACTION: SwipeAction = {
+  icon: <Pencil className="w-5 h-5" />,
+  label: 'Edit',
+  bg: 'bg-primary/15',
+  color: 'text-primary',
+};
+
+const DEFAULT_DELETE_ACTION: SwipeAction = {
+  icon: <Trash2 className="w-5 h-5" />,
+  label: 'Delete',
+  bg: 'bg-destructive/15',
+  color: 'text-destructive',
+};
+
+// ── Props ─────────────────────────────────────────────────────────────────────
+
 interface SwipeableRowProps {
   children: ReactNode;
+  /** Called when the user swipes right past the threshold */
   onEdit?: () => void;
+  /** Called when the user swipes left past the threshold */
   onDelete?: () => void;
+  /** Override the default icon/colour for the right-swipe reveal */
+  editAction?: SwipeAction;
+  /** Override the default icon/colour for the left-swipe reveal */
+  deleteAction?: SwipeAction;
   className?: string;
-  /** Rounded corner class applied to the reveal backgrounds, to match the row. */
+  /** Rounded corner class applied to the reveal backgrounds */
   roundedClassName?: string;
 }
 
 const COMMIT_THRESHOLD = 88;
 
-/**
- * Wraps a list/grid row with swipe-to-edit (right) and swipe-to-delete (left)
- * gestures, matching Phase 2.1: swipe left->right edits, right->left archives
- * (deletes). Works with touch AND mouse (framer-motion's drag handles both),
- * so this alone would already work on desktop — but each page also keeps its
- * existing hover-reveal Edit/Delete icons as an explicit non-swipe fallback.
- */
-export function SwipeableRow({ children, onEdit, onDelete, className = '', roundedClassName = 'rounded-2xl' }: SwipeableRowProps) {
+// ── Component ─────────────────────────────────────────────────────────────────
+
+export function SwipeableRow({
+  children,
+  onEdit,
+  onDelete,
+  editAction,
+  deleteAction,
+  className = '',
+  roundedClassName = 'rounded-2xl',
+}: SwipeableRowProps) {
   const [isDragging, setIsDragging] = useState(false);
   const x = useMotionValue(0);
-  const editOpacity = useTransform(x, [0, COMMIT_THRESHOLD], [0, 1]);
+
+  const rightReveal = editAction ?? DEFAULT_EDIT_ACTION;
+  const leftReveal  = deleteAction ?? DEFAULT_DELETE_ACTION;
+
+  const editOpacity   = useTransform(x, [0, COMMIT_THRESHOLD], [0, 1]);
   const deleteOpacity = useTransform(x, [-COMMIT_THRESHOLD, 0], [1, 0]);
-  const editScale = useTransform(x, [0, COMMIT_THRESHOLD], [0.7, 1]);
-  const deleteScale = useTransform(x, [-COMMIT_THRESHOLD, 0], [1, 0.7]);
+  const editScale     = useTransform(x, [0, COMMIT_THRESHOLD], [0.7, 1]);
+  const deleteScale   = useTransform(x, [-COMMIT_THRESHOLD, 0], [1, 0.7]);
 
   const handleDragEnd = (_: any, info: PanInfo) => {
     setIsDragging(false);
@@ -39,27 +79,33 @@ export function SwipeableRow({ children, onEdit, onDelete, className = '', round
 
   return (
     <div className={`relative ${className}`}>
-      {/* Edit reveal (swipe right) */}
+
+      {/* Right-swipe reveal (shown on left side) */}
       {onEdit && (
         <motion.div
-          className={`absolute inset-y-0 left-0 flex items-center pl-5 bg-primary/15 text-primary ${roundedClassName}`}
+          className={`absolute inset-y-0 left-0 flex items-center pl-5 ${rightReveal.bg} ${rightReveal.color} ${roundedClassName}`}
           style={{ opacity: editOpacity, right: 0 }}
         >
           <motion.div style={{ scale: editScale }} className="flex items-center gap-2">
-            <Pencil className="w-5 h-5" />
-            <span className="text-sm font-semibold hidden sm:inline">Edit</span>
+            {rightReveal.icon}
+            {rightReveal.label && (
+              <span className="text-sm font-semibold hidden sm:inline">{rightReveal.label}</span>
+            )}
           </motion.div>
         </motion.div>
       )}
-      {/* Delete reveal (swipe left) */}
+
+      {/* Left-swipe reveal (shown on right side) */}
       {onDelete && (
         <motion.div
-          className={`absolute inset-y-0 right-0 flex items-center justify-end pr-5 bg-destructive/15 text-destructive ${roundedClassName}`}
+          className={`absolute inset-y-0 right-0 flex items-center justify-end pr-5 ${leftReveal.bg} ${leftReveal.color} ${roundedClassName}`}
           style={{ opacity: deleteOpacity, left: 0 }}
         >
           <motion.div style={{ scale: deleteScale }} className="flex items-center gap-2">
-            <span className="text-sm font-semibold hidden sm:inline">Delete</span>
-            <Trash2 className="w-5 h-5" />
+            {leftReveal.label && (
+              <span className="text-sm font-semibold hidden sm:inline">{leftReveal.label}</span>
+            )}
+            {leftReveal.icon}
           </motion.div>
         </motion.div>
       )}

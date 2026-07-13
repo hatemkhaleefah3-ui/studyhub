@@ -5,12 +5,12 @@ import { type ImportanceLevel, type RepeatInterval } from "@/hooks/useStudyData"
 import { GlassCard } from "@/components/shared/GlassCard";
 import { BottomSheet } from "@/components/shared/BottomSheet";
 import { FabPortal } from "@/components/shared/FabPortal";
-import { SwipeableRow } from "@/components/shared/SwipeableRow";
+import { SwipeableRow, type SwipeAction } from "@/components/shared/SwipeableRow";
 import {
   TaskForm, TaskFormValues, DEFAULT_TASK, IMPORTANCE_META, REPEAT_META,
 } from "@/components/shared/TaskForm";
 import {
-  Plus, CheckCircle2, Circle, XCircle,
+  Plus, CheckCircle2, Circle, XCircle, Trash2,
   List, ListChecks, ChevronRight,
   SlidersHorizontal, RotateCcw, Link as LinkIcon,
   Clock, Repeat,
@@ -53,6 +53,36 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
       {children}
     </button>
   );
+}
+
+// ── Swipe action configs ──────────────────────────────────────────────────────
+
+const DELETE_ACTION: SwipeAction = {
+  icon: <Trash2 className="w-5 h-5" />,
+  label: "Delete",
+  bg: "bg-destructive/15",
+  color: "text-destructive",
+};
+
+function getCycleAction(done: boolean, didNotDo?: boolean): SwipeAction {
+  if (!done && !didNotDo) return {
+    icon: <CheckCircle2 className="w-5 h-5" />,
+    label: "Done",
+    bg: "bg-emerald-500/15",
+    color: "text-emerald-600",
+  };
+  if (done) return {
+    icon: <XCircle className="w-5 h-5" />,
+    label: "Skip",
+    bg: "bg-slate-400/15",
+    color: "text-slate-500",
+  };
+  return {
+    icon: <RotateCcw className="w-5 h-5" />,
+    label: "Undo",
+    bg: "bg-primary/15",
+    color: "text-primary",
+  };
 }
 
 // ── Main Checklist component ──────────────────────────────────────────────────
@@ -303,11 +333,10 @@ export function Checklist() {
                           transition={{ type: "spring", stiffness: 300, damping: 28 }}
                         >
                           <SwipeableRow
-                            onEdit={() => isListTask
-                              ? navigate(`/checklist/${item.id}`)
-                              : openEdit(item.id)
-                            }
-                            onDelete={() => deleteChecklistItem(item.id)}
+                            onEdit={() => deleteChecklistItem(item.id)}
+                            onDelete={() => cycleStatus(item.id)}
+                            editAction={DELETE_ACTION}
+                            deleteAction={getCycleAction(item.done, item.didNotDo)}
                           >
                             <GlassCard className={`transition-opacity duration-300 ${
                               (item.done || item.didNotDo) ? "opacity-50" : "opacity-100"
