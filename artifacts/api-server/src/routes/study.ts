@@ -64,9 +64,9 @@ async function getAllData() {
 // ─── GET /api/study/data ──────────────────────────────────────────────────────
 router.get("/data", async (_req, res) => {
   try {
-    res.json(await getAllData());
+    return res.json(await getAllData());
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    return res.status(500).json({ error: String(err) });
   }
 });
 
@@ -88,9 +88,9 @@ router.put("/settings", async (req, res) => {
       );
     }
     await Promise.all(upserts);
-    res.json({ ok: true });
+    return res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    return res.status(500).json({ error: String(err) });
   }
 });
 
@@ -99,9 +99,9 @@ router.post("/subjects", async (req, res) => {
   try {
     const subject = req.body;
     await db.insert(studySubjects).values({ id: subject.id, data: subject });
-    res.json(subject);
+    return res.json(subject);
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    return res.status(500).json({ error: String(err) });
   }
 });
 
@@ -112,9 +112,9 @@ router.put("/subjects/:id", async (req, res) => {
     if (!existing.length) return res.status(404).json({ error: "Not found" });
     const updated = { ...(existing[0].data as object), ...req.body };
     await db.update(studySubjects).set({ data: updated }).where(eq(studySubjects.id, id));
-    res.json(updated);
+    return res.json(updated);
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    return res.status(500).json({ error: String(err) });
   }
 });
 
@@ -133,9 +133,9 @@ router.delete("/subjects/:id", async (req, res) => {
       const item = row.data as any;
       if (item.subjectId === id) await archiveRow("checklist", row.id);
     }
-    res.json({ ok: true });
+    return res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    return res.status(500).json({ error: String(err) });
   }
 });
 
@@ -148,9 +148,9 @@ router.post("/subjects/:subjectId/lectures", async (req, res) => {
     const subject = existing[0].data as any;
     subject.lectures = [...(subject.lectures || []), req.body];
     await db.update(studySubjects).set({ data: subject }).where(eq(studySubjects.id, subjectId));
-    res.json(req.body);
+    return res.json(req.body);
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    return res.status(500).json({ error: String(err) });
   }
 });
 
@@ -164,9 +164,9 @@ router.put("/subjects/:subjectId/lectures/:id", async (req, res) => {
       l.id === id ? { ...l, ...req.body } : l
     );
     await db.update(studySubjects).set({ data: subject }).where(eq(studySubjects.id, subjectId));
-    res.json({ ok: true });
+    return res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    return res.status(500).json({ error: String(err) });
   }
 });
 
@@ -178,9 +178,9 @@ router.delete("/subjects/:subjectId/lectures/:id", async (req, res) => {
     const subject = existing[0].data as any;
     subject.lectures = (subject.lectures || []).filter((l: any) => l.id !== id);
     await db.update(studySubjects).set({ data: subject }).where(eq(studySubjects.id, subjectId));
-    res.json({ ok: true });
+    return res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    return res.status(500).json({ error: String(err) });
   }
 });
 
@@ -193,9 +193,9 @@ router.post("/subjects/:subjectId/exams", async (req, res) => {
     const subject = existing[0].data as any;
     subject.exams = [...(subject.exams || []), req.body];
     await db.update(studySubjects).set({ data: subject }).where(eq(studySubjects.id, subjectId));
-    res.json(req.body);
+    return res.json(req.body);
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    return res.status(500).json({ error: String(err) });
   }
 });
 
@@ -209,9 +209,9 @@ router.put("/subjects/:subjectId/exams/:id", async (req, res) => {
       e.id === id ? { ...e, ...req.body } : e
     );
     await db.update(studySubjects).set({ data: subject }).where(eq(studySubjects.id, subjectId));
-    res.json({ ok: true });
+    return res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    return res.status(500).json({ error: String(err) });
   }
 });
 
@@ -223,9 +223,9 @@ router.delete("/subjects/:subjectId/exams/:id", async (req, res) => {
     const subject = existing[0].data as any;
     subject.exams = (subject.exams || []).filter((e: any) => e.id !== id);
     await db.update(studySubjects).set({ data: subject }).where(eq(studySubjects.id, subjectId));
-    res.json({ ok: true });
+    return res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    return res.status(500).json({ error: String(err) });
   }
 });
 
@@ -251,9 +251,9 @@ router.post("/schedule", async (req, res) => {
       await db.update(studySchedule).set({ data: updatedEvent }).where(eq(studySchedule.id, event.id));
     }
 
-    res.json({ ok: true });
+    return res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    return res.status(500).json({ error: String(err) });
   }
 });
 
@@ -264,18 +264,18 @@ router.put("/schedule/:id", async (req, res) => {
     if (!existing.length) return res.status(404).json({ error: "Not found" });
     const updated = { ...(existing[0].data as object), ...req.body };
     await db.update(studySchedule).set({ data: updated }).where(eq(studySchedule.id, id));
-    res.json({ ok: true });
+    return res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    return res.status(500).json({ error: String(err) });
   }
 });
 
 router.delete("/schedule/:id", async (req, res) => {
   try {
     await archiveRow("schedule", req.params.id);
-    res.json({ ok: true });
+    return res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    return res.status(500).json({ error: String(err) });
   }
 });
 
@@ -284,9 +284,9 @@ router.post("/checklist", async (req, res) => {
   try {
     const item = req.body;
     await db.insert(studyChecklist).values({ id: item.id, data: item });
-    res.json(item);
+    return res.json(item);
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    return res.status(500).json({ error: String(err) });
   }
 });
 
@@ -297,18 +297,18 @@ router.put("/checklist/:id", async (req, res) => {
     if (!existing.length) return res.status(404).json({ error: "Not found" });
     const updated = { ...(existing[0].data as object), ...req.body };
     await db.update(studyChecklist).set({ data: updated }).where(eq(studyChecklist.id, id));
-    res.json({ ok: true });
+    return res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    return res.status(500).json({ error: String(err) });
   }
 });
 
 router.delete("/checklist/:id", async (req, res) => {
   try {
     await archiveRow("checklist", req.params.id);
-    res.json({ ok: true });
+    return res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    return res.status(500).json({ error: String(err) });
   }
 });
 
@@ -316,7 +316,7 @@ router.delete("/checklist/:id", async (req, res) => {
 router.get("/archive", async (_req, res) => {
   try {
     const rows = await db.select().from(studyArchive).orderBy(desc(studyArchive.deletedAt));
-    res.json(rows.map((r) => ({
+    return res.json(rows.map((r) => ({
       id: r.id,
       category: r.category,
       originalId: r.originalId,
@@ -324,7 +324,7 @@ router.get("/archive", async (_req, res) => {
       data: r.data,
     })));
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    return res.status(500).json({ error: String(err) });
   }
 });
 
@@ -339,18 +339,18 @@ router.post("/archive/:id/restore", async (req, res) => {
     if (!table) return res.status(400).json({ error: "Unknown category" });
     await db.insert(table as any).values({ id: row.originalId, data: row.data });
     await db.delete(studyArchive).where(eq(studyArchive.id, id));
-    res.json({ ok: true, category, item: row.data });
+    return res.json({ ok: true, category, item: row.data });
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    return res.status(500).json({ error: String(err) });
   }
 });
 
 router.delete("/archive/:id", async (req, res) => {
   try {
     await db.delete(studyArchive).where(eq(studyArchive.id, req.params.id));
-    res.json({ ok: true });
+    return res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    return res.status(500).json({ error: String(err) });
   }
 });
 
@@ -364,9 +364,9 @@ router.post("/checklist/:id/subtasks", async (req, res) => {
     const newSubTask = { id: crypto.randomUUID(), text: req.body.text, done: false };
     item.subTasks = [...(item.subTasks || []), newSubTask];
     await db.update(studyChecklist).set({ data: item }).where(eq(studyChecklist.id, id));
-    res.json(newSubTask);
+    return res.json(newSubTask);
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    return res.status(500).json({ error: String(err) });
   }
 });
 
@@ -380,9 +380,9 @@ router.put("/checklist/:id/subtasks/:sid", async (req, res) => {
       st.id === sid ? { ...st, ...req.body } : st
     );
     await db.update(studyChecklist).set({ data: item }).where(eq(studyChecklist.id, id));
-    res.json({ ok: true });
+    return res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    return res.status(500).json({ error: String(err) });
   }
 });
 
@@ -394,18 +394,18 @@ router.delete("/checklist/:id/subtasks/:sid", async (req, res) => {
     const item = existing[0].data as any;
     item.subTasks = (item.subTasks || []).filter((st: any) => st.id !== sid);
     await db.update(studyChecklist).set({ data: item }).where(eq(studyChecklist.id, id));
-    res.json({ ok: true });
+    return res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    return res.status(500).json({ error: String(err) });
   }
 });
 
 // ─── Export / Import / Reset ──────────────────────────────────────────────────
 router.get("/export", async (_req, res) => {
   try {
-    res.json(await getAllData());
+    return res.json(await getAllData());
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    return res.status(500).json({ error: String(err) });
   }
 });
 
@@ -431,9 +431,9 @@ router.post("/import", async (req, res) => {
       if (entries.length) await db.insert(studySettings).values(entries);
     }
 
-    res.json({ ok: true });
+    return res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    return res.status(500).json({ error: String(err) });
   }
 });
 
@@ -446,9 +446,9 @@ router.delete("/reset", async (_req, res) => {
       db.delete(studySettings),
       db.delete(studyArchive),
     ]);
-    res.json({ ok: true });
+    return res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    return res.status(500).json({ error: String(err) });
   }
 });
 
