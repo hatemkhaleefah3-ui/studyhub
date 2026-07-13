@@ -12,6 +12,7 @@ import { Subjects } from '@/pages/Subjects';
 import { SubjectDetail } from '@/pages/SubjectDetail';
 import { Schedule } from '@/pages/Schedule';
 import { Checklist } from '@/pages/Checklist';
+import { TaskListDetail } from '@/pages/TaskListDetail';
 import { Progress } from '@/pages/Progress';
 import { Settings } from '@/pages/Settings';
 import { Archive } from '@/pages/Archive';
@@ -26,6 +27,7 @@ function Router() {
       <Route path="/subjects/:id" component={SubjectDetail} />
       <Route path="/schedule" component={Schedule} />
       <Route path="/checklist" component={Checklist} />
+      <Route path="/checklist/:id" component={TaskListDetail} />
       <Route path="/progress" component={Progress} />
       <Route path="/settings" component={Settings} />
       <Route path="/archive" component={Archive} />

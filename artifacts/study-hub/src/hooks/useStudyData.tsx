@@ -56,24 +56,21 @@ export interface ScheduleEvent {
   done: boolean;
 }
 
+export type ImportanceLevel = 'high' | 'medium' | 'low';
+export type RepeatInterval  = 'none' | 'daily' | 'weekly' | 'monthly';
+export type TaskStatus      = 'undone' | 'done' | 'didNotDo';
+
 export interface SubTask {
   id: string;
   text: string;
+  description?: string;
+  importance?: ImportanceLevel | null;
+  dueDate?: string | null;
+  dueTime?: string | null;
+  link?: string | null;
   done: boolean;
-}
-
-export type ImportanceLevel = 'high' | 'medium' | 'low';
-export type RepeatInterval = 'none' | 'daily' | 'weekly' | 'monthly';
-export type TaskStatus = 'undone' | 'done' | 'didNotDo';
-
-// ── Repeat date helper (placed after types so RepeatInterval is in scope) ────
-function getNextDueDate(currentDate: string, repeat: RepeatInterval): string {
-  const date = parseISO(currentDate);
-  const next =
-    repeat === 'daily'   ? addDays(date, 1)   :
-    repeat === 'weekly'  ? addWeeks(date, 1)  :
-    /* monthly */          addMonths(date, 1);
-  return format(next, 'yyyy-MM-dd');
+  didNotDo?: boolean;
+  doneAt?: string;
 }
 
 export interface ChecklistItem {
@@ -84,8 +81,8 @@ export interface ChecklistItem {
   done: boolean;
   didNotDo?: boolean;
   importance?: ImportanceLevel | null;
-  dueDate?: string | null;   // ISO date string YYYY-MM-DD
-  dueTime?: string | null;   // HH:mm
+  dueDate?: string | null;
+  dueTime?: string | null;
   repeat?: RepeatInterval | null;
   link?: string | null;
   linkedScheduleId: string | null;
@@ -98,6 +95,18 @@ export interface Settings {
   theme: Theme;
   accentColor: AccentColor;
 }
+
+// ── Repeat date helper ────────────────────────────────────────────────────────
+function getNextDueDate(currentDate: string, repeat: RepeatInterval): string {
+  const date = parseISO(currentDate);
+  const next =
+    repeat === 'daily'   ? addDays(date, 1)   :
+    repeat === 'weekly'  ? addWeeks(date, 1)  :
+    /* monthly */          addMonths(date, 1);
+  return format(next, 'yyyy-MM-dd');
+}
+
+// ── Context type ──────────────────────────────────────────────────────────────
 
 interface StudyDataContextType {
   subjects: Subject[];
@@ -129,8 +138,10 @@ interface StudyDataContextType {
   updateChecklistItem: (id: string, i: Partial<ChecklistItem>) => void;
   toggleChecklistItem: (id: string) => void;
   deleteChecklistItem: (id: string) => void;
+  skipChecklistItem: (id: string) => void;
+  setCascadeChecklistStatus: (id: string, done: boolean, didNotDo: boolean) => void;
 
-  addSubTask: (itemId: string, text: string) => void;
+  addSubTask: (itemId: string, subTask: Omit<SubTask, 'id'>) => void;
   updateSubTask: (itemId: string, subTaskId: string, data: Partial<SubTask>) => void;
   toggleSubTask: (itemId: string, subTaskId: string) => void;
   deleteSubTask: (itemId: string, subTaskId: string) => void;
@@ -147,25 +158,24 @@ interface StudyDataContextType {
 }
 
 const defaultSettings: Settings = { theme: 'light', accentColor: 'blue' };
-
 const StudyDataContext = createContext<StudyDataContextType | null>(null);
 
 export const ACCENT_COLORS: Record<AccentColor, string> = {
-  blue: '211 100% 50%',
-  green: '135 59% 49%',
+  blue:   '211 100% 50%',
+  green:  '135 59% 49%',
   orange: '35 100% 50%',
-  red: '356 100% 59%',
+  red:    '356 100% 59%',
   purple: '280 67% 60%',
-  teal: '199 94% 67%',
+  teal:   '199 94% 67%',
 };
 
 export const ACCENT_HEX: Record<AccentColor, string> = {
-  blue: '#007aff',
-  green: '#34c759',
+  blue:   '#007aff',
+  green:  '#34c759',
   orange: '#ff9500',
-  red: '#ff3b30',
+  red:    '#ff3b30',
   purple: '#af52de',
-  teal: '#5ac8fa',
+  teal:   '#5ac8fa',
 };
 
 export const SUBJECT_WALLPAPERS: string[] = [
@@ -179,30 +189,28 @@ export const SUBJECT_WALLPAPERS: string[] = [
   'linear-gradient(135deg, #30cfd0 0%, #330867 100%)',
 ];
 
+// ── Provider ──────────────────────────────────────────────────────────────────
+
 export function StudyDataProvider({ children }: { children: ReactNode }) {
-  const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [schedule, setSchedule] = useState<ScheduleEvent[]>([]);
-  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
-  const [settings, setSettings] = useState<Settings>(defaultSettings);
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [archive, setArchive] = useState<ArchiveEntry[]>([]);
-  const [isArchiveLoaded, setIsArchiveLoaded] = useState(false);
+  const [subjects,         setSubjects]         = useState<Subject[]>([]);
+  const [schedule,         setSchedule]         = useState<ScheduleEvent[]>([]);
+  const [checklist,        setChecklist]        = useState<ChecklistItem[]>([]);
+  const [settings,         setSettings]         = useState<Settings>(defaultSettings);
+  const [isLoaded,         setIsLoaded]         = useState(false);
+  const [archive,          setArchive]          = useState<ArchiveEntry[]>([]);
+  const [isArchiveLoaded,  setIsArchiveLoaded]  = useState(false);
 
   // Load from API on mount
   useEffect(() => {
     api.getData()
       .then((data) => {
-        if (data.subjects) setSubjects(data.subjects);
-        if (data.schedule) setSchedule(data.schedule);
+        if (data.subjects)  setSubjects(data.subjects);
+        if (data.schedule)  setSchedule(data.schedule);
         if (data.checklist) setChecklist(data.checklist);
-        if (data.settings) setSettings(data.settings);
+        if (data.settings)  setSettings(data.settings);
       })
-      .catch((err) => {
-        console.error('Failed to load study data from API:', err);
-      })
-      .finally(() => {
-        setIsLoaded(true);
-      });
+      .catch((err) => console.error('Failed to load study data from API:', err))
+      .finally(() => setIsLoaded(true));
   }, []);
 
   const refreshArchive = useCallback(() => {
@@ -215,8 +223,8 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
   const restoreArchiveItem = useCallback((id: string) => {
     api.restoreArchiveItem(id)
       .then(({ category, item }) => {
-        if (category === 'subject') setSubjects((prev) => [...prev, item]);
-        if (category === 'schedule') setSchedule((prev) => [...prev, item]);
+        if (category === 'subject')   setSubjects((prev) => [...prev, item]);
+        if (category === 'schedule')  setSchedule((prev) => [...prev, item]);
         if (category === 'checklist') setChecklist((prev) => [...prev, item]);
         setArchive((prev) => prev.filter((a) => a.id !== id));
       })
@@ -239,34 +247,21 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
 
   // Apply accent color CSS variable
   useEffect(() => {
-    document.documentElement.style.setProperty(
-      '--primary',
-      ACCENT_COLORS[settings.accentColor]
-    );
+    document.documentElement.style.setProperty('--primary', ACCENT_COLORS[settings.accentColor]);
   }, [settings.accentColor]);
 
   // ─── Subjects ──────────────────────────────────────────────────────────────
   const addSubject = useCallback((s: Omit<Subject, 'id' | 'lectures' | 'exams' | 'color' | 'wallpaper' | 'attachments'>) => {
-    const colors = Object.values(ACCENT_HEX);
-    const autoColor = colors[Math.floor(Math.random() * colors.length)];
+    const colors       = Object.values(ACCENT_HEX);
+    const autoColor    = colors[Math.floor(Math.random() * colors.length)];
     const autoWallpaper = SUBJECT_WALLPAPERS[Math.floor(Math.random() * SUBJECT_WALLPAPERS.length)];
-    const newSubject: Subject = {
-      ...s,
-      id: crypto.randomUUID(),
-      color: autoColor,
-      wallpaper: autoWallpaper,
-      attachments: [],
-      lectures: [],
-      exams: [],
-    };
+    const newSubject: Subject = { ...s, id: crypto.randomUUID(), color: autoColor, wallpaper: autoWallpaper, attachments: [], lectures: [], exams: [] };
     setSubjects((prev) => [...prev, newSubject]);
     api.createSubject(newSubject).catch(console.error);
   }, []);
 
   const updateSubject = useCallback((id: string, s: Partial<Subject>) => {
-    setSubjects((prev) =>
-      prev.map((sub) => (sub.id === id ? { ...sub, ...s } : sub))
-    );
+    setSubjects((prev) => prev.map((sub) => (sub.id === id ? { ...sub, ...s } : sub)));
     api.updateSubject(id, s).catch(console.error);
   }, []);
 
@@ -277,13 +272,24 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
     api.deleteSubject(id).catch(console.error);
   }, []);
 
-  // ─── Attachments ──────────────────────────────────────────────────────────
+  // ─── Attachments ───────────────────────────────────────────────────────────
   const addAttachment = useCallback((subjectId: string, a: Omit<Attachment, 'id'>) => {
     const newAttachment: Attachment = { ...a, id: crypto.randomUUID() };
     setSubjects((prev) => {
       const updated = prev.map((s) =>
+        s.id === subjectId ? { ...s, attachments: [...(s.attachments || []), newAttachment] } : s
+      );
+      const subject = updated.find((s) => s.id === subjectId);
+      if (subject) api.updateSubject(subjectId, { attachments: subject.attachments }).catch(console.error);
+      return updated;
+    });
+  }, []);
+
+  const updateAttachment = useCallback((subjectId: string, attachmentId: string, data: Partial<Attachment>) => {
+    setSubjects((prev) => {
+      const updated = prev.map((s) =>
         s.id === subjectId
-          ? { ...s, attachments: [...(s.attachments || []), newAttachment] }
+          ? { ...s, attachments: (s.attachments || []).map((a) => a.id === attachmentId ? { ...a, ...data } : a) }
           : s
       );
       const subject = updated.find((s) => s.id === subjectId);
@@ -292,33 +298,10 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const updateAttachment = useCallback(
-    (subjectId: string, attachmentId: string, data: Partial<Attachment>) => {
-      setSubjects((prev) => {
-        const updated = prev.map((s) =>
-          s.id === subjectId
-            ? {
-                ...s,
-                attachments: (s.attachments || []).map((a) =>
-                  a.id === attachmentId ? { ...a, ...data } : a
-                ),
-              }
-            : s
-        );
-        const subject = updated.find((s) => s.id === subjectId);
-        if (subject) api.updateSubject(subjectId, { attachments: subject.attachments }).catch(console.error);
-        return updated;
-      });
-    },
-    []
-  );
-
   const deleteAttachment = useCallback((subjectId: string, attachmentId: string) => {
     setSubjects((prev) => {
       const updated = prev.map((s) =>
-        s.id === subjectId
-          ? { ...s, attachments: (s.attachments || []).filter((a) => a.id !== attachmentId) }
-          : s
+        s.id === subjectId ? { ...s, attachments: (s.attachments || []).filter((a) => a.id !== attachmentId) } : s
       );
       const subject = updated.find((s) => s.id === subjectId);
       if (subject) api.updateSubject(subjectId, { attachments: subject.attachments }).catch(console.error);
@@ -329,40 +312,24 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
   // ─── Lectures ──────────────────────────────────────────────────────────────
   const addLecture = useCallback((subjectId: string, l: Omit<Lecture, 'id'>) => {
     const newLecture: Lecture = { ...l, id: crypto.randomUUID() };
-    setSubjects((prev) =>
-      prev.map((s) =>
-        s.id === subjectId ? { ...s, lectures: [...s.lectures, newLecture] } : s
-      )
-    );
+    setSubjects((prev) => prev.map((s) => s.id === subjectId ? { ...s, lectures: [...s.lectures, newLecture] } : s));
     api.createLecture(subjectId, newLecture).catch(console.error);
   }, []);
 
-  const updateLecture = useCallback(
-    (subjectId: string, lectureId: string, l: Partial<Lecture>) => {
-      setSubjects((prev) =>
-        prev.map((s) =>
-          s.id === subjectId
-            ? {
-                ...s,
-                lectures: s.lectures.map((lec) =>
-                  lec.id === lectureId ? { ...lec, ...l } : lec
-                ),
-              }
-            : s
-        )
-      );
-      api.updateLecture(subjectId, lectureId, l).catch(console.error);
-    },
-    []
-  );
-
-  const deleteLecture = useCallback((subjectId: string, id: string) => {
+  const updateLecture = useCallback((subjectId: string, lectureId: string, l: Partial<Lecture>) => {
     setSubjects((prev) =>
       prev.map((s) =>
         s.id === subjectId
-          ? { ...s, lectures: s.lectures.filter((l) => l.id !== id) }
+          ? { ...s, lectures: s.lectures.map((lec) => lec.id === lectureId ? { ...lec, ...l } : lec) }
           : s
       )
+    );
+    api.updateLecture(subjectId, lectureId, l).catch(console.error);
+  }, []);
+
+  const deleteLecture = useCallback((subjectId: string, id: string) => {
+    setSubjects((prev) =>
+      prev.map((s) => s.id === subjectId ? { ...s, lectures: s.lectures.filter((l) => l.id !== id) } : s)
     );
     api.deleteLecture(subjectId, id).catch(console.error);
   }, []);
@@ -370,20 +337,14 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
   // ─── Exams ─────────────────────────────────────────────────────────────────
   const addExam = useCallback((subjectId: string, e: Omit<Exam, 'id'>) => {
     const newExam: Exam = { ...e, id: crypto.randomUUID() };
-    setSubjects((prev) =>
-      prev.map((s) =>
-        s.id === subjectId ? { ...s, exams: [...s.exams, newExam] } : s
-      )
-    );
+    setSubjects((prev) => prev.map((s) => s.id === subjectId ? { ...s, exams: [...s.exams, newExam] } : s));
     api.createExam(subjectId, newExam).catch(console.error);
   }, []);
 
   const updateExam = useCallback((subjectId: string, id: string, e: Partial<Exam>) => {
     setSubjects((prev) =>
       prev.map((s) =>
-        s.id === subjectId
-          ? { ...s, exams: s.exams.map((ex) => (ex.id === id ? { ...ex, ...e } : ex)) }
-          : s
+        s.id === subjectId ? { ...s, exams: s.exams.map((ex) => ex.id === id ? { ...ex, ...e } : ex) } : s
       )
     );
     api.updateExam(subjectId, id, e).catch(console.error);
@@ -391,41 +352,34 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
 
   const deleteExam = useCallback((subjectId: string, id: string) => {
     setSubjects((prev) =>
-      prev.map((s) =>
-        s.id === subjectId ? { ...s, exams: s.exams.filter((e) => e.id !== id) } : s
-      )
+      prev.map((s) => s.id === subjectId ? { ...s, exams: s.exams.filter((e) => e.id !== id) } : s)
     );
     api.deleteExam(subjectId, id).catch(console.error);
   }, []);
 
   // ─── Schedule ──────────────────────────────────────────────────────────────
-  const addScheduleEvent = useCallback(
-    (e: Omit<ScheduleEvent, 'id'>, createChecklistTask?: boolean) => {
-      const newEvent: ScheduleEvent = { ...e, id: crypto.randomUUID() };
-      setSchedule((prev) => [...prev, newEvent]);
+  const addScheduleEvent = useCallback((e: Omit<ScheduleEvent, 'id'>, createChecklistTask?: boolean) => {
+    const newEvent: ScheduleEvent = { ...e, id: crypto.randomUUID() };
+    setSchedule((prev) => [...prev, newEvent]);
 
-      if (createChecklistTask) {
-        const task: ChecklistItem = {
-          id: crypto.randomUUID(),
-          text: e.title,
-          subjectId: e.subjectId || null,
-          done: false,
-          linkedScheduleId: newEvent.id,
-          isTaskList: false,
-        };
-        setChecklist((prev) => [...prev, task]);
-        api.createScheduleEvent(newEvent, true).catch(console.error);
-      } else {
-        api.createScheduleEvent(newEvent, false).catch(console.error);
-      }
-    },
-    []
-  );
+    if (createChecklistTask) {
+      const task: ChecklistItem = {
+        id: crypto.randomUUID(),
+        text: e.title,
+        subjectId: e.subjectId || null,
+        done: false,
+        linkedScheduleId: newEvent.id,
+        isTaskList: false,
+      };
+      setChecklist((prev) => [...prev, task]);
+      api.createScheduleEvent(newEvent, true).catch(console.error);
+    } else {
+      api.createScheduleEvent(newEvent, false).catch(console.error);
+    }
+  }, []);
 
   const updateScheduleEvent = useCallback((id: string, e: Partial<ScheduleEvent>) => {
-    setSchedule((prev) =>
-      prev.map((ev) => (ev.id === id ? { ...ev, ...e } : ev))
-    );
+    setSchedule((prev) => prev.map((ev) => (ev.id === id ? { ...ev, ...e } : ev)));
     api.updateScheduleEvent(id, e).catch(console.error);
   }, []);
 
@@ -442,9 +396,7 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const updateChecklistItem = useCallback((id: string, i: Partial<ChecklistItem>) => {
-    setChecklist((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ...i } : item))
-    );
+    setChecklist((prev) => prev.map((item) => (item.id === id ? { ...item, ...i } : item)));
     api.updateChecklistItem(id, i).catch(console.error);
   }, []);
 
@@ -453,30 +405,23 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
       const item = prev.find((i) => i.id === id);
       if (!item) return prev;
 
-      const done = !item.done;
-      const updated: ChecklistItem = {
-        ...item,
-        done,
-        doneAt: done ? new Date().toISOString() : undefined,
-      };
+      const done    = !item.done;
+      const updated: ChecklistItem = { ...item, done, doneAt: done ? new Date().toISOString() : undefined };
       api.updateChecklistItem(id, { done, doneAt: updated.doneAt }).catch(console.error);
 
       // Sync linked schedule event
       if (item.linkedScheduleId) {
         setSchedule((prevSched) =>
-          prevSched.map((ev) =>
-            ev.id === item.linkedScheduleId ? { ...ev, done } : ev
-          )
+          prevSched.map((ev) => ev.id === item.linkedScheduleId ? { ...ev, done } : ev)
         );
         api.updateScheduleEvent(item.linkedScheduleId, { done }).catch(console.error);
       }
 
       let next = prev.map((i) => (i.id === id ? updated : i));
 
-      // ── Real repeat: spawn next occurrence when task is completed ──────────
-      // Only fires on done=true, only if a repeat interval and due date are set.
+      // Real repeat: spawn next occurrence on completion
       if (done && item.repeat && item.repeat !== 'none' && item.dueDate) {
-        const nextDue = getNextDueDate(item.dueDate, item.repeat);
+        const nextDue     = getNextDueDate(item.dueDate, item.repeat);
         const occurrence: ChecklistItem = {
           ...item,
           id: crypto.randomUUID(),
@@ -498,63 +443,159 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
     api.deleteChecklistItem(id).catch(console.error);
   }, []);
 
+  // Mark as skipped-for-the-day (didNotDo). For repeated tasks, also spawns the
+  // next occurrence so future days still see it. For non-repeated tasks, fully
+  // deletes the item from both schedule and checklist.
+  const skipChecklistItem = useCallback((id: string) => {
+    setChecklist((prev) => {
+      const item = prev.find(i => i.id === id);
+      if (!item) return prev;
+
+      // Non-repeated: full delete
+      if (!item.repeat || item.repeat === 'none') {
+        api.deleteChecklistItem(id).catch(console.error);
+        return prev.filter(i => i.id !== id);
+      }
+
+      // Repeated: mark didNotDo + spawn next occurrence
+      const updated = { ...item, done: false, didNotDo: true, doneAt: undefined };
+      api.updateChecklistItem(id, { done: false, didNotDo: true, doneAt: undefined }).catch(console.error);
+
+      const nextDue = getNextDueDate(item.dueDate!, item.repeat);
+      const occurrence: ChecklistItem = {
+        ...item,
+        id: crypto.randomUUID(),
+        done: false,
+        didNotDo: false,
+        doneAt: undefined,
+        dueDate: nextDue,
+      };
+      api.createChecklistItem(occurrence).catch(console.error);
+
+      return [...prev.map(i => i.id === id ? updated : i), occurrence];
+    });
+  }, []);
+
+  // Set a checklist item's done/didNotDo status and cascade the same status to
+  // all sub-tasks (for task lists). Also handles repeat-spawn when going done.
+  const setCascadeChecklistStatus = useCallback((id: string, done: boolean, didNotDo: boolean) => {
+    setChecklist((prev) => {
+      const item = prev.find(i => i.id === id);
+      if (!item) return prev;
+
+      const doneAt = done ? new Date().toISOString() : undefined;
+
+      const newSubTasks = item.subTasks?.map(st => ({
+        ...st,
+        done,
+        didNotDo,
+        doneAt: done ? new Date().toISOString() : undefined,
+      }));
+
+      const updated = { ...item, done, didNotDo, doneAt, subTasks: newSubTasks ?? item.subTasks };
+      api.updateChecklistItem(id, { done, didNotDo, doneAt, subTasks: updated.subTasks }).catch(console.error);
+
+      let next = prev.map(i => i.id === id ? updated : i);
+
+      // Spawn next occurrence when marking done on a repeated task
+      if (done && item.repeat && item.repeat !== 'none' && item.dueDate) {
+        const nextDue = getNextDueDate(item.dueDate, item.repeat);
+        const occurrence: ChecklistItem = {
+          ...item,
+          id: crypto.randomUUID(),
+          done: false,
+          didNotDo: false,
+          doneAt: undefined,
+          dueDate: nextDue,
+          subTasks: item.subTasks?.map(st => ({ ...st, done: false, didNotDo: false, doneAt: undefined })),
+        };
+        api.createChecklistItem(occurrence).catch(console.error);
+        next = [...next, occurrence];
+      }
+
+      return next;
+    });
+  }, []);
+
   // ─── SubTasks ──────────────────────────────────────────────────────────────
-  const addSubTask = useCallback((itemId: string, text: string) => {
-    const newSubTask: SubTask = { id: crypto.randomUUID(), text, done: false };
-    setChecklist((prev) =>
-      prev.map((item) =>
+
+  const addSubTask = useCallback((itemId: string, subTask: Omit<SubTask, 'id'>) => {
+    const newSubTask: SubTask = { ...subTask, id: crypto.randomUUID() };
+    setChecklist((prev) => {
+      const updated = prev.map((item) =>
         item.id === itemId
           ? { ...item, subTasks: [...(item.subTasks || []), newSubTask] }
           : item
-      )
-    );
-    api.createSubTask(itemId, text).catch(console.error);
+      );
+      const updatedItem = updated.find((item) => item.id === itemId);
+      if (updatedItem) {
+        api.updateChecklistItem(itemId, { subTasks: updatedItem.subTasks }).catch(console.error);
+      }
+      return updated;
+    });
   }, []);
 
-  const updateSubTask = useCallback(
-    (itemId: string, subTaskId: string, data: Partial<SubTask>) => {
-      setChecklist((prev) =>
-        prev.map((item) =>
-          item.id === itemId
-            ? {
-                ...item,
-                subTasks: (item.subTasks || []).map((st) =>
-                  st.id === subTaskId ? { ...st, ...data } : st
-                ),
-              }
-            : item
-        )
+  const updateSubTask = useCallback((itemId: string, subTaskId: string, data: Partial<SubTask>) => {
+    setChecklist((prev) => {
+      const updated = prev.map((item) =>
+        item.id === itemId
+          ? { ...item, subTasks: (item.subTasks || []).map((st) => st.id === subTaskId ? { ...st, ...data } : st) }
+          : item
       );
-      api.updateSubTask(itemId, subTaskId, data).catch(console.error);
-    },
-    []
-  );
+      const updatedItem = updated.find((item) => item.id === itemId);
+      if (updatedItem) {
+        api.updateChecklistItem(itemId, { subTasks: updatedItem.subTasks }).catch(console.error);
+      }
+      return updated;
+    });
+  }, []);
 
   const toggleSubTask = useCallback((itemId: string, subTaskId: string) => {
     setChecklist((prev) =>
       prev.map((item) => {
         if (item.id !== itemId) return item;
-        const newSubTasks = (item.subTasks || []).map((st) =>
-          st.id === subTaskId ? { ...st, done: !st.done } : st
-        );
-        const allDone = newSubTasks.length > 0 && newSubTasks.every((st) => st.done);
-        api.updateSubTask(itemId, subTaskId, {
-          done: newSubTasks.find((st) => st.id === subTaskId)?.done,
+
+        // 3-state cycle per sub-task: undone → done → didNotDo → undone
+        const newSubTasks = (item.subTasks || []).map((st) => {
+          if (st.id !== subTaskId) return st;
+          if (!st.done && !st.didNotDo) return { ...st, done: true,  didNotDo: false, doneAt: new Date().toISOString() };
+          if (st.done)                  return { ...st, done: false, didNotDo: true,  doneAt: undefined };
+          return                               { ...st, done: false, didNotDo: false, doneAt: undefined };
+        });
+
+        // Parent status: when every sub-task is resolved, majority wins
+        const checked      = newSubTasks.filter(st => st.done).length;
+        const skipped      = newSubTasks.filter(st => st.didNotDo).length;
+        const allResolved  = newSubTasks.length > 0 && (checked + skipped === newSubTasks.length);
+
+        // Tie goes to "done"
+        const parentDone      = allResolved && checked >= skipped;
+        const parentDidNotDo  = allResolved && skipped > checked;
+
+        api.updateChecklistItem(itemId, {
+          subTasks: newSubTasks,
+          done: parentDone,
+          didNotDo: parentDidNotDo,
         }).catch(console.error);
-        return { ...item, subTasks: newSubTasks, done: allDone };
+
+        return { ...item, subTasks: newSubTasks, done: parentDone, didNotDo: parentDidNotDo };
       })
     );
   }, []);
 
   const deleteSubTask = useCallback((itemId: string, subTaskId: string) => {
-    setChecklist((prev) =>
-      prev.map((item) =>
+    setChecklist((prev) => {
+      const updated = prev.map((item) =>
         item.id === itemId
           ? { ...item, subTasks: (item.subTasks || []).filter((st) => st.id !== subTaskId) }
           : item
-      )
-    );
-    api.deleteSubTask(itemId, subTaskId).catch(console.error);
+      );
+      const updatedItem = updated.find((item) => item.id === itemId);
+      if (updatedItem) {
+        api.updateChecklistItem(itemId, { subTasks: updatedItem.subTasks }).catch(console.error);
+      }
+      return updated;
+    });
   }, []);
 
   // ─── Settings ──────────────────────────────────────────────────────────────
@@ -575,52 +616,27 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const importData = useCallback((data: any) => {
-    if (data.subjects) setSubjects(data.subjects);
-    if (data.schedule) setSchedule(data.schedule);
+    if (data.subjects)  setSubjects(data.subjects);
+    if (data.schedule)  setSchedule(data.schedule);
     if (data.checklist) setChecklist(data.checklist);
-    if (data.settings) setSettings(data.settings);
+    if (data.settings)  setSettings(data.settings);
     api.importData(data).catch(console.error);
   }, []);
 
   return (
     <StudyDataContext.Provider
       value={{
-        subjects,
-        schedule,
-        checklist,
-        settings,
-        isLoaded,
-        addSubject,
-        updateSubject,
-        deleteSubject,
-        addAttachment,
-        updateAttachment,
-        deleteAttachment,
-        addLecture,
-        updateLecture,
-        deleteLecture,
-        addExam,
-        updateExam,
-        deleteExam,
-        addScheduleEvent,
-        updateScheduleEvent,
-        deleteScheduleEvent,
-        addChecklistItem,
-        updateChecklistItem,
-        toggleChecklistItem,
-        deleteChecklistItem,
-        addSubTask,
-        updateSubTask,
-        toggleSubTask,
-        deleteSubTask,
-        updateSettings,
-        resetData,
-        importData,
-        archive,
-        isArchiveLoaded,
-        refreshArchive,
-        restoreArchiveItem,
-        permanentlyDeleteArchiveItem,
+        subjects, schedule, checklist, settings, isLoaded,
+        addSubject, updateSubject, deleteSubject,
+        addAttachment, updateAttachment, deleteAttachment,
+        addLecture, updateLecture, deleteLecture,
+        addExam, updateExam, deleteExam,
+        addScheduleEvent, updateScheduleEvent, deleteScheduleEvent,
+        addChecklistItem, updateChecklistItem, toggleChecklistItem, deleteChecklistItem,
+        skipChecklistItem, setCascadeChecklistStatus,
+        addSubTask, updateSubTask, toggleSubTask, deleteSubTask,
+        updateSettings, resetData, importData,
+        archive, isArchiveLoaded, refreshArchive, restoreArchiveItem, permanentlyDeleteArchiveItem,
       }}
     >
       {isLoaded ? children : (
@@ -637,8 +653,6 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
 
 export function useStudyData() {
   const context = useContext(StudyDataContext);
-  if (!context) {
-    throw new Error('useStudyData must be used within a StudyDataProvider');
-  }
+  if (!context) throw new Error('useStudyData must be used within a StudyDataProvider');
   return context;
 }

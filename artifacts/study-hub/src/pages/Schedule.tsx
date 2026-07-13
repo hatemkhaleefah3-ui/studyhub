@@ -4,14 +4,14 @@ import { type ImportanceLevel, type RepeatInterval } from "@/hooks/useStudyData"
 import { GlassCard } from "@/components/shared/GlassCard";
 import { BottomSheet } from "@/components/shared/BottomSheet";
 import { ConfirmSheet } from "@/components/shared/ConfirmSheet";
-import { SwipeableRow } from "@/components/shared/SwipeableRow";
+import { SwipeableRow, type SwipeAction } from "@/components/shared/SwipeableRow";
 import {
   format, startOfWeek, addDays, isSameDay, parseISO,
   isPast, isToday as dateFnsIsToday,
 } from "date-fns";
 import {
   CheckCircle2, Circle, XCircle, Link2, Pencil, Trash2,
-  Clock, Repeat, CheckSquare,
+  Clock, Repeat, CheckSquare, RotateCcw,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { motion, AnimatePresence } from "framer-motion";
@@ -38,8 +38,31 @@ export function Schedule() {
   const {
     schedule, subjects, checklist,
     updateScheduleEvent, deleteScheduleEvent,
-    toggleChecklistItem,
+    toggleChecklistItem, skipChecklistItem, deleteChecklistItem,
+    setCascadeChecklistStatus,
   } = useStudyData();
+
+  // Left→Right swipe on schedule task:
+  // repeated task → skip for today + spawn next occurrence (stays in checklist for future days)
+  // non-repeated task → fully delete from schedule + checklist
+  const removeFromSchedule = (id: string) => {
+    const it = checklist.find(c => c.id === id);
+    if (!it) return;
+    if (it.repeat && it.repeat !== 'none') {
+      skipChecklistItem(id);
+    } else {
+      deleteChecklistItem(id);
+    }
+  };
+
+  // Right→Left swipe: 3-state cycle, cascades to sub-tasks for list tasks
+  const cycleChecklistStatus = (id: string) => {
+    const it = checklist.find(c => c.id === id);
+    if (!it) return;
+    if (!it.done && !it.didNotDo) setCascadeChecklistStatus(id, true,  false);
+    else if (it.done)              setCascadeChecklistStatus(id, false, true);
+    else                           setCascadeChecklistStatus(id, false, false);
+  };
 
   const [editingId, setEditingId]   = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -204,6 +227,8 @@ export function Schedule() {
                   checklist={checklist}
                   subjects={subjects}
                   onToggle={() => toggleChecklistItem(entry.id)}
+                  onRemove={() => removeFromSchedule(entry.id)}
+                  onCycleStatus={() => cycleChecklistStatus(entry.id)}
                 />
               );
             })}
@@ -334,15 +359,47 @@ function EventCard({
   );
 }
 
+// ── Swipe action configs for task cards ───────────────────────────────────────
+
+const SCHEDULE_REMOVE_ACTION: SwipeAction = {
+  icon: <Trash2 className="w-5 h-5" />,
+  label: "Remove",
+  bg: "bg-secondary",
+  color: "text-muted-foreground",
+};
+
+function getTaskCycleAction(done: boolean, didNotDo?: boolean): SwipeAction {
+  if (!done && !didNotDo) return {
+    icon: <CheckCircle2 className="w-5 h-5" />,
+    label: "Done",
+    bg: "bg-emerald-500/15",
+    color: "text-emerald-600",
+  };
+  if (done) return {
+    icon: <XCircle className="w-5 h-5" />,
+    label: "Skip",
+    bg: "bg-slate-400/15",
+    color: "text-slate-500",
+  };
+  return {
+    icon: <RotateCcw className="w-5 h-5" />,
+    label: "Undo",
+    bg: "bg-primary/15",
+    color: "text-primary",
+  };
+}
+
 // ── Task card (checklist items with dueDate) ──────────────────────────────────
 
 function TaskCard({
-  taskId, checklist, subjects, onToggle,
+  taskId, checklist, subjects, onToggle, onRemove, onCycleStatus,
 }: {
   taskId: string;
   checklist: any[];
   subjects: any[];
   onToggle: () => void;
+  onRemove: () => void;
+  onCycleStatus: () => void;
 }) {
   const item = checklist.find((c: any) => c.id === taskId);
   if (!item) return null;
@@ -359,67 +416,75 @@ function TaskCard({
       exit={{ opacity: 0, scale: 0.97 }}
       transition={{ type: "spring", stiffness: 300, damping: 28 }}
     >
-      <GlassCard
-        className={`p-4 flex gap-4 transition-all ${item.done || item.didNotDo ? "opacity-50" : ""}`}
+      <SwipeableRow
+        onEdit={onRemove}
+        onDelete={onCycleStatus}
+        editAction={SCHEDULE_REMOVE_ACTION}
+        deleteAction={getTaskCycleAction(item.done, item.didNotDo)}
       >
-        {/* Time column — shows dueTime or a task icon */}
-        <div className="w-14 shrink-0 text-center flex flex-col items-center justify-center border-r border-border/50 pr-3">
-          {item.dueTime ? (
-            <span className="text-base font-bold leading-tight">{item.dueTime}</span>
-          ) : (
-            <CheckSquare className="w-4 h-4 text-muted-foreground/60" />
-          )}
-        </div>
-
-        {/* Subject colour bar (or primary if no subject) */}
-        <div
-          className="w-1.5 rounded-full shrink-0 self-stretch"
-          style={{ backgroundColor: subject?.color || "hsl(var(--muted-foreground))" }}
-        />
-
-        {/* Content */}
-        <div className="flex-1 py-0.5 min-w-0">
-          <h3 className={`font-semibold ${item.done ? "line-through text-muted-foreground" : item.didNotDo ? "line-through text-muted-foreground/60" : ""}`}>
-            {item.text}
-          </h3>
-
-          <div className="flex items-center gap-1 flex-wrap mt-1">
-            {subject && <span className="text-xs text-muted-foreground">{subject.name}</span>}
-            {imp && (
-              <span className={`inline-flex items-center gap-1 text-xs ${imp.color}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${imp.dot}`} />
-                {imp.label}
-              </span>
-            )}
-            {item.repeat && item.repeat !== "none" && (
-              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                <Repeat className="w-3 h-3" />
-                {REPEAT_LABEL[item.repeat as RepeatInterval]}
-              </span>
-            )}
-            {isOverdue && (
-              <span className="text-xs text-rose-500 font-medium">Overdue</span>
-            )}
-            {item.didNotDo && (
-              <span className="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">Skipped</span>
+        <GlassCard
+          className={`p-4 flex gap-4 transition-all ${item.done || item.didNotDo ? "opacity-50" : ""}`}
+        >
+          {/* Time column — shows dueTime or a task icon */}
+          <div className="w-14 shrink-0 text-center flex flex-col items-center justify-center border-r border-border/50 pr-3">
+            {item.dueTime ? (
+              <span className="text-base font-bold leading-tight">{item.dueTime}</span>
+            ) : (
+              <CheckSquare className="w-4 h-4 text-muted-foreground/60" />
             )}
           </div>
 
-          {item.description && (
-            <p className="text-xs mt-1 text-muted-foreground/80 line-clamp-2">{item.description}</p>
-          )}
-        </div>
+          {/* Subject colour bar */}
+          <div
+            className="w-1.5 rounded-full shrink-0 self-stretch"
+            style={{ backgroundColor: subject?.color || "hsl(var(--muted-foreground))" }}
+          />
 
-        {/* Checkbox — cycles status like on Checklist page */}
-        <button onClick={onToggle} className="p-2 h-max shrink-0 mt-0.5 hover:scale-110 transition-transform">
-          {item.done
-            ? <CheckCircle2 className="w-6 h-6 text-primary" />
-            : item.didNotDo
-            ? <XCircle className="w-6 h-6 text-muted-foreground" />
-            : <Circle className="w-6 h-6 text-muted-foreground hover:text-primary transition-colors" />
-          }
-        </button>
-      </GlassCard>
+          {/* Content */}
+          <div className="flex-1 py-0.5 min-w-0">
+            <h3 className={`font-semibold ${item.done ? "line-through text-muted-foreground" : item.didNotDo ? "line-through text-muted-foreground/60" : ""}`}>
+              {item.text}
+            </h3>
+
+            <div className="flex items-center gap-1 flex-wrap mt-1">
+              {subject && <span className="text-xs text-muted-foreground">{subject.name}</span>}
+              {imp && (
+                <span className={`inline-flex items-center gap-1 text-xs ${imp.color}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${imp.dot}`} />
+                  {imp.label}
+                </span>
+              )}
+              {item.repeat && item.repeat !== "none" && (
+                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                  <Repeat className="w-3 h-3" />
+                  {REPEAT_LABEL[item.repeat as RepeatInterval]}
+                </span>
+              )}
+              {isOverdue && <span className="text-xs text-rose-500 font-medium">Overdue</span>}
+              {item.didNotDo && (
+                <span className="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">Skipped</span>
+              )}
+            </div>
+
+            {item.description && (
+              <p className="text-xs mt-1 text-muted-foreground/80 line-clamp-2">{item.description}</p>
+            )}
+          </div>
+
+          {/* Status button — tapping directly also cycles */}
+          <button
+            onClick={e => { e.stopPropagation(); onToggle(); }}
+            className="p-2 h-max shrink-0 mt-0.5 hover:scale-110 transition-transform"
+          >
+            {item.done
+              ? <CheckCircle2 className="w-6 h-6 text-primary" />
+              : item.didNotDo
+              ? <XCircle className="w-6 h-6 text-muted-foreground" />
+              : <Circle className="w-6 h-6 text-muted-foreground hover:text-primary transition-colors" />
+            }
+          </button>
+        </GlassCard>
+      </SwipeableRow>
     </motion.div>
   );
 }
