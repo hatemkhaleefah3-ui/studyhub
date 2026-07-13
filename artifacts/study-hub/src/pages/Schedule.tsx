@@ -10,11 +10,11 @@ import {
   isPast, isToday as dateFnsIsToday,
 } from "date-fns";
 import {
-  CheckCircle2, Check, X, Link2, Pencil, Trash2,
-  Clock, Repeat, CheckSquare,
+  CheckCircle2, Circle, XCircle, Check, X, Link2, Pencil, Trash2,
+  Repeat, CheckSquare,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue, useTransform, animate } from "framer-motion";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -214,6 +214,7 @@ export function Schedule() {
                   checklist={checklist}
                   subjects={subjects}
                   onCycle={() => cycleTaskStatus(entry.id)}
+                  onDelete={() => deleteChecklistItem(entry.id)}
                 />
               );
             })}
@@ -344,16 +345,29 @@ function EventCard({
   );
 }
 
-// ── Task card (checklist items with dueDate) ─────────────────────────────────
-//  Tap the status button (right side) to cycle: undone → done → skipped → undone
+// ── Task card — swipeable ─────────────────────────────────────────────────────
+//
+//  ← right-to-left : cycle  undone → done → skipped → undone
+//  → left-to-right : delete
+
+const CYCLE_THRESHOLD  = 72;   // px to trigger cycle
+const DELETE_THRESHOLD = 72;   // px to trigger delete
+
+// Next-action colour per current state (shown behind on right-to-left)
+const NEXT_ACTION: Record<string, { color: string; label: string; Icon: React.FC<any> }> = {
+  undone:   { color: "#22c55e", label: "Done",  Icon: CheckCircle2 },
+  done:     { color: "#f59e0b", label: "Skip",  Icon: XCircle      },
+  didNotDo: { color: "#64748b", label: "Undo",  Icon: Circle       },
+};
 
 function TaskCard({
-  taskId, checklist, subjects, onCycle,
+  taskId, checklist, subjects, onCycle, onDelete,
 }: {
-  taskId: string;
+  taskId:   string;
   checklist: any[];
-  subjects: any[];
-  onCycle: () => void;
+  subjects:  any[];
+  onCycle:  () => void;
+  onDelete: () => void;
 }) {
   const item = checklist.find((c: any) => c.id === taskId);
   if (!item) return null;
@@ -363,98 +377,162 @@ function TaskCard({
   const isOverdue = !item.done && !item.didNotDo && item.dueDate
     && isPast(parseISO(item.dueDate)) && !dateFnsIsToday(parseISO(item.dueDate));
 
-  // ── Status button visual state ───────────────────────────────────────────
-  // undone  → empty ring
-  // done    → solid primary fill + white check
-  // skipped → solid muted fill + white x
-  const btnBase = "w-9 h-9 rounded-full shrink-0 flex items-center justify-center transition-all duration-200 active:scale-90";
-  const btnStyle =
-    item.done
-      ? `${btnBase} bg-primary shadow-lg shadow-primary/40`
-      : item.didNotDo
-      ? `${btnBase} bg-muted-foreground/25`
-      : `${btnBase} border-2 border-muted-foreground/35 bg-card/50 hover:border-primary/60 hover:bg-primary/5`;
+  const stateKey = item.done ? "done" : item.didNotDo ? "didNotDo" : "undone";
+  const next = NEXT_ACTION[stateKey];
+
+  // ── Motion values ────────────────────────────────────────────────────────
+  const x      = useMotionValue(0);
+  const rotate = useTransform(x, [-140, 0, 140], [-1.8, 0, 1.8]);
+
+  // Right-to-left (negative x): cycle backdrop
+  const cycleOpacity  = useTransform(x, [-CYCLE_THRESHOLD, -24, 0], [1, 0.6, 0]);
+  const cycleIconScale = useTransform(x, [-CYCLE_THRESHOLD - 20, -CYCLE_THRESHOLD, -24], [1.25, 1.1, 0.8]);
+
+  // Left-to-right (positive x): delete backdrop
+  const deleteOpacity   = useTransform(x, [0, 24, DELETE_THRESHOLD], [0, 0.6, 1]);
+  const deleteIconScale = useTransform(x, [24, DELETE_THRESHOLD, DELETE_THRESHOLD + 20], [0.8, 1.1, 1.25]);
+
+  const handleDragEnd = (_: any, info: { offset: { x: number } }) => {
+    const ox = info.offset.x;
+    if (ox < -CYCLE_THRESHOLD) {
+      onCycle();
+      // snap card back after cycling
+      animate(x, 0, { type: "spring", stiffness: 500, damping: 36 });
+    } else if (ox > DELETE_THRESHOLD) {
+      onDelete();
+      // AnimatePresence handles exit; no snap needed
+    } else {
+      // below threshold — snap back
+      animate(x, 0, { type: "spring", stiffness: 500, damping: 36 });
+    }
+  };
+
+  // ── Status icon (decorative, shows current state) ────────────────────────
+  const StatusIcon =
+    item.done     ? CheckCircle2 :
+    item.didNotDo ? XCircle      :
+                    Circle;
+  const statusColor =
+    item.done     ? "text-primary"           :
+    item.didNotDo ? "text-muted-foreground/50" :
+                    "text-muted-foreground/40";
 
   return (
     <motion.div
       layout
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.97 }}
+      exit={{ opacity: 0, x: 80, transition: { duration: 0.22 } }}
       transition={{ type: "spring", stiffness: 300, damping: 28 }}
+      className="relative"
     >
-      <GlassCard className={`p-4 flex gap-4 transition-opacity duration-300 ${item.done || item.didNotDo ? "opacity-55" : ""}`}>
+      {/* ── Right-to-left backdrop (cycle action) ── */}
+      <motion.div
+        className="absolute inset-0 rounded-2xl flex items-center justify-end pr-5 gap-2"
+        style={{ backgroundColor: next.color, opacity: cycleOpacity }}
+      >
+        <span className="text-sm font-bold text-white">{next.label}</span>
+        <motion.div style={{ scale: cycleIconScale }}>
+          <next.Icon className="w-6 h-6 text-white" />
+        </motion.div>
+      </motion.div>
 
-        {/* Time column */}
-        <div className="w-14 shrink-0 flex flex-col items-center justify-center text-center border-r border-border/50 pr-3 gap-0.5">
-          {item.dueTime ? (
-            <>
-              <span className="text-base font-bold leading-none tabular-nums">{item.dueTime.split(":")[0]}</span>
-              <span className="text-[10px] text-muted-foreground font-medium leading-none">{item.dueTime.split(":")[1]}</span>
-            </>
-          ) : (
-            <CheckSquare className="w-4 h-4 text-muted-foreground/50" />
-          )}
-        </div>
+      {/* ── Left-to-right backdrop (delete) ── */}
+      <motion.div
+        className="absolute inset-0 rounded-2xl flex items-center pl-5 gap-2"
+        style={{ backgroundColor: "#ef4444", opacity: deleteOpacity }}
+      >
+        <motion.div style={{ scale: deleteIconScale }}>
+          <Trash2 className="w-6 h-6 text-white" />
+        </motion.div>
+        <span className="text-sm font-bold text-white">Delete</span>
+      </motion.div>
 
-        {/* Subject colour bar */}
-        <div
-          className="w-1 rounded-full shrink-0 self-stretch"
-          style={{ backgroundColor: subject?.color || "hsl(var(--muted-foreground) / 0.3)" }}
-        />
+      {/* ── Draggable card ── */}
+      <motion.div
+        drag="x"
+        dragMomentum={false}
+        dragElastic={0.12}
+        dragConstraints={{ left: -160, right: 160 }}
+        style={{ x, rotate }}
+        onDragEnd={handleDragEnd}
+        className="relative touch-pan-y cursor-grab active:cursor-grabbing"
+      >
+        <GlassCard className={`p-4 flex gap-4 transition-opacity duration-300 ${item.done || item.didNotDo ? "opacity-55" : ""}`}>
 
-        {/* Content */}
-        <div className="flex-1 py-0.5 min-w-0">
-          <p className={`font-semibold leading-snug ${
-            item.done      ? "line-through text-muted-foreground" :
-            item.didNotDo  ? "line-through text-muted-foreground/50" : ""
-          }`}>
-            {item.text}
-          </p>
-
-          <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
-            {subject && (
-              <span className="text-xs text-muted-foreground font-medium">{subject.name}</span>
-            )}
-            {imp && (
-              <span className={`inline-flex items-center gap-1 text-xs font-medium ${imp.color}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${imp.dot}`} />
-                {imp.label}
-              </span>
-            )}
-            {item.repeat && item.repeat !== "none" && (
-              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                <Repeat className="w-3 h-3" />
-                {REPEAT_LABEL[item.repeat as RepeatInterval]}
-              </span>
-            )}
-            {isOverdue && (
-              <span className="text-xs font-semibold text-rose-500 bg-rose-500/10 px-1.5 py-0.5 rounded-full">Overdue</span>
-            )}
-            {item.didNotDo && (
-              <span className="text-xs font-medium bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">Skipped</span>
+          {/* Time column */}
+          <div className="w-14 shrink-0 flex flex-col items-center justify-center text-center border-r border-border/50 pr-3 gap-0.5">
+            {item.dueTime ? (
+              <>
+                <span className="text-base font-bold leading-none tabular-nums">
+                  {item.dueTime.split(":")[0]}
+                </span>
+                <span className="text-[10px] text-muted-foreground font-medium leading-none">
+                  {item.dueTime.split(":")[1]}
+                </span>
+              </>
+            ) : (
+              <CheckSquare className="w-4 h-4 text-muted-foreground/50" />
             )}
           </div>
 
-          {item.description && (
-            <p className="text-xs mt-1.5 text-muted-foreground/70 line-clamp-2 leading-relaxed">{item.description}</p>
-          )}
-        </div>
+          {/* Subject colour bar */}
+          <div
+            className="w-1 rounded-full shrink-0 self-stretch"
+            style={{ backgroundColor: subject?.color || "hsl(var(--muted-foreground) / 0.3)" }}
+          />
 
-        {/* Status button — tap to cycle */}
-        <div className="flex items-center shrink-0 self-center">
-          <motion.button
-            onClick={onCycle}
-            className={btnStyle}
-            whileTap={{ scale: 0.82 }}
-            title={item.done ? "Mark skipped" : item.didNotDo ? "Mark undone" : "Mark done"}
-          >
-            {item.done && <Check className="w-4 h-4 text-primary-foreground stroke-[3]" />}
-            {item.didNotDo && <X className="w-3.5 h-3.5 text-muted-foreground stroke-[2.5]" />}
-          </motion.button>
-        </div>
+          {/* Content */}
+          <div className="flex-1 py-0.5 min-w-0">
+            <p className={`font-semibold leading-snug ${
+              item.done     ? "line-through text-muted-foreground"    :
+              item.didNotDo ? "line-through text-muted-foreground/50" : ""
+            }`}>
+              {item.text}
+            </p>
 
-      </GlassCard>
+            <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+              {subject && (
+                <span className="text-xs text-muted-foreground font-medium">{subject.name}</span>
+              )}
+              {imp && (
+                <span className={`inline-flex items-center gap-1 text-xs font-medium ${imp.color}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${imp.dot}`} />
+                  {imp.label}
+                </span>
+              )}
+              {item.repeat && item.repeat !== "none" && (
+                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                  <Repeat className="w-3 h-3" />
+                  {REPEAT_LABEL[item.repeat as RepeatInterval]}
+                </span>
+              )}
+              {isOverdue && (
+                <span className="text-xs font-semibold text-rose-500 bg-rose-500/10 px-1.5 py-0.5 rounded-full">
+                  Overdue
+                </span>
+              )}
+              {item.didNotDo && (
+                <span className="text-xs font-medium bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">
+                  Skipped
+                </span>
+              )}
+            </div>
+
+            {item.description && (
+              <p className="text-xs mt-1.5 text-muted-foreground/70 line-clamp-2 leading-relaxed">
+                {item.description}
+              </p>
+            )}
+          </div>
+
+          {/* Status icon — decorative, shows current state */}
+          <div className="flex items-center shrink-0 self-center pointer-events-none">
+            <StatusIcon className={`w-6 h-6 ${statusColor}`} />
+          </div>
+
+        </GlassCard>
+      </motion.div>
     </motion.div>
   );
 }
