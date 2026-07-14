@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { format, addDays, startOfWeek, isSameDay, isToday, parseISO } from "date-fns";
+import { format, addDays, isSameDay, isToday, parseISO } from "date-fns";
 import { GlassCard } from "@/components/shared/GlassCard";
 import { useStudyData } from "@/hooks/useStudyData";
 import { Circle, CheckCircle2, CalendarDays } from "lucide-react";
@@ -9,12 +9,10 @@ export function MiniCalendar({ schedule, checklist }: { schedule: any[], checkli
   const { subjects, toggleChecklistItem } = useStudyData();
   const [selectedDate, setSelectedDate] = useState(new Date());
 
-  // Generate a swipable week view: 14 days back, 14 days forward
   const today = new Date();
   const startDate = addDays(today, -14);
   const days = Array.from({ length: 28 }).map((_, i) => addDays(startDate, i));
   
-  // Auto scroll to today on mount
   const scrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = scrollRef.current?.querySelector('[data-today="true"]');
@@ -29,6 +27,14 @@ export function MiniCalendar({ schedule, checklist }: { schedule: any[], checkli
 
   const dayTasks = checklist
     .filter(c => !!c.dueDate && isSameDay(parseISO(c.dueDate), selectedDate));
+
+  // Combine: events first (sorted by time), then tasks — cap at 3
+  const allItems: Array<{ type: 'event'; data: any } | { type: 'task'; data: any }> = [
+    ...dayEvents.map(ev => ({ type: 'event' as const, data: ev })),
+    ...dayTasks.map(t => ({ type: 'task' as const, data: t })),
+  ];
+  const visibleItems = allItems.slice(0, 3);
+  const hiddenCount = allItems.length - visibleItems.length;
 
   return (
     <div className="space-y-4">
@@ -68,7 +74,6 @@ export function MiniCalendar({ schedule, checklist }: { schedule: any[], checkli
                 </span>
                 <span className="text-lg font-bold leading-none">{format(date, "d")}</span>
                 
-                {/* Dots indicator */}
                 {!isSelected && (isCurToday || hasEntries) && (
                   <div className={`w-1.5 h-1.5 rounded-full mt-1.5 ${isCurToday ? "bg-primary" : "bg-muted-foreground/30"}`} />
                 )}
@@ -86,52 +91,56 @@ export function MiniCalendar({ schedule, checklist }: { schedule: any[], checkli
             {isToday(selectedDate) ? "Today's Agenda" : format(selectedDate, "EEEE, MMMM d")}
           </h3>
 
-          {dayEvents.length === 0 && dayTasks.length === 0 ? (
+          {allItems.length === 0 ? (
             <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground py-6 border-2 border-dashed border-border/40 rounded-xl">
               No tasks or events.
             </div>
           ) : (
             <div className="space-y-3">
-              {/* Events */}
-              {dayEvents.map(ev => {
-                const subject = subjects.find(s => s.id === ev.subjectId);
+              {visibleItems.map((item, idx) => {
+                if (item.type === 'event') {
+                  const ev = item.data;
+                  const subject = subjects.find(s => s.id === ev.subjectId);
+                  return (
+                    <div key={`ev-${ev.id}-${idx}`} className="flex items-center gap-4 bg-background border border-border/50 rounded-xl p-3 shadow-sm">
+                      <div className="w-12 text-center shrink-0">
+                        <p className="text-xs font-bold text-muted-foreground">{format(new Date(ev.datetime), "HH:mm")}</p>
+                      </div>
+                      <div className="w-1 h-8 rounded-full shrink-0" style={{ backgroundColor: subject?.color || 'var(--primary)' }} />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm truncate">{ev.title}</p>
+                        <p className="text-xs text-muted-foreground truncate">{subject?.name}</p>
+                      </div>
+                    </div>
+                  );
+                }
+                const task = item.data;
                 return (
-                  <div key={ev.id} className="flex items-center gap-4 bg-background border border-border/50 rounded-xl p-3 shadow-sm">
-                    <div className="w-12 text-center shrink-0">
-                      <p className="text-xs font-bold text-muted-foreground">{format(new Date(ev.datetime), "HH:mm")}</p>
+                  <button
+                    key={`task-${task.id}-${idx}`}
+                    onClick={() => toggleChecklistItem(task.id)}
+                    className={`w-full flex items-center gap-3 bg-background border border-border/50 rounded-xl p-3 shadow-sm transition-colors text-left group ${task.done ? 'opacity-50 bg-secondary/30' : 'hover:bg-secondary/40'}`}
+                  >
+                    <div className="w-12 shrink-0 flex justify-center">
+                      {task.done ? (
+                        <CheckCircle2 className="w-5 h-5 text-primary" />
+                      ) : (
+                        <Circle className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                      )}
                     </div>
-                    <div className="w-1 h-8 rounded-full shrink-0" style={{ backgroundColor: subject?.color || 'var(--primary)' }} />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm truncate">{ev.title}</p>
-                      <p className="text-xs text-muted-foreground truncate">{subject?.name}</p>
-                    </div>
-                  </div>
-                )
+                    <span className={`flex-1 text-sm font-medium ${task.done ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+                      {task.text}
+                    </span>
+                  </button>
+                );
               })}
-
-              {/* Tasks */}
-              {dayTasks.map(task => (
-                <button
-                  key={task.id}
-                  onClick={() => toggleChecklistItem(task.id)}
-                  className={`w-full flex items-center gap-3 bg-background border border-border/50 rounded-xl p-3 shadow-sm transition-colors text-left group ${task.done ? 'opacity-50 bg-secondary/30' : 'hover:bg-secondary/40'}`}
-                >
-                  <div className="w-12 shrink-0 flex justify-center">
-                    {task.done ? (
-                      <CheckCircle2 className="w-5 h-5 text-primary" />
-                    ) : (
-                      <Circle className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
-                    )}
-                  </div>
-                  <span className={`flex-1 text-sm font-medium ${task.done ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
-                    {task.text}
-                  </span>
-                </button>
-              ))}
+              {hiddenCount > 0 && (
+                <p className="text-xs text-muted-foreground text-center py-2">+{hiddenCount} more</p>
+              )}
             </div>
           )}
         </div>
       </GlassCard>
     </div>
-  )
+  );
 }

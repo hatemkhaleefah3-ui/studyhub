@@ -8,6 +8,7 @@ import {
   type ChecklistItem,
   type ScheduleEvent,
   type ImportanceLevel,
+  type Subject,
 } from "@/hooks/useStudyData";
 import { GlassCard } from "@/components/shared/GlassCard";
 import { BottomSheet } from "@/components/shared/BottomSheet";
@@ -21,7 +22,7 @@ import {
 import {
   Plus, CalendarDays, Clock, ChevronLeft, ChevronRight,
   Trash2, CheckCircle2, Circle, XCircle,
-  GraduationCap, BookMarked,
+  GraduationCap, BookMarked, BookOpen,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -91,16 +92,15 @@ function hasEntriesOnDate(
   schedule: ScheduleEvent[],
   checklist: ChecklistItem[],
   plans: SchedulePlan[],
-  subjects: any[],
+  subjects: Subject[],
   date: Date
 ): boolean {
   if (schedule.some((e) => isSameDay(new Date(e.datetime), date))) return true;
   if (checklist.some((c) => !!c.dueDate && isSameDay(parseISO(c.dueDate), date))) return true;
   if (plans.some((p) => isStudyPlanDay(p, date))) return true;
-  if (subjects.some((s: any) =>
-    (s.exams ?? []).some((e: any) => e.date && isSameDay(new Date(e.date), date))
+  if (subjects.some((s) =>
+    (s.exams ?? []).some((e) => e.date && isSameDay(new Date(e.date), date))
   )) return true;
-  // Also mark exam plan item dates
   if (plans.some((p) =>
     p.type === "exam" &&
     p.items.some((i) => i.date && isSameDay(new Date(i.date), date))
@@ -127,6 +127,32 @@ function countEntriesInMonth(
   );
 }
 
+// ─── Active review subject helper ─────────────────────────────────────────────
+
+export function getActiveReviewSubject(plans: SchedulePlan[], now: Date): SchedulePlanItem | null {
+  const todayStr = format(now, "yyyy-MM-dd");
+  const reviewPlans = plans.filter(
+    (p) => p.type === "review" && p.startDate <= todayStr && p.endDate >= todayStr
+  );
+  const allItems: SchedulePlanItem[] = reviewPlans.flatMap((p) => p.items);
+
+  // Currently active: reviewStartDate <= today <= reviewEndDate
+  const active = allItems.filter(
+    (i) => i.reviewStartDate && i.reviewEndDate &&
+      i.reviewStartDate <= todayStr && i.reviewEndDate >= todayStr
+  );
+  if (active.length > 0) {
+    // Pick soonest reviewEndDate
+    return active.sort((a, b) => (a.reviewEndDate ?? "").localeCompare(b.reviewEndDate ?? ""))[0];
+  }
+  // Upcoming: nearest reviewStartDate
+  const upcoming = allItems.filter((i) => i.reviewStartDate && i.reviewStartDate > todayStr);
+  if (upcoming.length > 0) {
+    return upcoming.sort((a, b) => (a.reviewStartDate ?? "").localeCompare(b.reviewStartDate ?? ""))[0];
+  }
+  return null;
+}
+
 // ─── Section Header ───────────────────────────────────────────────────────────
 
 function SectionHeader({ title, action }: { title: string; action?: React.ReactNode }) {
@@ -138,95 +164,73 @@ function SectionHeader({ title, action }: { title: string; action?: React.ReactN
   );
 }
 
-// ─── Next Exam Section (from SchedulePlans) ───────────────────────────────────
+// ─── Next Exam Section — single featured card ─────────────────────────────────
 
 function NextExamSection({ plans }: { plans: SchedulePlan[] }) {
   const now = new Date(); now.setHours(0, 0, 0, 0);
   const examItems = plans
     .filter((p) => p.type === "exam")
-    .flatMap((p) => p.items.filter((i) => i.date && new Date(i.date) >= now))
+    .flatMap((p) => p.items.filter((i) => i.date && new Date(i.date) >= now && !i.checked))
     .sort((a, b) => new Date(a.date!).getTime() - new Date(b.date!).getTime());
 
   if (examItems.length === 0) return null;
 
   const featured = examItems[0];
-  const rest = examItems.slice(1, 5);
   const featuredDays = daysUntil(featured.date!);
 
   return (
     <section>
       <SectionHeader title="Next Exam" />
-      <div className="space-y-3">
-        {/* Featured */}
-        <GlassCard className="p-5 relative overflow-hidden border-l-4 border-destructive/60">
-          <div className="absolute inset-0 opacity-[0.03] bg-destructive pointer-events-none" />
-          <div className="relative z-10 flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">
-                {featured.subjectName}
+      <GlassCard className="p-5 relative overflow-hidden border-l-4 border-destructive/60">
+        <div className="absolute inset-0 opacity-[0.03] bg-destructive pointer-events-none" />
+        <div className="relative z-10 flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">
+              {featured.subjectName}
+            </p>
+            {featured.time && (
+              <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5" /> {featured.time}
               </p>
-              {featured.time && (
-                <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1">
-                  <Clock className="w-3.5 h-3.5" /> {featured.time}
-                </p>
-              )}
-              <p className="text-sm text-muted-foreground mt-1">
-                {format(new Date(featured.date!), "EEEE, MMMM d, yyyy")}
-              </p>
-            </div>
-            <div className="shrink-0 text-center min-w-[64px]">
-              <p
-                className="text-3xl font-black leading-none"
-                style={{ color: featuredDays <= 3 ? "hsl(var(--destructive))" : "hsl(var(--primary))" }}
-              >
-                {featuredDays === 0 ? "TODAY" : featuredDays < 0 ? "PAST" : String(featuredDays)}
-              </p>
-              {featuredDays > 0 && (
-                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mt-0.5">
-                  days left
-                </p>
-              )}
-            </div>
+            )}
+            <p className="text-sm text-muted-foreground mt-1">
+              {format(new Date(featured.date!), "EEEE, MMMM d, yyyy")}
+            </p>
           </div>
-        </GlassCard>
-
-        {rest.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {rest.map((item) => {
-              const days = daysUntil(item.date!);
-              return (
-                <GlassCard key={item.id} className="p-4 border-border/60 relative overflow-hidden">
-                  <div className="absolute top-0 left-0 w-1 h-full rounded-l bg-destructive/40" />
-                  <div className="pl-2">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1 truncate">
-                      {item.subjectName}
-                    </p>
-                    {item.date && (
-                      <p className="text-xs font-semibold text-foreground">
-                        {format(new Date(item.date), "MMM d")}
-                      </p>
-                    )}
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {days === 0 ? "Today" : days === 1 ? "Tomorrow" : days < 0 ? "Past" : `${days}d`}
-                    </p>
-                  </div>
-                </GlassCard>
-              );
-            })}
+          <div className="shrink-0 text-center min-w-[64px]">
+            <p
+              className="text-3xl font-black leading-none"
+              style={{ color: featuredDays <= 3 ? "hsl(var(--destructive))" : "hsl(var(--primary))" }}
+            >
+              {featuredDays === 0 ? "TODAY" : featuredDays < 0 ? "PAST" : String(featuredDays)}
+            </p>
+            {featuredDays > 0 && (
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mt-0.5">
+                days left
+              </p>
+            )}
           </div>
-        )}
-      </div>
+        </div>
+      </GlassCard>
     </section>
   );
 }
 
-// ─── Exams Section (all exam items from plans, sorted by date) ────────────────
+// ─── Exams Section ────────────────────────────────────────────────────────────
 
-function ExamsSection({ plans }: { plans: SchedulePlan[] }) {
+function ExamsSection({
+  plans,
+  onEdit,
+  onRemoveItem,
+}: {
+  plans: SchedulePlan[];
+  onEdit: (planId: string) => void;
+  onRemoveItem: (planId: string, itemId: string) => void;
+}) {
   const allItems = plans
     .filter((p) => p.type === "exam")
     .flatMap((p) =>
-      p.items.map((item) => ({ ...item, planTitle: p.title }))
+      p.items.map((item) => ({ ...item, planId: p.id, planTitle: p.title }))
     )
     .sort((a, b) => {
       if (!a.date) return 1;
@@ -243,42 +247,51 @@ function ExamsSection({ plans }: { plans: SchedulePlan[] }) {
         {allItems.map((item) => {
           const days = item.date ? daysUntil(item.date) : null;
           const isPast = days !== null && days < 0;
+          const isChecked = !!item.checked;
+
           return (
-            <GlassCard
+            <SwipeableRow
               key={item.id}
-              className={`p-4 flex items-center gap-4 border-border/60 ${isPast ? "opacity-50" : ""}`}
+              onEdit={() => onEdit(item.planId)}
+              onDelete={() => onRemoveItem(item.planId, item.id)}
             >
-              <div
-                className={`w-2 h-2 rounded-full shrink-0 ${
-                  days === null ? "bg-muted-foreground/30"
-                  : isPast ? "bg-muted-foreground/30"
-                  : days <= 2 ? "bg-destructive"
-                  : days <= 7 ? "bg-amber-500"
-                  : "bg-primary"
-                }`}
-              />
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm text-foreground truncate">{item.subjectName}</p>
-                {item.date && (
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {format(new Date(item.date), "EEE, MMM d")}
-                    {item.time && ` · ${item.time}`}
+              <GlassCard
+                className={`p-4 flex items-center gap-4 border-border/60 ${(isPast || isChecked) ? "opacity-50" : ""}`}
+              >
+                <div
+                  className={`w-2 h-2 rounded-full shrink-0 ${
+                    isChecked ? "bg-emerald-500"
+                    : days === null ? "bg-muted-foreground/30"
+                    : isPast ? "bg-muted-foreground/30"
+                    : days <= 2 ? "bg-destructive"
+                    : days <= 7 ? "bg-amber-500"
+                    : "bg-primary"
+                  }`}
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm text-foreground truncate">{item.subjectName}</p>
+                  {item.date && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {format(new Date(item.date), "EEE, MMM d")}
+                      {item.time && ` · ${item.time}`}
+                    </p>
+                  )}
+                </div>
+                {isChecked && <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />}
+                {!isChecked && days !== null && (
+                  <p
+                    className={`text-sm font-bold shrink-0 ${
+                      isPast ? "text-muted-foreground"
+                      : days <= 2 ? "text-destructive"
+                      : days <= 7 ? "text-amber-500"
+                      : "text-foreground"
+                    }`}
+                  >
+                    {isPast ? "Past" : days === 0 ? "Today" : days === 1 ? "Tomorrow" : `${days}d`}
                   </p>
                 )}
-              </div>
-              {days !== null && (
-                <p
-                  className={`text-sm font-bold shrink-0 ${
-                    isPast ? "text-muted-foreground"
-                    : days <= 2 ? "text-destructive"
-                    : days <= 7 ? "text-amber-500"
-                    : "text-foreground"
-                  }`}
-                >
-                  {isPast ? "Past" : days === 0 ? "Today" : days === 1 ? "Tomorrow" : `${days}d`}
-                </p>
-              )}
-            </GlassCard>
+              </GlassCard>
+            </SwipeableRow>
           );
         })}
       </div>
@@ -290,16 +303,23 @@ function ExamsSection({ plans }: { plans: SchedulePlan[] }) {
 
 function SchedulePlanCard({ plan, onClick }: { plan: SchedulePlan; onClick?: () => void }) {
   const isExam   = plan.type === "exam";
+  const isReview = plan.type === "review";
   const daysStart = daysUntil(plan.startDate);
   const daysEnd   = daysUntil(plan.endDate);
   const isActive  = daysStart <= 0 && daysEnd >= 0;
   const isPast    = daysEnd < 0;
 
+  const borderColor = isExam
+    ? "hsl(var(--destructive))"
+    : isReview
+    ? "#d97706"
+    : "hsl(var(--primary))";
+
   return (
     <GlassCard
       onClick={onClick}
       className={`p-5 cursor-pointer border-l-4 transition-all hover:shadow-md hover:bg-secondary/20 ${onClick ? "active:scale-[0.99]" : ""}`}
-      style={{ borderLeftColor: isExam ? "hsl(var(--destructive))" : "hsl(var(--primary))" }}
+      style={{ borderLeftColor: borderColor }}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
@@ -308,11 +328,13 @@ function SchedulePlanCard({ plan, onClick }: { plan: SchedulePlan; onClick?: () 
               className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${
                 isExam
                   ? "bg-destructive/10 text-destructive border-destructive/20"
+                  : isReview
+                  ? "bg-amber-500/10 text-amber-600 border-amber-500/20"
                   : "bg-primary/10 text-primary border-primary/20"
               }`}
             >
-              {isExam ? <GraduationCap className="w-3 h-3" /> : <BookMarked className="w-3 h-3" />}
-              {isExam ? "Exam" : "Study"}
+              {isExam ? <GraduationCap className="w-3 h-3" /> : isReview ? <BookOpen className="w-3 h-3" /> : <BookMarked className="w-3 h-3" />}
+              {isExam ? "Exam" : isReview ? "Review" : "Study"}
             </span>
             {isActive && (
               <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
@@ -334,7 +356,7 @@ function SchedulePlanCard({ plan, onClick }: { plan: SchedulePlan; onClick?: () 
             {isExam
               ? plan.items.length === 1 ? "exam" : "exams"
               : plan.items.length === 1 ? "subject" : "subjects"}
-            {!isExam && plan.items[0]?.repeatPattern && ` · ${plan.items[0].repeatPattern}`}
+            {!isExam && !isReview && plan.items[0]?.repeatPattern && ` · ${plan.items[0].repeatPattern}`}
           </p>
         </div>
         {!isPast && !isActive && (
@@ -405,7 +427,8 @@ function SchedulesSection({
 // ─── Plan Detail Sheet ────────────────────────────────────────────────────────
 
 function SchedulePlanDetail({ plan }: { plan: SchedulePlan }) {
-  const isExam = plan.type === "exam";
+  const isExam   = plan.type === "exam";
+  const isReview = plan.type === "review";
   const daysS  = daysUntil(plan.startDate);
   const daysE  = daysUntil(plan.endDate);
   const isActive = daysS <= 0 && daysE >= 0;
@@ -417,11 +440,13 @@ function SchedulePlanDetail({ plan }: { plan: SchedulePlan }) {
           className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider border ${
             isExam
               ? "bg-destructive/10 text-destructive border-destructive/20"
+              : isReview
+              ? "bg-amber-500/10 text-amber-600 border-amber-500/20"
               : "bg-primary/10 text-primary border-primary/20"
           }`}
         >
-          {isExam ? <GraduationCap className="w-3.5 h-3.5" /> : <BookMarked className="w-3.5 h-3.5" />}
-          {isExam ? "Exam Schedule" : "Study Schedule"}
+          {isExam ? <GraduationCap className="w-3.5 h-3.5" /> : isReview ? <BookOpen className="w-3.5 h-3.5" /> : <BookMarked className="w-3.5 h-3.5" />}
+          {isExam ? "Exam Schedule" : isReview ? "Review Schedule" : "Study Schedule"}
         </span>
         {isActive && (
           <span className="inline-flex px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
@@ -467,12 +492,19 @@ function SchedulePlanDetail({ plan }: { plan: SchedulePlan }) {
                 </span>
               </p>
             )}
-            {!isExam && (
+            {!isExam && !isReview && (
               <p className="text-sm text-muted-foreground mt-1">
                 {item.startTime && item.endTime ? `${item.startTime} – ${item.endTime}` : item.startTime ?? ""}
                 {item.repeatPattern && ` · ${item.repeatPattern}`}
                 {item.repeatPattern === "weekly" && item.weekDays && item.weekDays.length > 0 &&
                   ` (${item.weekDays.map((d) => DAY_NAMES[d]).join(", ")})`}
+              </p>
+            )}
+            {isReview && (
+              <p className="text-sm text-muted-foreground mt-1">
+                {item.reviewStartDate && item.reviewEndDate
+                  ? `${format(new Date(item.reviewStartDate), "MMM d")} → ${format(new Date(item.reviewEndDate), "MMM d")}`
+                  : ""}
               </p>
             )}
           </GlassCard>
@@ -482,7 +514,7 @@ function SchedulePlanDetail({ plan }: { plan: SchedulePlan }) {
   );
 }
 
-// ─── Tasks Section ────────────────────────────────────────────────────────────
+// ─── Tasks Section (kept but not rendered in Schedule page) ───────────────────
 
 function TasksSection({
   tasks,
@@ -711,7 +743,7 @@ function MonthView({
   schedule: ScheduleEvent[];
   checklist: ChecklistItem[];
   plans: SchedulePlan[];
-  subjects: any[];
+  subjects: Subject[];
   onSelectDay: (d: Date) => void;
   onBackToYear: () => void;
   onChangeMonth: (y: number, m: number) => void;
@@ -725,6 +757,55 @@ function MonthView({
   for (let i = 0; i < leading; i++) cells.push(null);
   for (let d = 1; d <= daysInM; d++) cells.push(new Date(year, month, d));
   while (cells.length % 7 !== 0) cells.push(null);
+
+  // Determine most-important non-exam plan
+  const nonExamPlans = plans.filter((p) => p.type !== "exam");
+  const mostImportantPlan = nonExamPlans.length > 0
+    ? nonExamPlans.reduce((best, p) => {
+        const bImp = best.importance ?? 2;
+        const pImp = p.importance ?? 2;
+        return pImp < bImp ? p : best;
+      })
+    : null;
+
+  const activeReviewSubject = getActiveReviewSubject(plans, today);
+
+  function getCellBg(date: Date): string | undefined {
+    const dateStr = format(date, "yyyy-MM-dd");
+
+    // 1. Exam item date → red
+    const hasExamItem = plans.some(
+      (p) => p.type === "exam" && p.items.some((i) => i.date === dateStr)
+    );
+    if (hasExamItem) return "rgba(239,68,68,0.18)";
+
+    // 2. Active review subject range → dark green
+    if (
+      activeReviewSubject &&
+      activeReviewSubject.reviewStartDate &&
+      activeReviewSubject.reviewEndDate &&
+      dateStr >= activeReviewSubject.reviewStartDate &&
+      dateStr <= activeReviewSubject.reviewEndDate
+    ) {
+      return "rgba(34,197,94,0.18)";
+    }
+
+    // 3. Most-important schedule's days
+    if (mostImportantPlan) {
+      if (mostImportantPlan.type === "review") {
+        const d = mostImportantPlan;
+        if (dateStr >= d.startDate && dateStr <= d.endDate) {
+          return "rgba(234,179,8,0.18)";
+        }
+      } else if (mostImportantPlan.type === "study") {
+        if (isStudyPlanDay(mostImportantPlan, date)) {
+          return "rgba(59,130,246,0.15)";
+        }
+      }
+    }
+
+    return undefined;
+  }
 
   return (
     <div className="space-y-4">
@@ -760,10 +841,12 @@ function MonthView({
             const isNow  = isSameDay(date, today);
             const isAnch = isSameDay(date, anchor) && !isNow;
             const hasEnt = hasEntriesOnDate(schedule, checklist, plans, subjects, date);
+            const cellBg = !isNow ? getCellBg(date) : undefined;
             return (
               <button
                 key={i}
                 onClick={() => onSelectDay(date)}
+                style={cellBg ? { backgroundColor: cellBg } : undefined}
                 className={`aspect-square rounded-xl flex flex-col items-center justify-center gap-0.5 text-sm font-bold transition-all border shadow-sm ${
                   isNow
                     ? "bg-primary text-primary-foreground border-primary shadow-primary/30 scale-105 z-10"
@@ -860,37 +943,64 @@ function YearView({
 // ─── Creation Forms ───────────────────────────────────────────────────────────
 
 function QuickExamForm({
+  subjects,
   onSubmit,
   onBack,
 }: {
+  subjects: Subject[];
   onSubmit: (plan: Omit<SchedulePlan, "id" | "createdAt">) => void;
   onBack: () => void;
 }) {
   const [subjectName, setSubjectName] = useState("");
+  const [subjectId, setSubjectId]     = useState("");
   const [date, setDate]               = useState("");
   const [time, setTime]               = useState("");
+  const [importance, setImportance]   = useState<number>(2);
+
+  const handleSubjectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    if (val === "") {
+      setSubjectName("");
+      setSubjectId("");
+    } else {
+      const sub = subjects.find((s) => s.id === val);
+      setSubjectName(sub?.name ?? "");
+      setSubjectId(val);
+    }
+  };
 
   const handleSubmit = () => {
     if (!subjectName.trim() || !date) return;
+    const finalTime = time || "09:00";
     onSubmit({
       type: "exam",
       title: subjectName.trim(),
       startDate: date,
       endDate: date,
-      items: [{ id: crypto.randomUUID(), subjectName: subjectName.trim(), date, time: time || undefined }],
+      importance,
+      items: [{ id: crypto.randomUUID(), subjectName: subjectName.trim(), subjectId: subjectId || undefined, date, time: finalTime }],
     });
   };
 
   return (
     <div className="space-y-4">
       <div>
-        <label className="block text-sm font-medium mb-2">Subject Name</label>
-        <input
-          className={inputCls}
-          value={subjectName}
-          onChange={(e) => setSubjectName(e.target.value)}
-          placeholder="e.g. Biochemistry"
-        />
+        <label className="block text-sm font-medium mb-2">Subject</label>
+        {subjects.length > 0 ? (
+          <select className={inputCls} value={subjectId} onChange={handleSubjectChange}>
+            <option value="">Select subject…</option>
+            {subjects.map((s) => (
+              <option key={s.id} value={s.id}>{s.emoji ? `${s.emoji} ` : ""}{s.name}</option>
+            ))}
+          </select>
+        ) : (
+          <input
+            className={inputCls}
+            value={subjectName}
+            onChange={(e) => setSubjectName(e.target.value)}
+            placeholder="e.g. Biochemistry"
+          />
+        )}
       </div>
       <div>
         <label className="block text-sm font-medium mb-2">Date</label>
@@ -898,9 +1008,17 @@ function QuickExamForm({
       </div>
       <div>
         <label className="block text-sm font-medium mb-2">
-          Time <span className="text-muted-foreground font-normal">(optional)</span>
+          Time <span className="text-muted-foreground font-normal">(optional, defaults to 09:00)</span>
         </label>
         <input type="time" className={inputCls} value={time} onChange={(e) => setTime(e.target.value)} />
+      </div>
+      <div>
+        <label className="block text-sm font-medium mb-2">Importance</label>
+        <select className={inputCls} value={importance} onChange={(e) => setImportance(Number(e.target.value))}>
+          <option value={1}>1 — Most Important</option>
+          <option value={2}>2</option>
+          <option value={3}>3 — Least Important</option>
+        </select>
       </div>
       <div className="flex gap-3 pt-2">
         <button
@@ -924,14 +1042,17 @@ function QuickExamForm({
 
 function ExamScheduleForm({
   initial,
+  subjects,
   onSubmit,
   onBack,
 }: {
   initial?: SchedulePlan;
+  subjects: Subject[];
   onSubmit: (plan: Omit<SchedulePlan, "id" | "createdAt">) => void;
   onBack: () => void;
 }) {
-  const [title, setTitle] = useState(initial?.title ?? "");
+  const [title, setTitle]         = useState(initial?.title ?? "");
+  const [importance, setImportance] = useState<number>(initial?.importance ?? 2);
   const [items, setItems] = useState<SchedulePlanItem[]>(
     initial?.items.length
       ? initial.items
@@ -943,16 +1064,27 @@ function ExamScheduleForm({
   const updateItem = (id: string, patch: Partial<SchedulePlanItem>) =>
     setItems((p) => p.map((i) => (i.id === id ? { ...i, ...patch } : i)));
 
+  const handleSubjectChange = (itemId: string, val: string) => {
+    if (val === "") {
+      updateItem(itemId, { subjectName: "", subjectId: undefined });
+    } else {
+      const sub = subjects.find((s) => s.id === val);
+      updateItem(itemId, { subjectName: sub?.name ?? "", subjectId: val });
+    }
+  };
+
   const handleSubmit = () => {
     const validItems = items.filter((i) => i.subjectName.trim() && i.date);
     if (!title.trim() || !validItems.length) return;
-    const dates = validItems.map((i) => i.date!).sort();
+    const finalItems = validItems.map((i) => ({ ...i, time: i.time || "09:00" }));
+    const dates = finalItems.map((i) => i.date!).sort();
     onSubmit({
       type: "exam",
       title: title.trim(),
       startDate: dates[0],
       endDate: dates[dates.length - 1],
-      items: validItems,
+      importance,
+      items: finalItems,
     });
   };
 
@@ -994,12 +1126,25 @@ function ExamScheduleForm({
                 </button>
               )}
             </div>
-            <input
-              className={inputCls}
-              value={item.subjectName}
-              onChange={(e) => updateItem(item.id, { subjectName: e.target.value })}
-              placeholder="Subject / Exam name"
-            />
+            {subjects.length > 0 ? (
+              <select
+                className={inputCls}
+                value={item.subjectId ?? ""}
+                onChange={(e) => handleSubjectChange(item.id, e.target.value)}
+              >
+                <option value="">Select subject…</option>
+                {subjects.map((s) => (
+                  <option key={s.id} value={s.id}>{s.emoji ? `${s.emoji} ` : ""}{s.name}</option>
+                ))}
+              </select>
+            ) : (
+              <input
+                className={inputCls}
+                value={item.subjectName}
+                onChange={(e) => updateItem(item.id, { subjectName: e.target.value })}
+                placeholder="Subject / Exam name"
+              />
+            )}
             <div className="grid grid-cols-2 gap-3">
               <input
                 type="date"
@@ -1016,6 +1161,14 @@ function ExamScheduleForm({
             </div>
           </GlassCard>
         ))}
+      </div>
+      <div>
+        <label className="block text-sm font-medium mb-2">Importance</label>
+        <select className={inputCls} value={importance} onChange={(e) => setImportance(Number(e.target.value))}>
+          <option value={1}>1 — Most Important</option>
+          <option value={2}>2</option>
+          <option value={3}>3 — Least Important</option>
+        </select>
       </div>
       <div className="flex gap-3 pt-2">
         {!initial && (
@@ -1041,16 +1194,19 @@ function ExamScheduleForm({
 
 function StudyScheduleForm({
   initial,
+  subjects,
   onSubmit,
   onBack,
 }: {
   initial?: SchedulePlan;
+  subjects: Subject[];
   onSubmit: (plan: Omit<SchedulePlan, "id" | "createdAt">) => void;
   onBack: () => void;
 }) {
   const [title, setTitle]         = useState(initial?.title ?? "");
   const [startDate, setStartDate] = useState(initial?.startDate ?? "");
   const [endDate, setEndDate]     = useState(initial?.endDate ?? "");
+  const [importance, setImportance] = useState<number>(initial?.importance ?? 2);
   const [items, setItems] = useState<SchedulePlanItem[]>(
     initial?.items.length
       ? initial.items
@@ -1075,6 +1231,15 @@ function StudyScheduleForm({
   const updateItem  = (id: string, patch: Partial<SchedulePlanItem>) =>
     setItems((p) => p.map((i) => (i.id === id ? { ...i, ...patch } : i)));
 
+  const handleSubjectChange = (itemId: string, val: string) => {
+    if (val === "") {
+      updateItem(itemId, { subjectName: "", subjectId: undefined });
+    } else {
+      const sub = subjects.find((s) => s.id === val);
+      updateItem(itemId, { subjectName: sub?.name ?? "", subjectId: val });
+    }
+  };
+
   const toggleWeekDay = (itemId: string, day: number) => {
     setItems((p) =>
       p.map((i) => {
@@ -1089,7 +1254,7 @@ function StudyScheduleForm({
   const handleSubmit = () => {
     const validItems = items.filter((i) => i.subjectName.trim());
     if (!title.trim() || !startDate || !endDate || !validItems.length) return;
-    onSubmit({ type: "study", title: title.trim(), startDate, endDate, items: validItems });
+    onSubmit({ type: "study", title: title.trim(), startDate, endDate, importance, items: validItems });
   };
 
   return (
@@ -1140,12 +1305,25 @@ function StudyScheduleForm({
                 </button>
               )}
             </div>
-            <input
-              className={inputCls}
-              value={item.subjectName}
-              onChange={(e) => updateItem(item.id, { subjectName: e.target.value })}
-              placeholder="Subject name"
-            />
+            {subjects.length > 0 ? (
+              <select
+                className={inputCls}
+                value={item.subjectId ?? ""}
+                onChange={(e) => handleSubjectChange(item.id, e.target.value)}
+              >
+                <option value="">Select subject…</option>
+                {subjects.map((s) => (
+                  <option key={s.id} value={s.id}>{s.emoji ? `${s.emoji} ` : ""}{s.name}</option>
+                ))}
+              </select>
+            ) : (
+              <input
+                className={inputCls}
+                value={item.subjectName}
+                onChange={(e) => updateItem(item.id, { subjectName: e.target.value })}
+                placeholder="Subject name"
+              />
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium mb-1.5 text-muted-foreground">Start time</label>
@@ -1209,6 +1387,14 @@ function StudyScheduleForm({
           </GlassCard>
         ))}
       </div>
+      <div>
+        <label className="block text-sm font-medium mb-2">Importance</label>
+        <select className={inputCls} value={importance} onChange={(e) => setImportance(Number(e.target.value))}>
+          <option value={1}>1 — Most Important</option>
+          <option value={2}>2</option>
+          <option value={3}>3 — Least Important</option>
+        </select>
+      </div>
       <div className="flex gap-3 pt-2">
         {!initial && (
           <button
@@ -1225,6 +1411,168 @@ function StudyScheduleForm({
           className="flex-1 bg-primary text-primary-foreground font-semibold rounded-xl py-3.5 hover:opacity-90 transition-opacity"
         >
           {initial ? "Save Changes" : "Create Schedule"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ReviewScheduleForm({
+  initial,
+  subjects,
+  onSubmit,
+  onBack,
+}: {
+  initial?: SchedulePlan;
+  subjects: Subject[];
+  onSubmit: (plan: Omit<SchedulePlan, "id" | "createdAt">) => void;
+  onBack: () => void;
+}) {
+  const [title, setTitle]         = useState(initial?.title ?? "");
+  const [startDate, setStartDate] = useState(initial?.startDate ?? "");
+  const [endDate, setEndDate]     = useState(initial?.endDate ?? "");
+  const [importance, setImportance] = useState<number>(initial?.importance ?? 2);
+  const [items, setItems] = useState<SchedulePlanItem[]>(
+    initial?.items.length
+      ? initial.items
+      : [{ id: crypto.randomUUID(), subjectName: "", reviewStartDate: "", reviewEndDate: "" }]
+  );
+
+  const addItem = () =>
+    setItems((p) => [...p, { id: crypto.randomUUID(), subjectName: "", reviewStartDate: "", reviewEndDate: "" }]);
+  const removeItem = (id: string) => setItems((p) => p.filter((i) => i.id !== id));
+  const updateItem = (id: string, patch: Partial<SchedulePlanItem>) =>
+    setItems((p) => p.map((i) => (i.id === id ? { ...i, ...patch } : i)));
+
+  const handleSubjectChange = (itemId: string, val: string) => {
+    if (val === "") {
+      updateItem(itemId, { subjectName: "", subjectId: undefined });
+    } else {
+      const sub = subjects.find((s) => s.id === val);
+      updateItem(itemId, { subjectName: sub?.name ?? "", subjectId: val });
+    }
+  };
+
+  const handleSubmit = () => {
+    const validItems = items.filter((i) => i.subjectName.trim());
+    if (!title.trim() || !startDate || !endDate || !validItems.length) return;
+    onSubmit({ type: "review", title: title.trim(), startDate, endDate, importance, items: validItems });
+  };
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <label className="block text-sm font-medium mb-2">Schedule Title</label>
+        <input
+          className={inputCls}
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="e.g. Final Review Period"
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm font-medium mb-2">Start Date</label>
+          <input type="date" className={inputCls} value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-2">End Date</label>
+          <input type="date" className={inputCls} value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+        </div>
+      </div>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-medium">Subjects</p>
+          <button
+            type="button"
+            onClick={addItem}
+            className="text-xs font-bold text-amber-600 flex items-center gap-1 hover:opacity-80"
+          >
+            <Plus className="w-3.5 h-3.5" /> Add Subject
+          </button>
+        </div>
+        {items.map((item, i) => (
+          <GlassCard key={item.id} className="p-4 space-y-3 border-amber-500/20 bg-amber-500/5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-amber-600">
+                Subject {i + 1}
+              </span>
+              {items.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => removeItem(item.id)}
+                  className="text-muted-foreground hover:text-destructive transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            {subjects.length > 0 ? (
+              <select
+                className={inputCls}
+                value={item.subjectId ?? ""}
+                onChange={(e) => handleSubjectChange(item.id, e.target.value)}
+              >
+                <option value="">Select subject…</option>
+                {subjects.map((s) => (
+                  <option key={s.id} value={s.id}>{s.emoji ? `${s.emoji} ` : ""}{s.name}</option>
+                ))}
+              </select>
+            ) : (
+              <input
+                className={inputCls}
+                value={item.subjectName}
+                onChange={(e) => updateItem(item.id, { subjectName: e.target.value })}
+                placeholder="Subject name"
+              />
+            )}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium mb-1.5 text-muted-foreground">Review Start</label>
+                <input
+                  type="date"
+                  className={inputCls}
+                  value={item.reviewStartDate ?? ""}
+                  onChange={(e) => updateItem(item.id, { reviewStartDate: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1.5 text-muted-foreground">Review End</label>
+                <input
+                  type="date"
+                  className={inputCls}
+                  value={item.reviewEndDate ?? ""}
+                  onChange={(e) => updateItem(item.id, { reviewEndDate: e.target.value })}
+                />
+              </div>
+            </div>
+          </GlassCard>
+        ))}
+      </div>
+      <div>
+        <label className="block text-sm font-medium mb-2">Importance</label>
+        <select className={inputCls} value={importance} onChange={(e) => setImportance(Number(e.target.value))}>
+          <option value={1}>1 — Most Important</option>
+          <option value={2}>2</option>
+          <option value={3}>3 — Least Important</option>
+        </select>
+      </div>
+      <div className="flex gap-3 pt-2">
+        {!initial && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="flex-none px-5 py-3.5 rounded-xl border border-border/50 text-muted-foreground font-semibold hover:bg-secondary/50 transition-colors"
+          >
+            Back
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={handleSubmit}
+          className="flex-1 bg-amber-500 text-white font-semibold rounded-xl py-3.5 hover:opacity-90 transition-opacity"
+        >
+          {initial ? "Save Changes" : "Create Review Schedule"}
         </button>
       </div>
     </div>
@@ -1288,17 +1636,6 @@ export function Schedule() {
     return [...events, ...tasks].sort((a, b) => a.sortTime - b.sortTime);
   }, [schedule, checklist, selectedDate]);
 
-  const taskEntries = useMemo(
-    () =>
-      checklist
-        .filter((c) => !!c.dueDate && !c.isTaskList)
-        .sort(
-          (a, b) =>
-            (a.dueDate! + (a.dueTime ?? "23:59")).localeCompare(b.dueDate! + (b.dueTime ?? "23:59"))
-        ),
-    [checklist]
-  );
-
   const { visible: visiblePlans, hidden: hiddenPlans } = useMemo(
     () => resolveConflicts(schedulePlans),
     [schedulePlans]
@@ -1326,6 +1663,17 @@ export function Schedule() {
     setCreateType(null);
   };
 
+  const handleEditPlan = (planId: string) => {
+    const plan = schedulePlans.find((p) => p.id === planId);
+    if (plan) setEditingPlan(plan);
+  };
+
+  const handleRemoveExamItem = (planId: string, itemId: string) => {
+    const plan = schedulePlans.find((p) => p.id === planId);
+    if (!plan) return;
+    updateSchedulePlan(planId, { ...plan, items: plan.items.filter((i) => i.id !== itemId) });
+  };
+
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
@@ -1336,7 +1684,10 @@ export function Schedule() {
         <p className="text-lg text-muted-foreground font-medium">{format(new Date(), "EEEE, MMMM do")}</p>
       </div>
 
-      {/* ── 1. CALENDAR (top) ── */}
+      {/* ── 1. NEXT EXAM (above calendar) ── */}
+      <NextExamSection plans={schedulePlans} />
+
+      {/* ── 2. CALENDAR ── */}
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold tracking-tight">Calendar</h2>
@@ -1399,7 +1750,7 @@ export function Schedule() {
                     if (entry.kind === "event") {
                       const ev  = schedule.find((e) => e.id === entry.id);
                       if (!ev) return null;
-                      const sub = subjects.find((s: any) => s.id === ev.subjectId);
+                      const sub = subjects.find((s) => s.id === ev.subjectId);
                       return (
                         <motion.div
                           key={`ev-${entry.id}`}
@@ -1484,13 +1835,14 @@ export function Schedule() {
         )}
       </section>
 
-      {/* ── 2. NEXT EXAM (hidden when empty) ── */}
-      <NextExamSection plans={schedulePlans} />
+      {/* ── 3. EXAMS ── */}
+      <ExamsSection
+        plans={schedulePlans}
+        onEdit={handleEditPlan}
+        onRemoveItem={handleRemoveExamItem}
+      />
 
-      {/* ── 3. EXAMS (hidden when empty) ── */}
-      <ExamsSection plans={schedulePlans} />
-
-      {/* ── 4. SCHEDULES (hidden when empty) ── */}
+      {/* ── 4. SCHEDULES ── */}
       <SchedulesSection
         visiblePlans={visiblePlans}
         hiddenPlans={hiddenPlans}
@@ -1498,14 +1850,6 @@ export function Schedule() {
         onDelete={setDeletingPlanId}
         onDetail={setDetailPlan}
         onShowHidden={() => setShowHidden(true)}
-      />
-
-      {/* ── 5. TASKS (hidden when empty) ── */}
-      <TasksSection
-        tasks={taskEntries}
-        onToggle={toggleChecklistItem}
-        onRemove={removeTask}
-        onCycle={cycleTask}
       />
 
       {/* ── FAB ── */}
@@ -1565,12 +1909,28 @@ export function Schedule() {
             </div>
             <ChevronRight className="w-5 h-5 text-muted-foreground ml-auto shrink-0" />
           </button>
+
+          {/* Review Schedule */}
+          <button
+            onClick={() => setCreateType("review")}
+            className="w-full flex items-center gap-4 p-5 rounded-2xl bg-amber-500/5 border border-amber-500/20 hover:bg-amber-500/10 transition-colors text-left"
+          >
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center shrink-0 border border-amber-500/20">
+              <BookOpen className="w-6 h-6 text-amber-600" />
+            </div>
+            <div>
+              <p className="font-bold text-foreground">Review Schedule</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Plan subject-by-subject review periods</p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-muted-foreground ml-auto shrink-0" />
+          </button>
         </div>
       </BottomSheet>
 
       {/* ── Quick Exam form ── */}
       <BottomSheet isOpen={isCreating && createType === "quickExam"} onClose={closeCreate} title="Add Exam">
         <QuickExamForm
+          subjects={subjects}
           onSubmit={(plan) => { addSchedulePlan(plan); closeCreate(); }}
           onBack={() => setCreateType(null)}
         />
@@ -1579,6 +1939,7 @@ export function Schedule() {
       {/* ── Exam Schedule form ── */}
       <BottomSheet isOpen={isCreating && createType === "exam"} onClose={closeCreate} title="New Exam Schedule">
         <ExamScheduleForm
+          subjects={subjects}
           onSubmit={(plan) => { addSchedulePlan(plan); closeCreate(); }}
           onBack={() => setCreateType(null)}
         />
@@ -1587,6 +1948,16 @@ export function Schedule() {
       {/* ── Study Schedule form ── */}
       <BottomSheet isOpen={isCreating && createType === "study"} onClose={closeCreate} title="New Study Schedule">
         <StudyScheduleForm
+          subjects={subjects}
+          onSubmit={(plan) => { addSchedulePlan(plan); closeCreate(); }}
+          onBack={() => setCreateType(null)}
+        />
+      </BottomSheet>
+
+      {/* ── Review Schedule form ── */}
+      <BottomSheet isOpen={isCreating && createType === "review"} onClose={closeCreate} title="New Review Schedule">
+        <ReviewScheduleForm
+          subjects={subjects}
           onSubmit={(plan) => { addSchedulePlan(plan); closeCreate(); }}
           onBack={() => setCreateType(null)}
         />
@@ -1601,6 +1972,7 @@ export function Schedule() {
         {editingPlan?.type === "exam" && (
           <ExamScheduleForm
             initial={editingPlan}
+            subjects={subjects}
             onSubmit={(plan) => { updateSchedulePlan(editingPlan.id, plan); setEditingPlan(null); }}
             onBack={() => setEditingPlan(null)}
           />
@@ -1616,6 +1988,23 @@ export function Schedule() {
         {editingPlan?.type === "study" && (
           <StudyScheduleForm
             initial={editingPlan}
+            subjects={subjects}
+            onSubmit={(plan) => { updateSchedulePlan(editingPlan.id, plan); setEditingPlan(null); }}
+            onBack={() => setEditingPlan(null)}
+          />
+        )}
+      </BottomSheet>
+
+      {/* ── Edit Review Schedule ── */}
+      <BottomSheet
+        isOpen={!!editingPlan && editingPlan.type === "review"}
+        onClose={() => setEditingPlan(null)}
+        title="Edit Review Schedule"
+      >
+        {editingPlan?.type === "review" && (
+          <ReviewScheduleForm
+            initial={editingPlan}
+            subjects={subjects}
             onSubmit={(plan) => { updateSchedulePlan(editingPlan.id, plan); setEditingPlan(null); }}
             onBack={() => setEditingPlan(null)}
           />
