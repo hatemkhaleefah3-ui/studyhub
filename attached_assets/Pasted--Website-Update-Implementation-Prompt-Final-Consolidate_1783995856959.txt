@@ -1,0 +1,102 @@
+
+Website Update — Implementation Prompt (Final Consolidated Version)
+⚠️ Deployment Safety Requirements (read first, apply throughout)
+Site is hosted via GitHub → Cloudflare Pages.
+Do not modify .github/workflows/*, wrangler.toml, _headers, _redirects, or any Cloudflare/CI/deploy config.
+Do not change build commands, output directory, environment variables, or Node/package manager versions.
+Keep all changes scoped to application code (components, styles, logic) — avoid touching shared config files unless strictly required.
+Run the project’s build locally before opening the PR — confirm zero errors.
+Resolve all merge conflicts locally against the current base branch before pushing — the PR must be cleanly mergeable with no manual conflict resolution needed.
+Keep commits scoped/logical so any build issue can be bisected easily.
+
+Part 1 — Bug Fixes (existing features currently broken)
+1.1 — Dashboard calendar: keep agenda view Keep the agenda list on the dashboard calendar, capped at a maximum of 3 upcoming tasks. If more than 3 exist, show a “+N more” indicator instead of listing them all.
+1.2 — Schedule page calendar: keep agenda view Keep the agenda on the full schedule page’s calendar too — full list, no cap.
+1.3 — Dashboard calendar: keep “Go to Schedule” button Keep the button on the dashboard calendar that navigates to the full schedule page.
+1.4 — Fix item card reordering (priority) See full spec in Part 8.7 — reordering must work end-to-end via long-press-and-drag, and the new order must persist.
+
+Part 2 — Exam Cards: Swipe Actions & Auto-Complete
+2.1 — Swipe gestures (schedule page, Exams section) Each exam card supports swipe actions:
+Swipe right → left: reveals Edit action
+Swipe left → right: reveals Remove action
+2.2 — Auto-check passed exams Once an exam’s date and time have passed, the exam card is automatically marked as checked/completed — no manual action required.
+
+Part 3 — Schedule Page Layout Changes
+3.1 — Remove Tasks section (calendar agenda is NOT part of this — do not touch it) Remove the standalone “Tasks” section/list from the schedule page. This is separate from the calendar’s agenda view (Part 1.2), which must remain untouched and fully intact — only the dedicated Tasks section is being removed.
+3.2 — Move Next Exam(s) section above the calendar On both the dashboard and the schedule page, the Next Exam(s) section must appear above the calendar (not below or beside it).
+3.3 — Dashboard: replace “Upcoming Exams” with “Next Exams” Remove the “Upcoming Exams” section from the dashboard. Replace it with a “Next Exams” section:
+Shows exactly 2 exams
+The closest upcoming exam is first, with a visually distinct design from the second card (accent color, emphasis, badge, etc. — marking it as the nearest one)
+Both cards share the same dimensions (only styling/emphasis differs, not size)
+3.4 — Schedule page: “Next Exam” section shows only 1 exam On the schedule page, the equivalent section shows just the single closest upcoming exam (not 2).
+
+Part 4 — Feature: Exam Schedule
+4.1 — Exam Schedule fields
+Name
+Start date / End date — overall range
+Exams (add one or more), each with:
+Link to an existing subject from the Subjects page → the subject’s name becomes the exam’s name (no separate name field)
+Exam date
+Exam time — defaults to 9:00 AM if left unset
+
+Part 5 — Feature: Review Schedule
+5.1 — Review Schedule fields
+Name
+Start date / End date — overall review period
+Subjects (add one or more), each with:
+Link to an existing subject from the Subjects page → its name is reused (no separate name field)
+Its own start date / end date, which must fall within the overall review schedule’s range
+5.2 — Calendar coloring: review schedule days
+Every day within a review schedule’s range → transparent yellow
+If a day is both a review day and an exam day → stays transparent red (exam color wins over yellow)
+5.3 — “Next Review” section (dashboard) — rotating active subject Positioned above the exam schedule section:
+The subject whose start date is closest to the review schedule’s start date is shown first
+While active, that subject’s date range is highlighted transparent dark green on the calendar (overrides yellow; exam red still wins if overlapping)
+Once the timeline passes that subject’s end date, the section automatically switches to whichever remaining subject has the next-closest start date; its range becomes the new dark-green highlight
+This rotation continues, subject by subject, until the review schedule’s end date is reached
+
+Part 6 — Calendar: Single “Most Important” Schedule Highlight
+6.1 — Calendar: single “most important” schedule highlight Among all active schedules (exam and/or review), determine the most important one via the importance setting. Only that schedule’s days are highlighted on the calendar with its assigned transparent color — other, less-important schedules do not simultaneously display their highlight on the same calendar.
+6.2 — Updated calendar color priority (highest to lowest)
+Individual exam day → red (always takes priority, regardless of importance ranking)
+The single most-important schedule’s days → its assigned transparent color (per 6.1)
+Active “Next Review” subject day → dark green (if not already overridden by a higher rule above)
+General review schedule day → yellow
+No event → no highlight
+
+Part 7 — Navigation Fix: Back Button on Edit Pages
+Within a subject’s specific page:
+Lecture edit page → Back button → goes to the Lectures sub-page (not the lecture’s details sub-page)
+Exam edit page → Back button → goes to the Exams sub-page (not the exam’s details sub-page)
+Fix the back-navigation stack/history so it skips the details sub-page and returns directly to the respective list sub-page.
+
+Part 8 — Calendar Grid, Task Repetition & Card Interaction
+8.1 — Correct day count per month The calendar’s day grid must reflect the actual number of days in each month (28 or 29 for February, 30 or 31 for other months) — not a fixed grid size.
+8.2 — Redesign: Next Exam card(s) Apply full-width layout and a polished visual redesign to the new Next Exams cards (Part 3.3 / 3.4) — clear hierarchy, spacing, and styling consistent with the app’s design language.
+8.3 — Design-quality standard Applies to all new/changed UI in this update: Exam Schedule form, Review Schedule form, Next Review section, Next Exams cards — everything should look intentional, not default/unstyled.
+8.4 — Task repetition: default time If a repeated/list task has no time set, default it to 12:00 AM.
+8.5 — Task repetition: trigger accuracy The repeat action must fire on the specific day(s) chosen, at the task’s set (or defaulted) time.
+8.6 — Task repetition: options (replace existing set with exactly these three)
+Daily — repeats every day
+Weekly — user selects specific day(s) of the week to repeat on
+Monthly — repeats every 30 days
+8.7 — Item card reordering (priority) Cards are reordered via long-press (long click) then drag, within the same section/list:
+Long-press initiates drag mode
+Dragging over another card previews the new position
+Releasing persists the new order (must survive refresh/reload)
+Must work end-to-end — verify before considering done
+
+Part 9 — Final Pass (do last)
+9.1 — Dark/Light mode refinement — whole site Review and refine both dark mode and light mode across the entire website, including every new/changed component from this update (Exam Schedule, Review Schedule, Next Exams cards, Next Review section, swipe actions). Ensure consistent theming, correct contrast, and no unstyled/broken elements in either mode.
+
+Execution Order (recommended)
+Part 1 — bug fixes (keep agenda views, keep schedule button)
+Part 4 — Exam Schedule rebuild (data model foundation)
+Part 5 — Review Schedule + Next Review rotation + calendar coloring
+Part 6 — Single-important-schedule calendar logic
+Part 2 & 3 — Exam card swipe actions, auto-complete, layout reshuffle (Next Exams sections, Tasks section removal — agenda untouched)
+Part 7 — back-button navigation fix
+Part 8 — calendar day-count fix, task repetition rework, long-press drag reorder
+Part 9 — dark/light mode pass (last, since prior steps introduce new UI needing theming)
+Local build check → resolve conflicts → open PR
+

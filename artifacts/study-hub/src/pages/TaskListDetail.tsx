@@ -122,6 +122,7 @@ export function TaskListDetail() {
     repeat: "none",
     subjectId: "",
     link: st.link || "",
+    repeatWeekDays: [],
   });
 
   const onEditSubTask = (data: TaskFormValues) => {

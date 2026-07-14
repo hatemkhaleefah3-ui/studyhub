@@ -19,6 +19,8 @@ export const REPEAT_META: Record<RepeatInterval, string> = {
   none: "No repeat", daily: "Daily", weekly: "Weekly", monthly: "Monthly",
 };
 
+const DAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface TaskFormValues {
@@ -30,11 +32,12 @@ export interface TaskFormValues {
   repeat: RepeatInterval;
   subjectId: string;
   link: string;
+  repeatWeekDays: number[];
 }
 
 export const DEFAULT_TASK: TaskFormValues = {
   text: "", description: "", importance: "", dueDate: "", dueTime: "",
-  repeat: "none", subjectId: "", link: "",
+  repeat: "none", subjectId: "", link: "", repeatWeekDays: [],
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -84,6 +87,7 @@ export function TaskForm({
     defaultValues.link
   );
   const [showAdvanced, setShowAdvanced] = useState(hasAdvancedValues);
+  const [weekDays, setWeekDays] = useState<number[]>(defaultValues.repeatWeekDays ?? []);
 
   const { register, handleSubmit, reset, watch, setValue } = useForm<TaskFormValues>({ defaultValues });
 
@@ -96,13 +100,18 @@ export function TaskForm({
     }
   }, [repeatValue, dueDateValue, setValue]);
 
+  const toggleWeekDay = (day: number) => {
+    setWeekDays((prev) =>
+      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort()
+    );
+  };
+
   const submit = (data: TaskFormValues) => {
-    // Repeated tasks default to 12:00 AM when no time was chosen, so the
-    // repeat occurs at a well-defined time on its scheduled day.
+    // Repeated tasks default to 12:00 AM when no time was chosen
     const finalData: TaskFormValues =
       data.repeat && data.repeat !== "none" && !data.dueTime
-        ? { ...data, dueTime: "00:00" }
-        : data;
+        ? { ...data, dueTime: "00:00", repeatWeekDays: weekDays }
+        : { ...data, repeatWeekDays: weekDays };
     onSubmit(finalData);
     reset();
   };
@@ -214,9 +223,27 @@ export function TaskForm({
                     <select {...register("repeat")} className={fieldCls}>
                       <option value="none">No repeat</option>
                       <option value="daily">Daily — repeats every day</option>
-                      <option value="weekly">Weekly — repeats every 7 days</option>
-                      <option value="monthly">Monthly — repeats same day each month</option>
+                      <option value="weekly">Weekly — pick specific days</option>
+                      <option value="monthly">Monthly — repeats every 30 days</option>
                     </select>
+                    {repeatValue === "weekly" && (
+                      <div className="flex gap-1.5 flex-wrap mt-2">
+                        {DAY_LABELS.map((label, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => toggleWeekDay(idx)}
+                            className={`w-9 h-9 rounded-full text-xs font-bold border transition-all ${
+                              weekDays.includes(idx)
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "bg-secondary/50 text-muted-foreground border-border/50 hover:bg-secondary"
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                     <p className="text-xs text-muted-foreground px-0.5">
                       When you complete a repeating task, the next occurrence is created automatically.
                     </p>

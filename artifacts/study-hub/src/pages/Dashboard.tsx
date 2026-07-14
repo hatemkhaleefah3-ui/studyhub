@@ -1,9 +1,179 @@
 import { useStudyData } from "@/hooks/useStudyData";
+import { type SchedulePlan, type SchedulePlanItem } from "@/hooks/useStudyData";
 import { GlassCard } from "@/components/shared/GlassCard";
 import { MiniCalendar } from "@/components/dashboard/MiniCalendar";
-import { format, isToday, isTomorrow, differenceInDays } from "date-fns";
-import { Flame, Calendar as CalendarIcon, Settings as SettingsIcon } from "lucide-react";
+import { format, differenceInDays, parseISO } from "date-fns";
+import { Flame, Calendar as CalendarIcon, Settings as SettingsIcon, BookOpen } from "lucide-react";
 import { Link } from "wouter";
+import { getActiveReviewSubject } from "@/pages/Schedule";
+
+// ─── Next Review Section ──────────────────────────────────────────────────────
+
+function NextReviewSection({ plans }: { plans: SchedulePlan[] }) {
+  const reviewPlans = plans.filter((p) => p.type === "review");
+  if (reviewPlans.length === 0) return null;
+
+  const now = new Date();
+  const todayStr = format(now, "yyyy-MM-dd");
+  const active = getActiveReviewSubject(plans, now);
+  if (!active) return null;
+
+  // Find the parent plan
+  const parentPlan = reviewPlans.find((p) => p.items.some((i) => i.id === active.id));
+
+  const isCurrentlyActive =
+    active.reviewStartDate &&
+    active.reviewEndDate &&
+    active.reviewStartDate <= todayStr &&
+    active.reviewEndDate >= todayStr;
+
+  const daysUntilStart = active.reviewStartDate
+    ? differenceInDays(parseISO(active.reviewStartDate), now)
+    : null;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between px-1">
+        <h2 className="text-xl font-bold tracking-tight">Next Review</h2>
+        <Link href="/schedule" className="text-sm text-primary hover:text-primary/80 transition-colors font-semibold">
+          View Schedule
+        </Link>
+      </div>
+      <GlassCard className="p-5 border-l-4 border-emerald-600/60 relative overflow-hidden">
+        <div className="absolute inset-0 opacity-[0.03] bg-emerald-500 pointer-events-none" />
+        <div className="relative z-10">
+          {parentPlan && (
+            <p className="text-xs text-muted-foreground font-medium mb-1">{parentPlan.title}</p>
+          )}
+          <p className="font-bold text-foreground text-lg leading-tight">{active.subjectName}</p>
+          {active.reviewStartDate && active.reviewEndDate && (
+            <p className="text-sm text-muted-foreground mt-1">
+              {format(parseISO(active.reviewStartDate), "MMM d")} → {format(parseISO(active.reviewEndDate), "MMM d")}
+            </p>
+          )}
+          <div className="mt-3 flex items-center gap-2">
+            {isCurrentlyActive ? (
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-600 border border-emerald-500/20">
+                Active
+              </span>
+            ) : daysUntilStart !== null && daysUntilStart > 0 ? (
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-secondary text-muted-foreground border border-border/50">
+                Starts in {daysUntilStart} day{daysUntilStart !== 1 ? "s" : ""}
+              </span>
+            ) : null}
+          </div>
+        </div>
+      </GlassCard>
+    </div>
+  );
+}
+
+// ─── Next Exams Section ───────────────────────────────────────────────────────
+
+function NextExamsSection({ plans, subjects }: { plans: SchedulePlan[]; subjects: any[] }) {
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+
+  const upcomingExams = plans
+    .filter((p) => p.type === "exam")
+    .flatMap((p) => p.items.map((item) => ({ ...item, planTitle: p.title })))
+    .filter((item) => item.date && new Date(item.date) >= now && !item.checked)
+    .sort((a, b) => new Date(a.date!).getTime() - new Date(b.date!).getTime())
+    .slice(0, 2);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between px-1">
+        <h2 className="text-xl font-bold tracking-tight">Next Exams</h2>
+        <Link href="/schedule" className="text-sm text-primary hover:text-primary/80 transition-colors font-semibold">
+          View all
+        </Link>
+      </div>
+
+      {upcomingExams.length === 0 ? (
+        <GlassCard className="p-8 text-center flex flex-col items-center justify-center text-muted-foreground border-dashed border-2 bg-transparent">
+          <CalendarIcon className="w-8 h-8 mb-3 opacity-30" />
+          <p className="font-medium">No upcoming exams.</p>
+        </GlassCard>
+      ) : (
+        <div className="space-y-3">
+          {upcomingExams.map((item, idx) => {
+            const subject = subjects.find((s: any) => s.name === item.subjectName || s.id === item.subjectId);
+            const accentColor = subject?.color ?? "hsl(var(--destructive))";
+            const days = differenceInDays(new Date(item.date!), new Date());
+            const isFirst = idx === 0;
+
+            if (isFirst) {
+              // Featured card — red left border accent, "NEXT" badge, larger name
+              return (
+                <GlassCard key={item.id} className="p-5 relative overflow-hidden border-l-4 border-destructive/70">
+                  <div className="absolute inset-0 opacity-[0.02] bg-destructive pointer-events-none" />
+                  <div className="relative z-10 flex items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-destructive/10 text-destructive border border-destructive/20 uppercase tracking-wider">
+                          NEXT
+                        </span>
+                        <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider truncate">
+                          {item.subjectName}
+                        </span>
+                      </div>
+                      <h3 className="font-bold text-foreground text-base leading-tight">{item.planTitle}</h3>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {format(new Date(item.date!), "EEEE, MMM d, yyyy")}
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-center min-w-[56px]">
+                      <p
+                        className="text-2xl font-black leading-none"
+                        style={{ color: days <= 3 ? "hsl(var(--destructive))" : "hsl(var(--primary))" }}
+                      >
+                        {days === 0 ? "Today" : days === 1 ? "1" : String(days)}
+                      </p>
+                      {days > 1 && (
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mt-0.5">
+                          days
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </GlassCard>
+              );
+            }
+
+            // Second card — standard styling
+            return (
+              <GlassCard key={item.id} className="p-5 relative overflow-hidden border-l-4" style={{ borderLeftColor: `${accentColor}60` }}>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1 truncate">
+                      {item.subjectName}
+                    </p>
+                    <h3 className="font-bold text-foreground text-sm leading-tight">{item.planTitle}</h3>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {format(new Date(item.date!), "EEE, MMM d, yyyy")}
+                    </p>
+                  </div>
+                  <div className="shrink-0 text-center min-w-[48px]">
+                    <p className="text-lg font-black text-foreground leading-none">
+                      {days === 0 ? "Today" : String(days)}
+                    </p>
+                    {days > 0 && (
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                        days
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </GlassCard>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
 
 export function Dashboard() {
   const { subjects, schedule, checklist, schedulePlans } = useStudyData();
@@ -11,9 +181,9 @@ export function Dashboard() {
   // Streak logic
   const doneItems = checklist.filter(item => item.done && item.doneAt);
   doneItems.sort((a, b) => new Date(b.doneAt!).getTime() - new Date(a.doneAt!).getTime());
-  
+
   let currentStreak = 0;
-  
+
   const hasCompletedOnDate = (d: Date) => {
     return doneItems.some(item => {
       const itemDate = new Date(item.doneAt!);
@@ -42,20 +212,12 @@ export function Dashboard() {
     }
   }
 
-  // Upcoming Exams — sourced from Exam Schedule plans
-  const _now = new Date(); _now.setHours(0, 0, 0, 0);
-  const upcomingExams = schedulePlans
-    .filter(p => p.type === 'exam')
-    .flatMap(p => p.items.map(item => ({ ...item, planTitle: p.title })))
-    .filter(item => item.date && new Date(item.date) >= _now)
-    .sort((a, b) => new Date(a.date!).getTime() - new Date(b.date!).getTime())
-    .slice(0, 4);
-
   return (
     <div className="space-y-10 pb-12">
+      {/* Greeting header */}
       <div className="flex flex-row items-center md:items-end justify-between gap-3 md:gap-4">
         <div className="min-w-0">
-          <h1 className="text-2xl md:text-4xl font-bold tracking-tight mb-1 md:mb-2">Hello failed student 🤣👋</h1>
+          <h1 className="text-2xl md:text-4xl font-bold tracking-tight mb-1 md:mb-2">👋 Hello failed student 🤣</h1>
           <p className="text-muted-foreground font-medium text-sm md:text-lg truncate">{format(new Date(), "EEEE, MMMM do")}</p>
         </div>
 
@@ -81,103 +243,63 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* Weekly Schedule takes full width */}
+      {/* Next Review (only if review schedules exist) */}
+      <NextReviewSection plans={schedulePlans} />
+
+      {/* Next Exams — 2 cards */}
+      <NextExamsSection plans={schedulePlans} subjects={subjects} />
+
+      {/* Mini Calendar (below exams) */}
       <MiniCalendar schedule={schedule} checklist={checklist} />
 
-      {/* Split lower section: Exams & Progress */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        
-        {/* Exams */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between px-1">
-            <h2 className="text-xl font-bold tracking-tight">Upcoming Exams</h2>
-            <Link href="/subjects" className="text-sm text-primary hover:text-primary/80 transition-colors font-semibold">View all</Link>
-          </div>
-          
-          {upcomingExams.length === 0 ? (
-             <GlassCard className="p-8 text-center flex flex-col items-center justify-center text-muted-foreground border-dashed border-2 bg-transparent">
-               <CalendarIcon className="w-8 h-8 mb-3 opacity-30" />
-               <p className="font-medium">No upcoming exams.</p>
-             </GlassCard>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-4">
-              {upcomingExams.map(item => {
-                const subject = subjects.find(s => s.name === item.subjectName || s.id === item.subjectId);
-                const accentColor = subject?.color ?? '#007aff';
-                const days = differenceInDays(new Date(item.date!), new Date());
-                const isUrgent = days <= 3;
-                const isCritical = days <= 1;
+      {/* Progress rings */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between px-1">
+          <h2 className="text-xl font-bold tracking-tight">Progress</h2>
+        </div>
+
+        {subjects.length === 0 ? (
+          <GlassCard className="p-8 text-center text-muted-foreground border-dashed border-2 bg-transparent">
+            <p className="font-medium">Add subjects to see progress.</p>
+          </GlassCard>
+        ) : (
+          <GlassCard className="p-6 border-border/60">
+            <div className="flex flex-wrap gap-6 justify-center">
+              {subjects.map(subject => {
+                const gradedExams = subject.exams.filter(e => e.grade);
+                let avg = 0;
+                if (gradedExams.length > 0) {
+                  const total = gradedExams.reduce((acc, curr) => acc + (parseFloat(curr.grade!) || 0), 0);
+                  avg = total / gradedExams.length;
+                }
+                const circumference = 2 * Math.PI * 30;
+                const offset = circumference - (avg / 100) * circumference;
+
                 return (
-                  <GlassCard key={item.id} className="p-5 flex flex-col gap-3 relative overflow-hidden group border-border/60 hover:shadow-md transition-shadow">
-                    <div className="absolute top-0 left-0 w-1.5 h-full" style={{ backgroundColor: accentColor }} />
-                    <div className="pl-3">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: accentColor }} />
-                        <p className="text-xs font-bold text-muted-foreground tracking-wide uppercase">{item.subjectName}</p>
-                      </div>
-                      <h3 className="font-bold text-lg leading-tight mt-1">{item.planTitle}</h3>
-                      <div className="mt-4 inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold bg-secondary text-secondary-foreground border border-border/50 uppercase tracking-wide">
-                        {isToday(new Date(item.date!)) ? "Today" : isTomorrow(new Date(item.date!)) ? "Tomorrow" : `In ${days} days`}
-                        {isUrgent && <span className={`ml-2 w-1.5 h-1.5 rounded-full ${isCritical ? 'bg-destructive' : 'bg-orange-500'}`} />}
-                      </div>
+                  <div key={subject.id} className="flex flex-col items-center gap-3 shrink-0">
+                    <div className="relative w-[72px] h-[72px] flex items-center justify-center">
+                      <svg className="w-full h-full transform -rotate-90">
+                        <circle cx="36" cy="36" r="30" stroke="currentColor" strokeWidth="5" fill="transparent" className="text-secondary" />
+                        <circle
+                          cx="36" cy="36" r="30"
+                          stroke={subject.color}
+                          strokeWidth="5"
+                          strokeLinecap="round"
+                          fill="transparent"
+                          strokeDasharray={circumference}
+                          strokeDashoffset={offset}
+                          className="transition-all duration-1000 ease-out drop-shadow-sm"
+                        />
+                      </svg>
+                      <span className="absolute font-bold text-sm">{Math.round(avg)}%</span>
                     </div>
-                  </GlassCard>
+                    <p className="text-[11px] font-bold text-center w-20 truncate text-muted-foreground uppercase tracking-wider">{subject.name}</p>
+                  </div>
                 );
               })}
             </div>
-          )}
-        </div>
-
-        {/* Progress rings */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between px-1">
-            <h2 className="text-xl font-bold tracking-tight">Progress</h2>
-          </div>
-          
-          {subjects.length === 0 ? (
-            <GlassCard className="p-8 text-center text-muted-foreground border-dashed border-2 bg-transparent">
-              <p className="font-medium">Add subjects to see progress.</p>
-            </GlassCard>
-          ) : (
-            <GlassCard className="p-6 border-border/60">
-              <div className="flex flex-wrap gap-6 justify-center">
-                {subjects.map(subject => {
-                  const gradedExams = subject.exams.filter(e => e.grade);
-                  let avg = 0;
-                  if (gradedExams.length > 0) {
-                    const total = gradedExams.reduce((acc, curr) => acc + (parseFloat(curr.grade!) || 0), 0);
-                    avg = total / gradedExams.length;
-                  }
-                  const circumference = 2 * Math.PI * 30;
-                  const offset = circumference - (avg / 100) * circumference;
-
-                  return (
-                    <div key={subject.id} className="flex flex-col items-center gap-3 shrink-0">
-                      <div className="relative w-[72px] h-[72px] flex items-center justify-center">
-                        <svg className="w-full h-full transform -rotate-90">
-                          <circle cx="36" cy="36" r="30" stroke="currentColor" strokeWidth="5" fill="transparent" className="text-secondary" />
-                          <circle 
-                            cx="36" cy="36" r="30" 
-                            stroke={subject.color} 
-                            strokeWidth="5" 
-                            strokeLinecap="round"
-                            fill="transparent" 
-                            strokeDasharray={circumference}
-                            strokeDashoffset={offset}
-                            className="transition-all duration-1000 ease-out drop-shadow-sm"
-                          />
-                        </svg>
-                        <span className="absolute font-bold text-sm">{Math.round(avg)}%</span>
-                      </div>
-                      <p className="text-[11px] font-bold text-center w-20 truncate text-muted-foreground uppercase tracking-wider">{subject.name}</p>
-                    </div>
-                  );
-                })}
-              </div>
-            </GlassCard>
-          )}
-        </div>
-
+          </GlassCard>
+        )}
       </div>
     </div>
   );

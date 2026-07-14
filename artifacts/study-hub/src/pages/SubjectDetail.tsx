@@ -10,7 +10,7 @@ import {
   Plus, Trash2, ArrowLeft, ExternalLink, BookOpen, FileText, Pencil,
   FolderOpen, BarChart2, Link2, Paperclip, Info, Layers, Brain, ChevronRight, CheckSquare,
 } from "lucide-react";
-import { Link, useRoute, useLocation } from "wouter";
+import { Link, useRoute, useLocation, useSearch } from "wouter";
 import { useForm } from "react-hook-form";
 import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
@@ -33,8 +33,10 @@ export function SubjectDetail() {
   } = useStudyData();
 
   const subject = subjects.find(s => s.id === params?.id);
+  const search = useSearch();
+  const initialTab = (new URLSearchParams(search).get('tab') ?? 'details') as Tab;
 
-  const [activeTab, setActiveTab] = useState<Tab>("details");
+  const [activeTab, setActiveTab] = useState<Tab>(initialTab);
   const [lectureTypeTab, setLectureTypeTab] = useState<StudyType>("theoretical");
   const [examTypeTab, setExamTypeTab] = useState<StudyType>("theoretical");
 

@@ -122,11 +122,13 @@ export interface ChecklistItem {
   dueDate?: string | null;
   dueTime?: string | null;
   repeat?: RepeatInterval | null;
+  repeatWeekDays?: number[];
   link?: string | null;
   linkedScheduleId: string | null;
   doneAt?: string;
   isTaskList?: boolean;
   subTasks?: SubTask[];
+  sortOrder?: number;
 }
 
 export interface Settings {
@@ -141,7 +143,7 @@ export const DEFAULT_SUBJECT_EMOJIS = [
   '🔢','🧠','💡','🏆','🌟','⚗️','🎓','🔩','🌊','🎸',
 ];
 
-export type ScheduleType = 'exam' | 'study';
+export type ScheduleType = 'exam' | 'study' | 'review';
 export type RepeatPatternPlan = 'daily' | 'weekly' | 'monthly';
 
 export interface SchedulePlanItem {
@@ -151,11 +153,15 @@ export interface SchedulePlanItem {
   /** Exam-type fields */
   date?: string;       // yyyy-MM-dd
   time?: string;       // HH:mm
+  checked?: boolean;
   /** Study-type fields */
   startTime?: string;  // HH:mm
   endTime?: string;    // HH:mm
   repeatPattern?: RepeatPatternPlan;
   weekDays?: number[]; // 0=Sun … 6=Sat
+  /** Review-type fields */
+  reviewStartDate?: string;
+  reviewEndDate?: string;
 }
 
 export interface SchedulePlan {
@@ -166,12 +172,10 @@ export interface SchedulePlan {
   endDate: string;   // yyyy-MM-dd
   items: SchedulePlanItem[];
   createdAt: string;
+  importance?: number; // 1 = most important
 }
 
 // ── Backfill helper ────────────────────────────────────────────────────────────
-// Records created before the Theoretical/Practical split have no `type` field.
-// Silently default them to "theoretical" on load rather than forcing
-// reclassification (see study-hub feature spec, section 1.8).
 function normalizeSubject(s: Subject): Subject {
   return {
     ...s,
@@ -187,20 +191,31 @@ export interface ScoreBand {
 }
 
 export function getScoreBand(percentage: number): ScoreBand {
-  if (percentage >= 100) return { label: 'Excellent', color: '#a855f7' }; // purple
-  if (percentage >= 90) return { label: 'Very Good', color: '#22c55e' }; // green
-  if (percentage >= 80) return { label: 'Good', color: '#3b82f6' }; // blue
-  if (percentage >= 70) return { label: 'Okay', color: '#f97316' }; // orange
-  return { label: 'Bad', color: '#eab308' }; // yellow
+  if (percentage >= 100) return { label: 'Excellent', color: '#a855f7' };
+  if (percentage >= 90) return { label: 'Very Good', color: '#22c55e' };
+  if (percentage >= 80) return { label: 'Good', color: '#3b82f6' };
+  if (percentage >= 70) return { label: 'Okay', color: '#f97316' };
+  return { label: 'Bad', color: '#eab308' };
 }
 
 // ── Repeat date helper ────────────────────────────────────────────────────────
-function getNextDueDate(currentDate: string, repeat: RepeatInterval): string {
+function getNextDueDate(currentDate: string, repeat: RepeatInterval, repeatWeekDays?: number[]): string {
   const date = parseISO(currentDate);
+  if (repeat === 'weekly' && repeatWeekDays && repeatWeekDays.length > 0) {
+    // Find next date (day after currentDate) that falls on one of repeatWeekDays
+    let next = addDays(date, 1);
+    for (let i = 0; i < 7; i++) {
+      if (repeatWeekDays.includes(next.getDay())) {
+        return format(next, 'yyyy-MM-dd');
+      }
+      next = addDays(next, 1);
+    }
+    return format(addDays(date, 7), 'yyyy-MM-dd');
+  }
   const next =
     repeat === 'daily'   ? addDays(date, 1)   :
     repeat === 'weekly'  ? addWeeks(date, 1)  :
-    /* monthly */          addMonths(date, 1);
+    /* monthly */          addDays(date, 30);
   return format(next, 'yyyy-MM-dd');
 }
 
@@ -244,6 +259,7 @@ interface StudyDataContextType {
   deleteChecklistItem: (id: string) => void;
   skipChecklistItem: (id: string) => void;
   setCascadeChecklistStatus: (id: string, done: boolean, didNotDo: boolean) => void;
+  reorderChecklistItems: (orderedIds: string[]) => void;
 
   addSubTask: (itemId: string, subTask: Omit<SubTask, 'id'>) => void;
   updateSubTask: (itemId: string, subTaskId: string, data: Partial<SubTask>) => void;
@@ -362,10 +378,6 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
   }, [settings.accentColor]);
 
   // ─── Repeat rollover ─────────────────────────────────────────────────────────
-  // Repeated tasks/lists do NOT spawn a new occurrence the moment they're
-  // checked or skipped. They stay marked done/didNotDo — visibly completed —
-  // until the actual next occurrence's date + time is reached, at which point
-  // this same item resets in place (dueDate advances, done/didNotDo clears).
   const rolloverRepeats = useCallback(() => {
     setChecklist((prev) => {
       const now = new Date();
@@ -376,7 +388,7 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
         if (!item.done && !item.didNotDo) return item;
         if (!item.dueDate) return item;
 
-        const nextDueDate = getNextDueDate(item.dueDate, item.repeat);
+        const nextDueDate = getNextDueDate(item.dueDate, item.repeat, item.repeatWeekDays);
         const nextDueAt   = parseISO(`${nextDueDate}T${item.dueTime || '00:00'}`);
         if (now < nextDueAt) return item;
 
@@ -409,6 +421,42 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
     const id = setInterval(rolloverRepeats, 60_000);
     return () => clearInterval(id);
   }, [isLoaded, rolloverRepeats]);
+
+  // ─── Auto-check passed exams ─────────────────────────────────────────────────
+  const checkPassedExams = useCallback(() => {
+    const now = new Date();
+    setSchedulePlans((prev) => {
+      let changed = false;
+      const next = prev.map((plan) => {
+        if (plan.type !== 'exam') return plan;
+        let planChanged = false;
+        const newItems = plan.items.map((item) => {
+          if (item.checked) return item;
+          if (!item.date) return item;
+          const examTime = item.time || '09:00';
+          const examAt = parseISO(`${item.date}T${examTime}`);
+          if (now >= examAt) {
+            planChanged = true;
+            return { ...item, checked: true };
+          }
+          return item;
+        });
+        if (!planChanged) return plan;
+        changed = true;
+        const updatedPlan = { ...plan, items: newItems };
+        api.updateSchedulePlan(plan.id, updatedPlan).catch(console.error);
+        return updatedPlan;
+      });
+      return changed ? next : prev;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    checkPassedExams();
+    const id = setInterval(checkPassedExams, 60_000);
+    return () => clearInterval(id);
+  }, [isLoaded, checkPassedExams]);
 
   // ─── Subjects ──────────────────────────────────────────────────────────────
   const addSubject = useCallback((s: Omit<Subject, 'id' | 'lectures' | 'exams' | 'wallpaper' | 'attachments'>) => {
@@ -518,10 +566,6 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
     api.deleteExam(subjectId, id).catch(console.error);
   }, []);
 
-  // Score an exam attempt, apply the result to the exam's `grade`/`lastScore`
-  // (same field the Progress page reads), and — if >=70% — check the exam
-  // and cascade-check every lecture linked to it. Returns the computed score
-  // synchronously so the exam-taking UI can show the result immediately.
   const submitExamAttempt = useCallback((subjectId: string, examId: string, answers: number[]): ExamScore => {
     let score: ExamScore = { correct: 0, total: 0, percentage: 0, takenAt: new Date().toISOString() };
 
@@ -627,8 +671,6 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  // Store only the most recent Flashcards Reader percentage per lecture —
-  // informational only, never written to exam/checklist records (spec 1.3).
   const recordReaderSession = useCallback((subjectId: string, lectureId: string, percentage: number) => {
     setSubjects((prev) =>
       prev.map((s) =>
@@ -692,7 +734,6 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
       const updated: ChecklistItem = { ...item, done, doneAt: done ? new Date().toISOString() : undefined };
       api.updateChecklistItem(id, { done, doneAt: updated.doneAt }).catch(console.error);
 
-      // Sync linked schedule event
       if (item.linkedScheduleId) {
         setSchedule((prevSched) =>
           prevSched.map((ev) => ev.id === item.linkedScheduleId ? { ...ev, done } : ev)
@@ -710,55 +751,51 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
     api.deleteChecklistItem(id).catch(console.error);
   }, []);
 
-  // Mark as skipped-for-the-day (didNotDo). Repeated tasks stay in place —
-  // marked skipped — until rolloverRepeats() resets them once the next
-  // occurrence's date/time actually arrives. Non-repeated tasks are fully
-  // deleted from both schedule and checklist.
   const skipChecklistItem = useCallback((id: string) => {
     setChecklist((prev) => {
-      const item = prev.find(i => i.id === id);
+      const item = prev.find((i) => i.id === id);
       if (!item) return prev;
-
-      // Non-repeated: full delete
-      if (!item.repeat || item.repeat === 'none') {
-        api.deleteChecklistItem(id).catch(console.error);
-        return prev.filter(i => i.id !== id);
+      if (item.repeat && item.repeat !== 'none') {
+        const updated: ChecklistItem = { ...item, didNotDo: true, doneAt: new Date().toISOString() };
+        api.updateChecklistItem(id, { didNotDo: true, doneAt: updated.doneAt }).catch(console.error);
+        return prev.map((i) => (i.id === id ? updated : i));
       }
-
-      // Repeated: mark didNotDo in place; rolloverRepeats() will reset it later.
-      const updated = { ...item, done: false, didNotDo: true, doneAt: undefined };
-      api.updateChecklistItem(id, { done: false, didNotDo: true, doneAt: undefined }).catch(console.error);
-
-      return prev.map(i => i.id === id ? updated : i);
+      api.deleteChecklistItem(id).catch(console.error);
+      return prev.filter((i) => i.id !== id);
     });
   }, []);
 
-  // Set a checklist item's done/didNotDo status and cascade the same status to
-  // all sub-tasks (for task lists). Repeated items are reset in place later by
-  // rolloverRepeats() once the next occurrence's date/time actually arrives.
   const setCascadeChecklistStatus = useCallback((id: string, done: boolean, didNotDo: boolean) => {
     setChecklist((prev) => {
-      const item = prev.find(i => i.id === id);
+      const item = prev.find((i) => i.id === id);
       if (!item) return prev;
-
-      const doneAt = done ? new Date().toISOString() : undefined;
-
-      const newSubTasks = item.subTasks?.map(st => ({
-        ...st,
-        done,
-        didNotDo,
-        doneAt: done ? new Date().toISOString() : undefined,
-      }));
-
-      const updated = { ...item, done, didNotDo, doneAt, subTasks: newSubTasks ?? item.subTasks };
+      const doneAt = (done || didNotDo) ? new Date().toISOString() : undefined;
+      const resetSubTasks = item.subTasks?.map((st) => ({ ...st, done, didNotDo, doneAt }));
+      const updated: ChecklistItem = { ...item, done, didNotDo, doneAt, subTasks: resetSubTasks ?? item.subTasks };
       api.updateChecklistItem(id, { done, didNotDo, doneAt, subTasks: updated.subTasks }).catch(console.error);
+      return prev.map((i) => (i.id === id ? updated : i));
+    });
+  }, []);
 
-      return prev.map(i => i.id === id ? updated : i);
+  const reorderChecklistItems = useCallback((orderedIds: string[]) => {
+    setChecklist((prev) => {
+      const next = prev.map((item) => {
+        const idx = orderedIds.indexOf(item.id);
+        if (idx === -1) return item;
+        return { ...item, sortOrder: idx };
+      });
+      // Persist each changed item
+      next.forEach((item) => {
+        const old = prev.find((i) => i.id === item.id);
+        if (old && old.sortOrder !== item.sortOrder) {
+          api.updateChecklistItem(item.id, { sortOrder: item.sortOrder }).catch(console.error);
+        }
+      });
+      return next;
     });
   }, []);
 
   // ─── SubTasks ──────────────────────────────────────────────────────────────
-
   const addSubTask = useCallback((itemId: string, subTask: Omit<SubTask, 'id'>) => {
     const newSubTask: SubTask = { ...subTask, id: crypto.randomUUID() };
     setChecklist((prev) => {
@@ -767,10 +804,8 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
           ? { ...item, subTasks: [...(item.subTasks || []), newSubTask] }
           : item
       );
-      const updatedItem = updated.find((item) => item.id === itemId);
-      if (updatedItem) {
-        api.updateChecklistItem(itemId, { subTasks: updatedItem.subTasks }).catch(console.error);
-      }
+      const found = updated.find((i) => i.id === itemId);
+      if (found) api.updateChecklistItem(itemId, { subTasks: found.subTasks }).catch(console.error);
       return updated;
     });
   }, []);
@@ -782,45 +817,25 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
           ? { ...item, subTasks: (item.subTasks || []).map((st) => st.id === subTaskId ? { ...st, ...data } : st) }
           : item
       );
-      const updatedItem = updated.find((item) => item.id === itemId);
-      if (updatedItem) {
-        api.updateChecklistItem(itemId, { subTasks: updatedItem.subTasks }).catch(console.error);
-      }
+      const found = updated.find((i) => i.id === itemId);
+      if (found) api.updateChecklistItem(itemId, { subTasks: found.subTasks }).catch(console.error);
       return updated;
     });
   }, []);
 
   const toggleSubTask = useCallback((itemId: string, subTaskId: string) => {
-    setChecklist((prev) =>
-      prev.map((item) => {
+    setChecklist((prev) => {
+      const updated = prev.map((item) => {
         if (item.id !== itemId) return item;
-
-        // 3-state cycle per sub-task: undone → done → didNotDo → undone
-        const newSubTasks = (item.subTasks || []).map((st) => {
-          if (st.id !== subTaskId) return st;
-          if (!st.done && !st.didNotDo) return { ...st, done: true,  didNotDo: false, doneAt: new Date().toISOString() };
-          if (st.done)                  return { ...st, done: false, didNotDo: true,  doneAt: undefined };
-          return                               { ...st, done: false, didNotDo: false, doneAt: undefined };
-        });
-
-        // Parent status: when every sub-task is resolved, majority wins
-        const checked      = newSubTasks.filter(st => st.done).length;
-        const skipped      = newSubTasks.filter(st => st.didNotDo).length;
-        const allResolved  = newSubTasks.length > 0 && (checked + skipped === newSubTasks.length);
-
-        // Tie goes to "done"
-        const parentDone      = allResolved && checked >= skipped;
-        const parentDidNotDo  = allResolved && skipped > checked;
-
-        api.updateChecklistItem(itemId, {
-          subTasks: newSubTasks,
-          done: parentDone,
-          didNotDo: parentDidNotDo,
-        }).catch(console.error);
-
-        return { ...item, subTasks: newSubTasks, done: parentDone, didNotDo: parentDidNotDo };
-      })
-    );
+        const subTasks = (item.subTasks || []).map((st) =>
+          st.id === subTaskId ? { ...st, done: !st.done, doneAt: !st.done ? new Date().toISOString() : undefined } : st
+        );
+        return { ...item, subTasks };
+      });
+      const found = updated.find((i) => i.id === itemId);
+      if (found) api.updateChecklistItem(itemId, { subTasks: found.subTasks }).catch(console.error);
+      return updated;
+    });
   }, []);
 
   const deleteSubTask = useCallback((itemId: string, subTaskId: string) => {
@@ -830,10 +845,8 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
           ? { ...item, subTasks: (item.subTasks || []).filter((st) => st.id !== subTaskId) }
           : item
       );
-      const updatedItem = updated.find((item) => item.id === itemId);
-      if (updatedItem) {
-        api.updateChecklistItem(itemId, { subTasks: updatedItem.subTasks }).catch(console.error);
-      }
+      const found = updated.find((i) => i.id === itemId);
+      if (found) api.updateChecklistItem(itemId, { subTasks: found.subTasks }).catch(console.error);
       return updated;
     });
   }, []);
@@ -841,9 +854,9 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
   // ─── Settings ──────────────────────────────────────────────────────────────
   const updateSettings = useCallback((s: Partial<Settings>) => {
     setSettings((prev) => {
-      const next = { ...prev, ...s };
-      api.updateSettings(next).catch(console.error);
-      return next;
+      const updated = { ...prev, ...s };
+      api.updateSettings(updated).catch(console.error);
+      return updated;
     });
   }, []);
 
@@ -855,9 +868,21 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
     api.resetData().catch(console.error);
   }, []);
 
+  const importData = useCallback((data: any) => {
+    if (data.subjects)  setSubjects((data.subjects || []).map(normalizeSubject));
+    if (data.schedule)  setSchedule(data.schedule || []);
+    if (data.checklist) setChecklist(data.checklist || []);
+    if (data.settings)  setSettings(data.settings);
+    api.importData(data).catch(console.error);
+  }, []);
+
   // ─── Schedule Plans ────────────────────────────────────────────────────────
   const addSchedulePlan = useCallback((plan: Omit<SchedulePlan, 'id' | 'createdAt'>) => {
-    const newPlan: SchedulePlan = { ...plan, id: crypto.randomUUID(), createdAt: new Date().toISOString() };
+    const newPlan: SchedulePlan = {
+      ...plan,
+      id: crypto.randomUUID(),
+      createdAt: new Date().toISOString(),
+    };
     setSchedulePlans((prev) => [...prev, newPlan]);
     api.createSchedulePlan(newPlan).catch(console.error);
   }, []);
@@ -872,14 +897,6 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
     api.deleteSchedulePlan(id).catch(console.error);
   }, []);
 
-  const importData = useCallback((data: any) => {
-    if (data.subjects)  setSubjects(data.subjects.map(normalizeSubject));
-    if (data.schedule)  setSchedule(data.schedule);
-    if (data.checklist) setChecklist(data.checklist);
-    if (data.settings)  setSettings(data.settings);
-    api.importData(data).catch(console.error);
-  }, []);
-
   return (
     <StudyDataContext.Provider
       value={{
@@ -890,28 +907,21 @@ export function StudyDataProvider({ children }: { children: ReactNode }) {
         addExam, updateExam, deleteExam, submitExamAttempt,
         addFlashcard, updateFlashcard, deleteFlashcard, recordReaderSession,
         addScheduleEvent, updateScheduleEvent, deleteScheduleEvent,
-        addChecklistItem, updateChecklistItem, toggleChecklistItem, deleteChecklistItem,
-        skipChecklistItem, setCascadeChecklistStatus,
+        addChecklistItem, updateChecklistItem, toggleChecklistItem,
+        deleteChecklistItem, skipChecklistItem, setCascadeChecklistStatus, reorderChecklistItems,
         addSubTask, updateSubTask, toggleSubTask, deleteSubTask,
         updateSettings, resetData, importData,
-        archive, isArchiveLoaded, refreshArchive, restoreArchiveItem, permanentlyDeleteArchiveItem,
         schedulePlans, addSchedulePlan, updateSchedulePlan, deleteSchedulePlan,
+        archive, isArchiveLoaded, refreshArchive, restoreArchiveItem, permanentlyDeleteArchiveItem,
       }}
     >
-      {isLoaded ? children : (
-        <div className="min-h-screen flex items-center justify-center bg-background">
-          <div className="flex flex-col items-center gap-4 text-muted-foreground">
-            <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-            <p className="text-sm font-medium">Loading your data…</p>
-          </div>
-        </div>
-      )}
+      {children}
     </StudyDataContext.Provider>
   );
 }
 
 export function useStudyData() {
-  const context = useContext(StudyDataContext);
-  if (!context) throw new Error('useStudyData must be used within a StudyDataProvider');
-  return context;
+  const ctx = useContext(StudyDataContext);
+  if (!ctx) throw new Error('useStudyData must be used inside StudyDataProvider');
+  return ctx;
 }

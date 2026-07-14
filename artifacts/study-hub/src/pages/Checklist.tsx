@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useStudyData } from "@/hooks/useStudyData";
-import { type ImportanceLevel, type RepeatInterval } from "@/hooks/useStudyData";
+import { type ImportanceLevel, type RepeatInterval, type ChecklistItem } from "@/hooks/useStudyData";
 import { GlassCard } from "@/components/shared/GlassCard";
 import { BottomSheet } from "@/components/shared/BottomSheet";
 import { FabPortal } from "@/components/shared/FabPortal";
@@ -18,6 +18,21 @@ import {
 import { LinkChip } from "@/components/shared/LinkChip";
 import { motion, AnimatePresence } from "framer-motion";
 import { format, isToday, isPast, parseISO } from "date-fns";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 // ── Filter types ──────────────────────────────────────────────────────────────
 
@@ -86,13 +101,45 @@ function getCycleAction(done: boolean, didNotDo?: boolean): SwipeAction {
   };
 }
 
+// ── Sortable Item Wrapper ─────────────────────────────────────────────────────
+
+function SortableItem({
+  id,
+  children,
+}: {
+  id: string;
+  children: React.ReactNode;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.8 : 1,
+    scale: isDragging ? "1.02" : undefined,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      {children}
+    </div>
+  );
+}
+
 // ── Main Checklist component ──────────────────────────────────────────────────
 
 export function Checklist() {
   const {
     checklist, subjects,
     toggleChecklistItem, deleteChecklistItem, addChecklistItem, updateChecklistItem,
-    setCascadeChecklistStatus,
+    setCascadeChecklistStatus, reorderChecklistItems,
   } = useStudyData();
   const [, navigate] = useLocation();
 
@@ -106,6 +153,16 @@ export function Checklist() {
   // Filters
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const filterCount = activeFilterCount(filters);
+
+  // DnD sensors — long press (400ms)
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        delay: 400,
+        tolerance: 5,
+      },
+    })
+  );
 
   // ── Data handlers ──────────────────────────────────────────────────────────
 
@@ -122,6 +179,7 @@ export function Checklist() {
         : null),
       dueTime: data.dueTime || null,
       repeat: (data.repeat !== "none" ? data.repeat : null) as RepeatInterval | null,
+      repeatWeekDays: data.repeatWeekDays?.length ? data.repeatWeekDays : undefined,
       link: data.link || null,
       linkedScheduleId: null,
       isTaskList: false,
@@ -142,6 +200,7 @@ export function Checklist() {
         : null),
       dueTime: data.dueTime || null,
       repeat: (data.repeat !== "none" ? data.repeat : null) as RepeatInterval | null,
+      repeatWeekDays: data.repeatWeekDays?.length ? data.repeatWeekDays : undefined,
       link: data.link || null,
       linkedScheduleId: null,
       isTaskList: true,
@@ -164,6 +223,7 @@ export function Checklist() {
       repeat: item.repeat || "none",
       subjectId: item.subjectId || "",
       link: item.link || "",
+      repeatWeekDays: item.repeatWeekDays || [],
     };
   };
 
@@ -179,22 +239,21 @@ export function Checklist() {
         : null),
       dueTime: data.dueTime || null,
       repeat: (data.repeat !== "none" ? data.repeat : null) as RepeatInterval | null,
+      repeatWeekDays: data.repeatWeekDays?.length ? data.repeatWeekDays : undefined,
       link: data.link || null,
     });
     setEditingItemId(null);
   };
 
-  // Cycles: undone → done → didNotDo → undone
-  // For task lists, cascades the new status to every sub-task.
   const cycleStatus = (id: string) => {
     const item = checklist.find(c => c.id === id);
     if (!item) return;
     if (!item.done && !item.didNotDo) {
-      setCascadeChecklistStatus(id, true, false);   // → done
+      setCascadeChecklistStatus(id, true, false);
     } else if (item.done) {
-      setCascadeChecklistStatus(id, false, true);   // → skipped
+      setCascadeChecklistStatus(id, false, true);
     } else {
-      setCascadeChecklistStatus(id, false, false);  // → undone
+      setCascadeChecklistStatus(id, false, false);
     }
   };
 
@@ -220,15 +279,38 @@ export function Checklist() {
     });
   }, [checklist, filters]);
 
-  // ── Flat sorted list ────────────────────────────────────────────────────────
+  // ── Sorted list (by sortOrder, then by done status) ────────────────────────
 
-  const sortedItems = [...filteredChecklist].sort(
-    (a, b) => Number(a.done || a.didNotDo) - Number(b.done || b.didNotDo)
-  );
+  const sortedItems = useMemo(() => {
+    return [...filteredChecklist].sort((a, b) => {
+      // Done/skipped items go last
+      const aDone = Number(a.done || a.didNotDo);
+      const bDone = Number(b.done || b.didNotDo);
+      if (aDone !== bDone) return aDone - bDone;
+      // Among same status, sort by sortOrder
+      const aOrder = a.sortOrder ?? Infinity;
+      const bOrder = b.sortOrder ?? Infinity;
+      return aOrder - bOrder;
+    });
+  }, [filteredChecklist]);
+
+  // ── DnD handler ────────────────────────────────────────────────────────────
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = sortedItems.findIndex(i => i.id === active.id);
+    const newIndex = sortedItems.findIndex(i => i.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = arrayMove(sortedItems, oldIndex, newIndex);
+    reorderChecklistItems(reordered.map(i => i.id));
+  };
 
   // ── Due date badge ─────────────────────────────────────────────────────────
 
-  const dueBadge = (item: typeof checklist[number]) => {
+  const dueBadge = (item: ChecklistItem) => {
     if (!item.dueDate) return null;
     try {
       const date    = parseISO(item.dueDate);
@@ -246,8 +328,6 @@ export function Checklist() {
       );
     } catch { return null; }
   };
-
-  // ── Editing item lookup ────────────────────────────────────────────────────
 
   const editingItem = editingItemId ? checklist.find(c => c.id === editingItemId) : null;
 
@@ -298,121 +378,130 @@ export function Checklist() {
           )}
         </GlassCard>
       ) : (
-        <div className="space-y-2">
-          <AnimatePresence initial={false}>
-            {sortedItems.map(item => {
-                      const subTasks = item.subTasks || [];
-                      const imp      = item.importance ? IMPORTANCE_META[item.importance] : null;
-                      const isListTask = item.isTaskList;
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={sortedItems.map(i => i.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <div className="space-y-2">
+              <AnimatePresence initial={false}>
+                {sortedItems.map(item => {
+                  const subTasks = item.subTasks || [];
+                  const imp      = item.importance ? IMPORTANCE_META[item.importance] : null;
+                  const isListTask = item.isTaskList;
 
-                      return (
-                        <motion.div
-                          key={item.id}
-                          layout
-                          initial={{ opacity: 0, y: 8 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, scale: 0.95 }}
-                          transition={{ type: "spring", stiffness: 300, damping: 28 }}
+                  return (
+                    <SortableItem key={item.id} id={item.id}>
+                      <motion.div
+                        layout
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        transition={{ type: "spring", stiffness: 300, damping: 28 }}
+                      >
+                        <SwipeableRow
+                          onEdit={() => deleteChecklistItem(item.id)}
+                          onDelete={() => cycleStatus(item.id)}
+                          editAction={DELETE_ACTION}
+                          deleteAction={getCycleAction(item.done, item.didNotDo)}
                         >
-                          <SwipeableRow
-                            onEdit={() => deleteChecklistItem(item.id)}
-                            onDelete={() => cycleStatus(item.id)}
-                            editAction={DELETE_ACTION}
-                            deleteAction={getCycleAction(item.done, item.didNotDo)}
-                          >
-                            <GlassCard className={`transition-opacity duration-300 ${
-                              (item.done || item.didNotDo) ? "opacity-50" : "opacity-100"
-                            }`}>
-                              <div className="p-4 flex items-start gap-3">
+                          <GlassCard className={`transition-opacity duration-300 ${
+                            (item.done || item.didNotDo) ? "opacity-50" : "opacity-100"
+                          }`}>
+                            <div className="p-4 flex items-start gap-3">
 
-                                {/* Clickable content area */}
-                                <div
-                                  className="flex-1 min-w-0 py-0.5 cursor-pointer select-none"
-                                  onClick={() => isListTask
-                                    ? navigate(`/checklist/${item.id}`)
-                                    : openEdit(item.id)
-                                  }
-                                >
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <span className={`text-base font-medium truncate transition-all ${
-                                      item.done     ? "line-through text-muted-foreground" :
-                                      item.didNotDo ? "line-through text-muted-foreground/60" : ""
-                                    }`}>
-                                      {item.text}
+                              {/* Clickable content area */}
+                              <div
+                                className="flex-1 min-w-0 py-0.5 cursor-pointer select-none"
+                                onClick={() => isListTask
+                                  ? navigate(`/checklist/${item.id}`)
+                                  : openEdit(item.id)
+                                }
+                              >
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className={`text-base font-medium truncate transition-all ${
+                                    item.done     ? "line-through text-muted-foreground" :
+                                    item.didNotDo ? "line-through text-muted-foreground/60" : ""
+                                  }`}>
+                                    {item.text}
+                                  </span>
+
+                                  {isListTask && (
+                                    <span className="text-xs text-muted-foreground bg-secondary px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1">
+                                      <ListChecks className="w-3 h-3" />
+                                      {subTasks.filter(st => st.done).length + subTasks.filter(st => st.didNotDo).length}/{subTasks.length}
                                     </span>
-
-                                    {/* List task progress badge */}
-                                    {isListTask && (
-                                      <span className="text-xs text-muted-foreground bg-secondary px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1">
-                                        <ListChecks className="w-3 h-3" />
-                                        {subTasks.filter(st => st.done).length + subTasks.filter(st => st.didNotDo).length}/{subTasks.length}
-                                      </span>
-                                    )}
-
-                                    {item.didNotDo && (
-                                      <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full shrink-0">
-                                        Skipped
-                                      </span>
-                                    )}
-                                  </div>
-
-                                  {item.description && (
-                                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{item.description}</p>
                                   )}
 
-                                  {/* Badges */}
-                                  {(imp || item.dueDate || item.repeat || item.link) && (
-                                    <div className="flex items-center flex-wrap gap-1.5 mt-1.5">
-                                      {imp && (
-                                        <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium bg-muted ${imp.color}`}>
-                                          <span className={`w-1.5 h-1.5 rounded-full ${imp.dot}`} />
-                                          {imp.label}
-                                        </span>
-                                      )}
-                                      {dueBadge(item)}
-                                      {item.repeat && item.repeat !== "none" && (
-                                        <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-                                          <Repeat className="w-3 h-3" />
-                                          {REPEAT_META[item.repeat]}
-                                        </span>
-                                      )}
-                                      {item.link && <LinkChip href={item.link} />}
-                                    </div>
+                                  {item.didNotDo && (
+                                    <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full shrink-0">
+                                      Skipped
+                                    </span>
                                   )}
                                 </div>
 
-                                {/* Right side: chevron for lists, status button for tasks */}
-                                {isListTask ? (
-                                  <button
-                                    onClick={() => navigate(`/checklist/${item.id}`)}
-                                    className="shrink-0 mt-0.5 p-1 text-muted-foreground hover:text-foreground transition-colors"
-                                  >
-                                    <ChevronRight className="w-5 h-5" />
-                                  </button>
-                                ) : (
-                                  <button
-                                    onClick={() => cycleStatus(item.id)}
-                                    className="shrink-0 mt-0.5 p-1 hover:scale-110 transition-transform focus:outline-none"
-                                  >
-                                    <motion.div whileTap={{ scale: 0.75 }}>
-                                      {item.done ? (
-                                        <CheckCircle2 className="w-6 h-6 text-primary" />
-                                      ) : item.didNotDo ? (
-                                        <XCircle className="w-6 h-6 text-muted-foreground" />
-                                      ) : (
-                                        <Circle className="w-6 h-6 text-muted-foreground hover:text-primary transition-colors" />
-                                      )}
-                                    </motion.div>
-                                  </button>
+                                {item.description && (
+                                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{item.description}</p>
+                                )}
+
+                                {(imp || item.dueDate || item.repeat || item.link) && (
+                                  <div className="flex items-center flex-wrap gap-1.5 mt-1.5">
+                                    {imp && (
+                                      <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium bg-muted ${imp.color}`}>
+                                        <span className={`w-1.5 h-1.5 rounded-full ${imp.dot}`} />
+                                        {imp.label}
+                                      </span>
+                                    )}
+                                    {dueBadge(item)}
+                                    {item.repeat && item.repeat !== "none" && (
+                                      <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                                        <Repeat className="w-3 h-3" />
+                                        {REPEAT_META[item.repeat]}
+                                      </span>
+                                    )}
+                                    {item.link && <LinkChip href={item.link} />}
+                                  </div>
                                 )}
                               </div>
-                            </GlassCard>
-                          </SwipeableRow>
-                        </motion.div>
-                      );
-            })}
-          </AnimatePresence>
-        </div>
+
+                              {isListTask ? (
+                                <button
+                                  onClick={() => navigate(`/checklist/${item.id}`)}
+                                  className="shrink-0 mt-0.5 p-1 text-muted-foreground hover:text-foreground transition-colors"
+                                >
+                                  <ChevronRight className="w-5 h-5" />
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => cycleStatus(item.id)}
+                                  className="shrink-0 mt-0.5 p-1 hover:scale-110 transition-transform focus:outline-none"
+                                >
+                                  <motion.div whileTap={{ scale: 0.75 }}>
+                                    {item.done ? (
+                                      <CheckCircle2 className="w-6 h-6 text-primary" />
+                                    ) : item.didNotDo ? (
+                                      <XCircle className="w-6 h-6 text-muted-foreground" />
+                                    ) : (
+                                      <Circle className="w-6 h-6 text-muted-foreground hover:text-primary transition-colors" />
+                                    )}
+                                  </motion.div>
+                                </button>
+                              )}
+                            </div>
+                          </GlassCard>
+                        </SwipeableRow>
+                      </motion.div>
+                    </SortableItem>
+                  );
+                })}
+              </AnimatePresence>
+            </div>
+          </SortableContext>
+        </DndContext>
       )}
 
       {/* ── FAB + action menu ───────────────────────────────────────────────── */}
@@ -491,8 +580,6 @@ export function Checklist() {
       )}
 
       {/* ── Edit Task / Edit Task List ────────────────────────────────────────── */}
-      {/* Task lists share the same form as single tasks now, so they can be
-          given a due date/time and repeat interval just like regular tasks. */}
       {editingItemId && editingItem && (
         <TaskForm
           title={editingItem.isTaskList ? "Edit Task List" : "Edit Task"}

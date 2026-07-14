@@ -92,7 +92,7 @@ export function ExamEdit() {
     <div className="space-y-6 pb-20">
       <div className="flex items-center gap-3">
         <Link
-          href={`/subjects/${subject.id}`}
+          href={`/subjects/${subject.id}?tab=exams`}
           className="p-2 rounded-full bg-secondary hover:bg-secondary/80 transition-colors shrink-0"
         >
           <ArrowLeft className="w-5 h-5" />
