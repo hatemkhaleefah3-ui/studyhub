@@ -2,7 +2,7 @@ import { useStudyData } from "@/hooks/useStudyData";
 import { type SchedulePlan } from "@/hooks/useStudyData";
 import { GlassCard } from "@/components/shared/GlassCard";
 import { MiniCalendar } from "@/components/dashboard/MiniCalendar";
-import { format, differenceInDays } from "date-fns";
+import { format } from "date-fns";
 import { Flame, Calendar as CalendarIcon, Settings as SettingsIcon } from "lucide-react";
 import { Link } from "wouter";
 
@@ -37,7 +37,9 @@ function NextExamsSection({ plans, subjects }: { plans: SchedulePlan[]; subjects
           {upcomingExams.map((item, idx) => {
             const subject = subjects.find((s: any) => s.name === item.subjectName || s.id === item.subjectId);
             const accentColor = subject?.color ?? "hsl(var(--destructive))";
-            const days = differenceInDays(new Date(item.date!), new Date());
+            const _ed = new Date(item.date!); _ed.setHours(0, 0, 0, 0);
+            const _td = new Date(); _td.setHours(0, 0, 0, 0);
+            const days = Math.ceil((_ed.getTime() - _td.getTime()) / 86_400_000);
             const isFirst = idx === 0;
 
             if (isFirst) {
@@ -53,8 +55,7 @@ function NextExamsSection({ plans, subjects }: { plans: SchedulePlan[]; subjects
               return (
                 <div
                   key={item.id}
-                  className="rounded-3xl overflow-hidden border border-white/[0.06] shadow-xl"
-                  style={{ background: "linear-gradient(145deg,#18181b 0%,#111113 100%)" }}
+                  className="rounded-3xl overflow-hidden border border-border dark:border-white/[0.06] shadow-xl bg-card relative"
                 >
                   {/* Radial glow blob top-right */}
                   <div
@@ -73,25 +74,25 @@ function NextExamsSection({ plans, subjects }: { plans: SchedulePlan[]; subjects
                         >
                           ● Next Exam
                         </span>
-                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest truncate">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest truncate">
                           {item.subjectName}
                         </span>
                       </div>
 
                       {/* Exam title */}
-                      <h3 className="text-white font-bold text-lg leading-snug flex-1">
+                      <h3 className="text-foreground font-bold text-lg leading-snug flex-1">
                         {item.planTitle}
                       </h3>
 
                       {/* Date */}
-                      <p className="text-zinc-500 text-xs flex items-center gap-1.5 mt-3">
+                      <p className="text-muted-foreground text-xs flex items-center gap-1.5 mt-3">
                         <CalendarIcon className="w-3 h-3 shrink-0" />
                         {format(new Date(item.date!), "EEEE, MMM d, yyyy")}
                       </p>
                     </div>
 
                     {/* ── Vertical divider ── */}
-                    <div className="w-px bg-white/10 mx-5 self-stretch" />
+                    <div className="w-px bg-border dark:bg-white/10 mx-5 self-stretch" />
 
                     {/* ── Right: countdown number ── */}
                     <div className="flex flex-col items-center justify-center min-w-[68px]">
@@ -119,7 +120,7 @@ function NextExamsSection({ plans, subjects }: { plans: SchedulePlan[]; subjects
                   </div>
 
                   {/* ── Urgency bar ── */}
-                  <div className="h-[3px] bg-white/5">
+                  <div className="h-[3px] bg-muted/20 dark:bg-white/5">
                     <div
                       className="h-full rounded-full transition-all duration-700"
                       style={{ width: `${barPct}%`, background: `linear-gradient(90deg, ${countColor}66, ${countColor})` }}
