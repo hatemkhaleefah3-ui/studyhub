@@ -39,7 +39,7 @@ export function MiniCalendar({ schedule, checklist }: { schedule: any[], checkli
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between px-1">
-        <h2 className="text-xl font-bold tracking-tight">This Week</h2>
+        <h2 className="text-xl font-bold tracking-tight">This Month</h2>
         <Link href="/schedule" className="text-sm text-primary hover:text-primary/80 transition-colors font-semibold inline-flex items-center gap-1.5">
           <CalendarDays className="w-4 h-4" /> Full Schedule
         </Link>

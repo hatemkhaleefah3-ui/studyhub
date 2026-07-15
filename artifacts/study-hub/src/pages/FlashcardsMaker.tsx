@@ -1,8 +1,7 @@
-import { useState, useRef } from "react";
-import * as XLSX from "xlsx";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useRoute, useLocation } from "wouter";
-import { ArrowLeft, Plus, Trash2, Brain, Layers, Pencil, FileSpreadsheet, ImageIcon } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Brain, Layers, Pencil, ImageIcon } from "lucide-react";
 import { useStudyData } from "@/hooks/useStudyData";
 import { GlassCard } from "@/components/shared/GlassCard";
 import { BottomSheet } from "@/components/shared/BottomSheet";
@@ -26,12 +25,10 @@ export function FlashcardsMaker() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [excelError, setExcelError] = useState<string | null>(null);
   const [addFrontIsImage, setAddFrontIsImage] = useState(false);
   const [addBackIsImage, setAddBackIsImage] = useState(false);
   const [editFrontIsImage, setEditFrontIsImage] = useState(false);
   const [editBackIsImage, setEditBackIsImage] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const addForm = useForm({ defaultValues: { front: "", back: "" } });
   const editForm = useForm({ defaultValues: { front: "", back: "" } });
@@ -62,31 +59,6 @@ export function FlashcardsMaker() {
     setEditFrontIsImage(/^https?:\/\//.test(card.front));
     setEditBackIsImage(/^https?:\/\//.test(card.back));
     setEditingId(id);
-  };
-
-  const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    try {
-      const data = await file.arrayBuffer();
-      const wb = XLSX.read(data, { type: "array" });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json<Record<string, string>>(ws);
-      if (!rows.length || !("Front face" in rows[0]) || !("Back face" in rows[0])) {
-        setExcelError("Invalid file: first column must be 'Front face', second must be 'Back face'.");
-        return;
-      }
-      let added = 0;
-      rows.forEach(row => {
-        const front = String(row["Front face"] ?? "").trim();
-        const back  = String(row["Back face"]  ?? "").trim();
-        if (front && back) { addFlashcard(subject.id, lecture.id, { front, back }); added++; }
-      });
-      setExcelError(added ? null : "No valid rows found in the file.");
-    } catch {
-      setExcelError("Could not parse the file. Please upload a valid .xlsx file.");
-    }
   };
 
   const onEdit = (data: any) => {
@@ -258,20 +230,6 @@ export function FlashcardsMaker() {
         onClose={() => { setIsAddOpen(false); addForm.reset(); setAddFrontIsImage(false); setAddBackIsImage(false); }}
         title="New Flashcard"
       >
-        {/* Excel bulk import */}
-        <div className="mb-5">
-          <button
-            type="button"
-            onClick={() => { setExcelError(null); fileInputRef.current?.click(); }}
-            className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-border rounded-xl p-3 text-sm text-muted-foreground hover:border-primary/40 hover:text-foreground transition-all font-medium"
-          >
-            <FileSpreadsheet className="w-4 h-4" /> Import from Excel (.xlsx)
-          </button>
-          <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleExcelUpload} />
-          {excelError && <p className="text-xs text-destructive mt-2">{excelError}</p>}
-          <p className="text-xs text-muted-foreground mt-1.5 text-center">Columns: "Front face" · "Back face"</p>
-        </div>
-
         <form onSubmit={addForm.handleSubmit(onAdd)} className="space-y-5">
           {/* Front face */}
           <div>
