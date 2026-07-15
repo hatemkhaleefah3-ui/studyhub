@@ -22,6 +22,7 @@ import {
   DndContext,
   closestCenter,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   DragEndEvent,
@@ -154,9 +155,15 @@ export function Checklist() {
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const filterCount = activeFilterCount(filters);
 
-  // DnD sensors — long press (400ms)
+  // DnD sensors — long press (400ms) for both mouse and touch
   const sensors = useSensors(
     useSensor(PointerSensor, {
+      activationConstraint: {
+        delay: 400,
+        tolerance: 5,
+      },
+    }),
+    useSensor(TouchSensor, {
       activationConstraint: {
         delay: 400,
         tolerance: 5,
