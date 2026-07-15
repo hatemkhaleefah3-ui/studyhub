@@ -224,19 +224,6 @@ export function LectureEdit() {
           </button>
 
           <button
-            onClick={() => { setLocation(`/subjects/${subject.id}/lectures/${lecture.id}/study`); setFlashcardsOpen(false); }}
-            className="w-full flex items-center gap-4 rounded-2xl p-4 bg-secondary/50 hover:bg-secondary transition-colors text-left border border-border/40 hover:border-border/60"
-          >
-            <div className="w-11 h-11 rounded-xl bg-emerald-500/12 border border-emerald-500/20 flex items-center justify-center shrink-0">
-              <Brain className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <div>
-              <p className="font-bold text-sm text-foreground">Study Flashcards</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Flip-card review mode</p>
-            </div>
-          </button>
-
-          <button
             onClick={() => { setLocation(`/subjects/${subject.id}/lectures/${lecture.id}/flashcards`); setFlashcardsOpen(false); }}
             className="w-full flex items-center gap-4 rounded-2xl p-4 bg-secondary/50 hover:bg-secondary transition-colors text-left border border-border/40 hover:border-border/60"
           >

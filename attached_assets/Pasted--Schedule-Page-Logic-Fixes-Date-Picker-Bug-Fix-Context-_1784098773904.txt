@@ -1,0 +1,51 @@
+# Schedule Page — Logic Fixes & Date Picker Bug Fix
+
+## Context / Deployment Constraints (read first)
+This site is hosted via **GitHub → Cloudflare (Pages/Workers) auto-deploy**. Please respect these constraints:
+
+- **Don't break the connection**: Do not modify repo settings, branch names, webhooks, `wrangler.toml` / Cloudflare project config, build command, output directory, or environment variable names.
+- **Don't break the build**: Verify build/lint/typecheck pass before finishing. No unused imports, no broken types, no leftover debug code.
+- **Avoid merge conflicts**: Keep changes scoped to the Schedule page and its related components (calendar view, exams section, date picker). Don't reformat or restructure unrelated files.
+- **Test before moving on**: Confirm each fix below works correctly and doesn't regress the others before considering the page done.
+
+---
+
+## 1. Exams Must Always Appear Grouped Under Their Schedule
+Currently an exam can end up shown as a standalone/orphaned item in the exams section below the calendar, disconnected from the schedule it belongs to.
+
+**Required behavior:**
+- When an exam schedule is added (whether it contains one exam or multiple), **all exams belonging to that schedule** must appear together in the exams section below — never as an isolated standalone exam floating separately from its schedule grouping.
+- Remove/fix whatever logic currently allows an exam to render without being tied to and grouped under its parent schedule.
+
+## 2. Review-Schedule Coloring Must Only Clear on Exam Days
+Currently, adding an exam or exam schedule appears to wipe the review-schedule coloring across all days on the calendar.
+
+**Required behavior:**
+- The review schedule's day coloring must remain intact on all days **except** the specific day(s) the exam itself falls on.
+- Adding an exam/exam schedule should only affect coloring on that exam's date(s) — every other day's existing review-schedule color must stay untouched.
+- Fix the logic so it targets the specific exam date(s) instead of clearing/overwriting the color state for the whole calendar.
+
+## 3. Remove "Hide Schedule" Behavior Entirely
+The schedule section below the calendar currently has some concept of hiding a schedule from view.
+
+**Required behavior:**
+- No schedule should ever be hidden in this section — all schedules must always be visible/listed.
+- Remove the hide functionality and any related UI (hide toggle/button, hidden-state logic, conditional rendering that excludes a schedule from the list) entirely from this section.
+
+---
+
+## 4. Bug Fix: Date Picker Text Color
+On the Schedule page, the day/month/year selector options sometimes render with **white text even when not selected** (i.e., no blue background), making them unreadable.
+
+**Required fix:**
+- Unselected options must always show the default (readable) text color.
+- Selected options (blue background) must show white text.
+- This is not just a hover/click-triggered state bug — verify correct text color on **initial render** and after **any re-render/state update**, not only on direct interaction. (Likely cause: a conditional class/style that only applies on an interaction event rather than being derived from the actual selected state on every render.)
+
+---
+
+## Acceptance Check
+- Adding a multi-exam schedule shows every exam in that schedule grouped together in the exams section — none appear standalone.
+- Adding an exam only changes calendar coloring on that exam's specific date(s); all other days keep their existing review-schedule color.
+- The schedule section below the calendar always shows every schedule — there is no way to hide one, and no leftover hide-related UI or state.
+- Date picker: unselected options are always readable (default text color) on load and after any interaction/re-render; only the selected (blue background) option shows white text.

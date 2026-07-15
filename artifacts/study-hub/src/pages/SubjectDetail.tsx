@@ -573,18 +573,6 @@ export function SubjectDetail() {
             </div>
           </button>
           <button
-            onClick={() => { setLocation(`/subjects/${subject.id}/lectures/${flashcardsSheetLecId}/study`); setFlashcardsSheetLecId(null); }}
-            className="w-full flex items-center gap-3 rounded-2xl p-4 bg-secondary/60 hover:bg-secondary transition-colors text-left"
-          >
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 shrink-0">
-              <Brain className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <div>
-              <p className="font-semibold text-foreground">Study Flashcards</p>
-              <p className="text-xs text-muted-foreground">Flip-card review mode</p>
-            </div>
-          </button>
-          <button
             onClick={() => { setLocation(`/subjects/${subject.id}/lectures/${flashcardsSheetLecId}/flashcards`); setFlashcardsSheetLecId(null); }}
             className="w-full flex items-center gap-3 rounded-2xl p-4 bg-secondary/60 hover:bg-secondary transition-colors text-left"
           >
