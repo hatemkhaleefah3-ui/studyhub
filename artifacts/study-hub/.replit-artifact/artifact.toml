@@ -3,7 +3,6 @@ previewPath = "/"
 title = "Study Hub"
 version = "1.0.0"
 id = "artifacts/study-hub"
-router = "path"
 
 [[services]]
 name = "web"
