@@ -1,0 +1,67 @@
+# Task Prompt for Replit Agent
+
+## Critical constraints (read first, apply to every change below)
+
+- This repo is connected to GitHub, and GitHub Actions builds/deploys it to Cloudflare Pages automatically. **Do not break the build.**
+- Make all changes in a **single feature branch**, with **small, isolated commits per feature**, so the resulting PR is clean and mergeable with no merge conflicts.
+- Do **not** touch build config, CI/CD workflow files, Cloudflare config, environment variables, or any unrelated files unless strictly required for one of the features below.
+- Do **not** rename, move, or delete existing files/routes that aren't explicitly mentioned.
+- After each feature is implemented, **run the build locally** (e.g. `npm run build`) and confirm it succeeds with no errors/warnings before moving to the next feature.
+- Keep code style, formatting, and existing component/folder conventions consistent with the rest of the codebase.
+- Do not push directly to `main`. Open a PR when done so it can be reviewed and merged.
+
+Work through the features **in this exact priority order**:
+
+---
+
+## 1. (Highest priority) Item card drag-to-reorder
+
+- Implement long-press + drag on item cards so the user can reorder them **above or below** other item cards, but **only within the same section** (no cross-section dragging).
+- Use a drag-and-drop library already present in `package.json` if one exists (check first: `@dnd-kit/core`, `react-beautiful-dnd`, `@hello-pangea/dnd`, or `framer-motion`'s `Reorder`). If none exists, add `@dnd-kit/core` + `@dnd-kit/sortable` (lightweight, actively maintained, works well with touch/long-press).
+- Persist the new order (to the database/local storage/state — whatever the app already uses for item cards) so the order survives a page refresh.
+- Ensure it works on both touch (mobile long-press) and desktop (mouse drag).
+
+## 2. (Second priority) Calendar day coloring based on schedule
+
+- **Important correction**: this applies to the **calendar grid itself** (the actual day cells shown in the calendar view), **not** the schedule list/section.
+- When a day has a review scheduled, that day's cell in the calendar must:
+  - Show a **transparent dark-green** background tint.
+  - Display the **name of the review schedule** inside the day cell.
+  - Show that name/label with an **"active" visual state** (e.g. bold, highlighted, or a small active-state badge/style consistent with the app's design system).
+- Make this solid and reusable: derive the color/label from a single interconnected source of truth (e.g. a shared `schedules` data source or context) so any other calendar instance in the app automatically reflects the same logic — don't hardcode it per-view.
+- Handle multiple schedules on the same day gracefully (e.g. stack labels or show a compact indicator — use good judgment for clean UI, don't overflow the cell).
+
+## 3. Remaining changes
+
+**Dashboard page**
+- Remove the "Next Review" section entirely (component, its data-fetching logic if unused elsewhere, and any now-unused imports).
+
+**Schedule page**
+- Change the "Add" button to offer two top-level options: **"Add Exam"** and **"Add Schedule"**.
+- When the add flow/settings modal opens, the user should be able to choose the type: **Exam**, **Review**, or **Study Schedule**.
+- Wire this into whatever the existing add-schedule logic/data model is, extending it rather than duplicating it.
+
+**Flashcard maker page**
+- Add an **Excel file upload** option to bulk-import flashcards:
+  - Expected format: first column header = `Front face`, second column header = `Back face`.
+  - Parse the file (use a library like `xlsx`/`SheetJS` if not already present) and create one flashcard per row.
+  - Show a clear error if the headers don't match or the file is invalid.
+- Add an **image URL input** option so either the front or back face of a flashcard can be an image instead of text:
+  - The image must actually render inside the flashcard (not just store the URL).
+  - Handle broken/invalid image URLs gracefully (fallback placeholder or error message, don't crash the card).
+
+**MCQ exam page**
+- Update the results screen so that for every question the user answered **incorrectly**, the results view shows:
+  - The question.
+  - The user's (wrong) selected answer.
+  - The **correct answer**, clearly marked.
+- Keep correctly-answered questions in the results as they currently are (just add this detail for wrong ones), unless the current design already lists all questions — in that case just add the wrong-answer/correct-answer detail to each wrong one.
+
+---
+
+## Final steps
+
+1. Verify the app builds successfully.
+2. Verify no existing functionality was broken (dashboard, schedule, calendar, flashcards, MCQ exam all still load and work).
+3. Commit with clear, descriptive commit messages per feature (not one giant commit).
+4. Open a pull request summarizing all four areas of change, so it can be reviewed and merged without conflicts.
