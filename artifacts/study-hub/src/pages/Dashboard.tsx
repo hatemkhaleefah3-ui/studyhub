@@ -1,72 +1,10 @@
 import { useStudyData } from "@/hooks/useStudyData";
-import { type SchedulePlan, type SchedulePlanItem } from "@/hooks/useStudyData";
+import { type SchedulePlan } from "@/hooks/useStudyData";
 import { GlassCard } from "@/components/shared/GlassCard";
 import { MiniCalendar } from "@/components/dashboard/MiniCalendar";
-import { format, differenceInDays, parseISO } from "date-fns";
-import { Flame, Calendar as CalendarIcon, Settings as SettingsIcon, BookOpen } from "lucide-react";
+import { format, differenceInDays } from "date-fns";
+import { Flame, Calendar as CalendarIcon, Settings as SettingsIcon } from "lucide-react";
 import { Link } from "wouter";
-import { getActiveReviewSubject } from "@/pages/Schedule";
-
-// ─── Next Review Section ──────────────────────────────────────────────────────
-
-function NextReviewSection({ plans }: { plans: SchedulePlan[] }) {
-  const reviewPlans = plans.filter((p) => p.type === "review");
-  if (reviewPlans.length === 0) return null;
-
-  const now = new Date();
-  const todayStr = format(now, "yyyy-MM-dd");
-  const active = getActiveReviewSubject(plans, now);
-  if (!active) return null;
-
-  // Find the parent plan
-  const parentPlan = reviewPlans.find((p) => p.items.some((i) => i.id === active.id));
-
-  const isCurrentlyActive =
-    active.reviewStartDate &&
-    active.reviewEndDate &&
-    active.reviewStartDate <= todayStr &&
-    active.reviewEndDate >= todayStr;
-
-  const daysUntilStart = active.reviewStartDate
-    ? differenceInDays(parseISO(active.reviewStartDate), now)
-    : null;
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between px-1">
-        <h2 className="text-xl font-bold tracking-tight">Next Review</h2>
-        <Link href="/schedule" className="text-sm text-primary hover:text-primary/80 transition-colors font-semibold">
-          View Schedule
-        </Link>
-      </div>
-      <GlassCard className="p-5 border-l-4 border-emerald-600/60 relative overflow-hidden">
-        <div className="absolute inset-0 opacity-[0.03] bg-emerald-500 pointer-events-none" />
-        <div className="relative z-10">
-          {parentPlan && (
-            <p className="text-xs text-muted-foreground font-medium mb-1">{parentPlan.title}</p>
-          )}
-          <p className="font-bold text-foreground text-lg leading-tight">{active.subjectName}</p>
-          {active.reviewStartDate && active.reviewEndDate && (
-            <p className="text-sm text-muted-foreground mt-1">
-              {format(parseISO(active.reviewStartDate), "MMM d")} → {format(parseISO(active.reviewEndDate), "MMM d")}
-            </p>
-          )}
-          <div className="mt-3 flex items-center gap-2">
-            {isCurrentlyActive ? (
-              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-600 border border-emerald-500/20">
-                Active
-              </span>
-            ) : daysUntilStart !== null && daysUntilStart > 0 ? (
-              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-secondary text-muted-foreground border border-border/50">
-                Starts in {daysUntilStart} day{daysUntilStart !== 1 ? "s" : ""}
-              </span>
-            ) : null}
-          </div>
-        </div>
-      </GlassCard>
-    </div>
-  );
-}
 
 // ─── Next Exams Section ───────────────────────────────────────────────────────
 
@@ -242,9 +180,6 @@ export function Dashboard() {
           </Link>
         </div>
       </div>
-
-      {/* Next Review (only if review schedules exist) */}
-      <NextReviewSection plans={schedulePlans} />
 
       {/* Next Exams — 2 cards */}
       <NextExamsSection plans={schedulePlans} subjects={subjects} />

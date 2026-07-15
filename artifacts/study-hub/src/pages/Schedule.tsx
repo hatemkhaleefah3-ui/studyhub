@@ -807,6 +807,37 @@ function MonthView({
     return undefined;
   }
 
+  function getCellScheduleInfo(date: Date): { label: string } | null {
+    const dateStr = format(date, "yyyy-MM-dd");
+    // 1. Exam item on this exact date
+    for (const plan of plans) {
+      if (plan.type === "exam") {
+        const item = plan.items.find(i => i.date === dateStr);
+        if (item) return { label: (item as any).subjectName || plan.title };
+      }
+    }
+    // 2. Active review subject window
+    if (
+      activeReviewSubject?.reviewStartDate &&
+      activeReviewSubject?.reviewEndDate &&
+      dateStr >= activeReviewSubject.reviewStartDate &&
+      dateStr <= activeReviewSubject.reviewEndDate
+    ) {
+      return { label: (activeReviewSubject as any).subjectName || "Review" };
+    }
+    // 3. Most-important non-exam plan
+    if (mostImportantPlan) {
+      if (mostImportantPlan.type === "review") {
+        if (dateStr >= mostImportantPlan.startDate && dateStr <= mostImportantPlan.endDate)
+          return { label: mostImportantPlan.title };
+      } else if (mostImportantPlan.type === "study") {
+        if (isStudyPlanDay(mostImportantPlan, date))
+          return { label: mostImportantPlan.title };
+      }
+    }
+    return null;
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -842,6 +873,7 @@ function MonthView({
             const isAnch = isSameDay(date, anchor) && !isNow;
             const hasEnt = hasEntriesOnDate(schedule, checklist, plans, subjects, date);
             const cellBg = !isNow ? getCellBg(date) : undefined;
+            const schedInfo = !isNow ? getCellScheduleInfo(date) : null;
             return (
               <button
                 key={i}
@@ -855,16 +887,22 @@ function MonthView({
                     : "bg-card border-border/40 hover:bg-secondary/60 text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {format(date, "d")}
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ${
-                    hasEnt
-                      ? isNow
-                        ? "bg-primary-foreground/80"
-                        : "bg-primary"
-                      : "bg-transparent"
-                  }`}
-                />
+                <span className="leading-none">{format(date, "d")}</span>
+                {schedInfo ? (
+                  <span className="text-[7px] font-bold truncate w-full text-center px-0.5 leading-tight opacity-90">
+                    {schedInfo.label}
+                  </span>
+                ) : (
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      hasEnt
+                        ? isNow
+                          ? "bg-primary-foreground/80"
+                          : "bg-primary"
+                        : "bg-transparent"
+                    }`}
+                  />
+                )}
               </button>
             );
           })}
@@ -1603,6 +1641,7 @@ export function Schedule() {
   const [detailPlan,     setDetailPlan]     = useState<SchedulePlan | null>(null);
   const [deletingPlanId, setDeletingPlanId] = useState<string | null>(null);
   const [showHidden,     setShowHidden]     = useState(false);
+  const [scheduleSubMenu, setScheduleSubMenu] = useState(false);
 
   // Calendar state
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -1661,6 +1700,7 @@ export function Schedule() {
   const closeCreate = () => {
     setIsCreating(false);
     setCreateType(null);
+    setScheduleSubMenu(false);
   };
 
   const handleEditPlan = (planId: string) => {
@@ -1865,65 +1905,94 @@ export function Schedule() {
       {/* ── Type picker ── */}
       <BottomSheet isOpen={isCreating && !createType} onClose={closeCreate} title="Add to Schedule">
         <div className="space-y-3">
-          {/* Add Exam (quick) */}
-          <button
-            onClick={() => setCreateType("quickExam")}
-            className="w-full flex items-center gap-4 p-5 rounded-2xl bg-destructive/5 border border-destructive/20 hover:bg-destructive/10 transition-colors text-left"
-          >
-            <div className="w-12 h-12 rounded-2xl bg-destructive/10 flex items-center justify-center shrink-0 border border-destructive/20">
-              <GraduationCap className="w-6 h-6 text-destructive" />
-            </div>
-            <div>
-              <p className="font-bold text-foreground">Add Exam</p>
-              <p className="text-sm text-muted-foreground mt-0.5">Quick-add a single upcoming exam</p>
-            </div>
-            <ChevronRight className="w-5 h-5 text-muted-foreground ml-auto shrink-0" />
-          </button>
+          {!scheduleSubMenu ? (
+            <>
+              {/* Top-level: Add Exam */}
+              <button
+                onClick={() => setCreateType("quickExam")}
+                className="w-full flex items-center gap-4 p-5 rounded-2xl bg-destructive/5 border border-destructive/20 hover:bg-destructive/10 transition-colors text-left"
+              >
+                <div className="w-12 h-12 rounded-2xl bg-destructive/10 flex items-center justify-center shrink-0 border border-destructive/20">
+                  <GraduationCap className="w-6 h-6 text-destructive" />
+                </div>
+                <div>
+                  <p className="font-bold text-foreground">Add Exam</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">Quick-add a single upcoming exam</p>
+                </div>
+                <ChevronRight className="w-5 h-5 text-muted-foreground ml-auto shrink-0" />
+              </button>
 
-          {/* Exam Schedule */}
-          <button
-            onClick={() => setCreateType("exam")}
-            className="w-full flex items-center gap-4 p-5 rounded-2xl bg-secondary/40 border border-border/50 hover:bg-secondary/60 transition-colors text-left"
-          >
-            <div className="w-12 h-12 rounded-2xl bg-secondary flex items-center justify-center shrink-0 border border-border/50">
-              <CalendarDays className="w-6 h-6 text-foreground/70" />
-            </div>
-            <div>
-              <p className="font-bold text-foreground">Exam Schedule</p>
-              <p className="text-sm text-muted-foreground mt-0.5">Group multiple exams in one schedule</p>
-            </div>
-            <ChevronRight className="w-5 h-5 text-muted-foreground ml-auto shrink-0" />
-          </button>
+              {/* Top-level: Add Schedule */}
+              <button
+                onClick={() => setScheduleSubMenu(true)}
+                className="w-full flex items-center gap-4 p-5 rounded-2xl bg-primary/5 border border-primary/20 hover:bg-primary/10 transition-colors text-left"
+              >
+                <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0 border border-primary/20">
+                  <CalendarDays className="w-6 h-6 text-primary" />
+                </div>
+                <div>
+                  <p className="font-bold text-foreground">Add Schedule</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">Set up an exam, review, or study schedule</p>
+                </div>
+                <ChevronRight className="w-5 h-5 text-muted-foreground ml-auto shrink-0" />
+              </button>
+            </>
+          ) : (
+            <>
+              {/* Back */}
+              <button
+                onClick={() => setScheduleSubMenu(false)}
+                className="flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors mb-1"
+              >
+                <ChevronLeft className="w-4 h-4" /> Back
+              </button>
 
-          {/* Study Schedule */}
-          <button
-            onClick={() => setCreateType("study")}
-            className="w-full flex items-center gap-4 p-5 rounded-2xl bg-primary/5 border border-primary/20 hover:bg-primary/10 transition-colors text-left"
-          >
-            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0 border border-primary/20">
-              <BookMarked className="w-6 h-6 text-primary" />
-            </div>
-            <div>
-              <p className="font-bold text-foreground">Study Schedule</p>
-              <p className="text-sm text-muted-foreground mt-0.5">Recurring sessions with times &amp; days</p>
-            </div>
-            <ChevronRight className="w-5 h-5 text-muted-foreground ml-auto shrink-0" />
-          </button>
+              {/* Exam Schedule */}
+              <button
+                onClick={() => setCreateType("exam")}
+                className="w-full flex items-center gap-4 p-5 rounded-2xl bg-secondary/40 border border-border/50 hover:bg-secondary/60 transition-colors text-left"
+              >
+                <div className="w-12 h-12 rounded-2xl bg-secondary flex items-center justify-center shrink-0 border border-border/50">
+                  <CalendarDays className="w-6 h-6 text-foreground/70" />
+                </div>
+                <div>
+                  <p className="font-bold text-foreground">Exam Schedule</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">Group multiple exams in one schedule</p>
+                </div>
+                <ChevronRight className="w-5 h-5 text-muted-foreground ml-auto shrink-0" />
+              </button>
 
-          {/* Review Schedule */}
-          <button
-            onClick={() => setCreateType("review")}
-            className="w-full flex items-center gap-4 p-5 rounded-2xl bg-amber-500/5 border border-amber-500/20 hover:bg-amber-500/10 transition-colors text-left"
-          >
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center shrink-0 border border-amber-500/20">
-              <BookOpen className="w-6 h-6 text-amber-600" />
-            </div>
-            <div>
-              <p className="font-bold text-foreground">Review Schedule</p>
-              <p className="text-sm text-muted-foreground mt-0.5">Plan subject-by-subject review periods</p>
-            </div>
-            <ChevronRight className="w-5 h-5 text-muted-foreground ml-auto shrink-0" />
-          </button>
+              {/* Review Schedule */}
+              <button
+                onClick={() => setCreateType("review")}
+                className="w-full flex items-center gap-4 p-5 rounded-2xl bg-amber-500/5 border border-amber-500/20 hover:bg-amber-500/10 transition-colors text-left"
+              >
+                <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center shrink-0 border border-amber-500/20">
+                  <BookOpen className="w-6 h-6 text-amber-600" />
+                </div>
+                <div>
+                  <p className="font-bold text-foreground">Review Schedule</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">Plan subject-by-subject review periods</p>
+                </div>
+                <ChevronRight className="w-5 h-5 text-muted-foreground ml-auto shrink-0" />
+              </button>
+
+              {/* Study Schedule */}
+              <button
+                onClick={() => setCreateType("study")}
+                className="w-full flex items-center gap-4 p-5 rounded-2xl bg-primary/5 border border-primary/20 hover:bg-primary/10 transition-colors text-left"
+              >
+                <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0 border border-primary/20">
+                  <BookMarked className="w-6 h-6 text-primary" />
+                </div>
+                <div>
+                  <p className="font-bold text-foreground">Study Schedule</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">Recurring sessions with times &amp; days</p>
+                </div>
+                <ChevronRight className="w-5 h-5 text-muted-foreground ml-auto shrink-0" />
+              </button>
+            </>
+          )}
         </div>
       </BottomSheet>
 

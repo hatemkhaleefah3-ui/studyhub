@@ -118,6 +118,39 @@ export function ExamTake() {
             </button>
           </div>
         </GlassCard>
+
+        {/* Wrong answers breakdown */}
+        {questions.some((_: any, i: number) => answers[i] !== questions[i].correctAnswer) && (
+          <div className="space-y-3">
+            <h2 className="text-lg font-bold tracking-tight px-1">Review Wrong Answers</h2>
+            {questions.map((q: any, i: number) => {
+              const userAnswer = answers[i];
+              const correct = q.correctAnswer;
+              if (userAnswer === correct) return null;
+              const label = (n: number) => String.fromCharCode(64 + n);
+              return (
+                <GlassCard key={i} className="p-4 space-y-3">
+                  <div className="flex items-start gap-2">
+                    <span className="px-2 py-0.5 rounded-md text-xs font-bold text-primary-foreground bg-primary shrink-0 mt-0.5">
+                      Q{i + 1}
+                    </span>
+                    <p className="font-medium text-sm leading-relaxed">{q.text}</p>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-destructive/10 border border-destructive/20">
+                      <span className="text-xs font-bold text-destructive shrink-0 mt-0.5 whitespace-nowrap">✗ Your answer</span>
+                      <p className="text-sm text-destructive">{label(userAnswer)}. {q.choices[userAnswer - 1]}</p>
+                    </div>
+                    <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                      <span className="text-xs font-bold text-emerald-600 shrink-0 mt-0.5 whitespace-nowrap">✓ Correct</span>
+                      <p className="text-sm text-emerald-700 dark:text-emerald-400">{label(correct)}. {q.choices[correct - 1]}</p>
+                    </div>
+                  </div>
+                </GlassCard>
+              );
+            })}
+          </div>
+        )}
       </div>
     );
   }
