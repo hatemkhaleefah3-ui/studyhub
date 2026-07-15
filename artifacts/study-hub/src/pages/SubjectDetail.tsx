@@ -8,7 +8,7 @@ import { SwipeRow } from "@/components/shared/SwipeRow";
 import { LectureCoverBadge } from "@/components/study/LectureCoverBadge";
 import {
   Plus, Trash2, ArrowLeft, ExternalLink, BookOpen, FileText, Pencil,
-  FolderOpen, BarChart2, Link2, Paperclip, Info, Layers, Brain, ChevronRight, CheckSquare,
+  FolderOpen, BarChart2, Link2, Paperclip, Info, Layers, Brain, ChevronRight, CheckSquare, Upload,
 } from "lucide-react";
 import { Link, useRoute, useLocation, useSearch } from "wouter";
 import { useForm } from "react-hook-form";
@@ -44,6 +44,7 @@ export function SubjectDetail() {
   const [isAddLectureOpen, setIsAddLectureOpen] = useState(false);
   const [isAddExamOpen, setIsAddExamOpen] = useState(false);
   const [deletingExamId, setDeletingExamId] = useState<string | null>(null);
+  const [questionsExamId, setQuestionsExamId] = useState<string | null>(null);
 
   const [isAddAttachmentOpen, setIsAddAttachmentOpen] = useState(false);
   const [editingAttachmentId, setEditingAttachmentId] = useState<string | null>(null);
@@ -383,11 +384,11 @@ export function SubjectDetail() {
                     return (
                       <SwipeRow
                         key={exam.id}
-                        onTap={() => setLocation(`/subjects/${subject.id}/exams/${exam.id}/take`)}
-                        onSwipeRight={() => setDeletingExamId(exam.id)}
-                        rightLabel="Delete" rightIcon={Trash2} rightColor="#ef4444"
-                        onSwipeLeft={() => setLocation(`/subjects/${subject.id}/exams/${exam.id}/edit`)}
-                        leftLabel="Edit" leftIcon={Pencil} leftColor="#6366f1"
+                        onTap={() => setLocation(`/subjects/${subject.id}/exams/${exam.id}/edit`)}
+                        onSwipeRight={() => setQuestionsExamId(exam.id)}
+                        rightLabel="Questions" rightIcon={Brain} rightColor="#6366f1"
+                        onSwipeLeft={() => setLocation(`/subjects/${subject.id}/exams/${exam.id}/take`)}
+                        leftLabel="Study" leftIcon={BookOpen} leftColor="#22c55e"
                       >
                         <GlassCard className={`p-4 cursor-pointer transition-all border group  ${isChecked ? 'bg-secondary/10 border-border/40' : 'bg-card border-border/60 hover:border-border hover:shadow-md'}`}>
                           <div className="flex items-center gap-4">
@@ -409,6 +410,23 @@ export function SubjectDetail() {
                                   {(exam.questions || []).length} Qs
                                 </span>
                               </div>
+                            </div>
+                            {/* Desktop-only action buttons */}
+                            <div className="hidden md:flex items-center gap-1 shrink-0">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setQuestionsExamId(exam.id); }}
+                                className="p-1.5 rounded-lg bg-secondary/80 hover:bg-indigo-500/20 hover:text-indigo-500 transition-colors text-muted-foreground"
+                                title="Questions"
+                              >
+                                <Brain className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setLocation(`/subjects/${subject.id}/exams/${exam.id}/take`); }}
+                                className="p-1.5 rounded-lg bg-secondary/80 hover:bg-emerald-500/20 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-muted-foreground"
+                                title="Study Mode"
+                              >
+                                <BookOpen className="w-3.5 h-3.5" />
+                              </button>
                             </div>
                             {exam.lastScore ? (
                               <div className={`px-2.5 py-1 rounded-full text-[11px] font-bold flex items-center gap-1.5 border shadow-sm ${isChecked ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20" : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"}`}>
@@ -529,6 +547,36 @@ export function SubjectDetail() {
         onConfirm={() => { if (deletingExamId) { deleteExam(subject.id, deletingExamId); setDeletingExamId(null); } }}
         title="Delete exam?" message="This will permanently delete this exam and its score." confirmLabel="Delete Exam"
       />
+
+      {/* Questions panel — swipe-right or desktop Brain button */}
+      <BottomSheet isOpen={!!questionsExamId} onClose={() => setQuestionsExamId(null)} title="Exam Questions">
+        <div className="space-y-3 pb-2">
+          <button
+            onClick={() => { setLocation(`/subjects/${subject.id}/exams/${questionsExamId!}/edit`); setQuestionsExamId(null); }}
+            className="w-full flex items-center gap-3 rounded-2xl p-4 bg-secondary/60 hover:bg-secondary transition-colors text-left"
+          >
+            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20 shrink-0">
+              <Upload className="w-5 h-5 text-indigo-500" />
+            </div>
+            <div>
+              <p className="font-semibold text-foreground">Upload Questions</p>
+              <p className="text-xs text-muted-foreground">Import from Excel (.xlsx / .xls)</p>
+            </div>
+          </button>
+          <button
+            onClick={() => { setLocation(`/subjects/${subject.id}/exams/${questionsExamId!}/edit`); setQuestionsExamId(null); }}
+            className="w-full flex items-center gap-3 rounded-2xl p-4 bg-secondary/60 hover:bg-secondary transition-colors text-left"
+          >
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0">
+              <Pencil className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <p className="font-semibold text-foreground">Edit Questions</p>
+              <p className="text-xs text-muted-foreground">View and manage existing questions</p>
+            </div>
+          </button>
+        </div>
+      </BottomSheet>
 
       <BottomSheet isOpen={isAddAttachmentOpen} onClose={() => setIsAddAttachmentOpen(false)} title="Add Attachment">
         <form onSubmit={attachForm.handleSubmit(onAddAttachment)} className="space-y-5">
