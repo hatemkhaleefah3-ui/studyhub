@@ -718,7 +718,7 @@ function SliderSelector<T extends string | number>({
             className={`snap-center flex-shrink-0 px-5 py-2.5 rounded-xl text-sm font-bold transition-all border shadow-sm ${
               isSel
                 ? "bg-primary text-primary-foreground border-primary shadow-primary/20 scale-105"
-                : "bg-card border-border/50 hover:bg-secondary/60 text-muted-foreground"
+                : "bg-card border-border/50 hover:bg-secondary/60 hover:text-foreground text-muted-foreground"
             }`}
           >
             {getLabel(item)}
@@ -951,7 +951,7 @@ function YearView({
               className={`p-5 rounded-2xl border text-left transition-all shadow-sm ${
                 isNow
                   ? "bg-primary text-primary-foreground border-primary shadow-primary/20 scale-[1.02]"
-                  : "bg-card border-border/50 hover:bg-secondary/60 hover:-translate-y-1"
+                  : "bg-card border-border/50 hover:bg-secondary/60 hover:-translate-y-1 text-foreground"
               }`}
             >
               <span
@@ -1777,7 +1777,7 @@ export function Schedule() {
                     className={`snap-center flex-shrink-0 flex flex-col items-center justify-center w-[4.5rem] h-[5rem] rounded-2xl transition-all duration-200 border shadow-sm ${
                       isSel
                         ? "bg-primary text-primary-foreground border-primary shadow-primary/20 scale-105"
-                        : "bg-card border-border/50 hover:bg-secondary/60 text-muted-foreground"
+                        : "bg-card border-border/50 hover:bg-secondary/60 hover:text-foreground text-muted-foreground"
                     }`}
                   >
                     <span className="text-[10px] uppercase font-bold tracking-wider leading-none mb-1">
