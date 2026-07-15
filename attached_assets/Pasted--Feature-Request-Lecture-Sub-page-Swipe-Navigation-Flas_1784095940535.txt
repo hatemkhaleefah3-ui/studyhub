@@ -1,0 +1,64 @@
+# Feature Request: Lecture Sub-page — Swipe Navigation, Flashcards, Excel-Based Lecture Import & Google Drive Reader
+
+## Context / Deployment Constraints (read first)
+This site is hosted via **GitHub → Cloudflare (Pages/Workers) auto-deploy**. Please respect these constraints so the pipeline keeps working and the resulting change is safely mergeable:
+
+- **Don't break the connection**: Do not modify repo settings, branch names, webhooks, `wrangler.toml` / Cloudflare project config, build command, output directory, or environment variable names unless explicitly required — and if required, call it out clearly and explain the change.
+- **Don't break the build**: Before finishing, verify the project's build/lint/typecheck steps pass. No unused imports, no broken types, no leftover debug code, no syntax errors. New dependencies must be added to `package.json` (not just imported) and be Cloudflare-Pages-compatible (no Node-only APIs in edge/worker code unless the runtime supports it).
+- **Avoid merge conflicts**: Keep changes scoped to the files/components actually relevant to this feature — don't reformat, rename, or restructure unrelated files. Prefer additive changes (new components/files/functions) over rewriting shared/core files when possible.
+- **No secrets needed for this feature** — see below, there's no API/credential requirement at all.
+- **Test before moving on**: This is multi-step work (see Implementation Order at the end). Confirm each stage builds and behaves correctly before starting the next, so a partial/broken state never gets pushed.
+
+---
+
+## Feature Overview
+This is the **Lecture sub-page**, found inside: Subjects Page → a specific Subject → Lecture sub-page. It needs swipe-based navigation on lecture cards, a flashcards feature, a bulk lecture-import mechanism via Excel, and a lecture content viewer that embeds Google Drive files (no file storage or API integration required — Google Drive hosts the files, the app just stores links).
+
+## 1. Lecture Page Navigation Structure
+The Lecture sub-page is the default/center view. Each lecture card supports swipe gestures:
+
+- **Swipe right** (panel reveals from the left): opens the **Flashcards panel** with three options:
+  1. **Make Flashcards** — manual creation (front/back fields; add/edit/delete).
+  2. **Study Flashcards** — flip-card review mode (mark known/unknown; sequential or spaced-repetition review).
+  3. **Upload Flashcards** — upload an Excel file (.xlsx/.xls/.csv) to bulk-import flashcards (Column A = front/question, Column B = back/answer, unless headers indicate otherwise).
+- **Swipe left** (panel reveals from the right): opens the **Lecture File Reader page** (see section 4) **immediately**, loading that specific lecture's content — no intermediate tap or screen.
+- All swipe/panel transitions must be smoothly animated — no abrupt reloads.
+- Include non-swipe fallback controls (arrows/buttons) for desktop users (no touch input).
+
+## 2. Lecture Import via Excel (bulk import, no file uploads)
+Add an **"Upload Lectures"** button on the Lectures sub-page:
+
+- Accepts a single Excel/CSV file with two columns:
+  - **Column A header: `Name`** — the lecture's display name.
+  - **Column B header: `Link`** — the lecture's Google Drive share link (the file must be shared as "Anyone with the link can view").
+- Backend parses the file server-side and creates one lecture record per row, storing only `name` and `driveLink` (plain text fields) in the app's existing database.
+- No file bytes are uploaded or stored anywhere in this flow — only the name/link pair per row.
+- Show a clear success/error summary after import (e.g. "12 lectures imported, 1 row skipped — missing link").
+- Keep this fully separate from the flashcard Excel upload (section 1.3) — different purpose, different target table, clearly labeled in the UI.
+
+## 3. Storage Backend
+No file storage backend is needed — no cloud bucket, no Google Drive API, no OAuth, no service account, no signed URLs, no API keys or credentials of any kind. Google Drive itself hosts and serves the files directly. The app's database only ever stores the lecture `name` and `driveLink` text fields.
+
+## 4. Lecture File Reader Page — Design
+Opens directly on left-swipe of a lecture card (per section 1) and displays that lecture's content via an embedded Google Drive viewer:
+
+- On open, take the lecture's stored `driveLink`, extract the Drive file ID (the segment between `/d/` and `/view` in the URL), and build the embed URL:
+  `https://drive.google.com/file/d/FILE_ID/preview`
+- Render that URL inside an `<iframe>` as the main content area.
+- Page shell (built natively, matching the rest of the app's style — colors, fonts, spacing):
+  - File name/title header (from the `Name` column).
+  - Close/back control — also allow swipe back (right) to return to the Lecture page.
+  - Loading state while the iframe loads.
+  - Graceful error state if the link is malformed or the file isn't accessible (e.g. not shared publicly) — show a clear message rather than a blank/broken iframe.
+- Note: zoom, pagination, and scroll controls inside the viewer are Google's native controls (since it's an embedded iframe) — only the page shell/header/close/loading/error states are custom-built to match the app.
+- Fully responsive (mobile + desktop).
+
+## Implementation Order
+Test each stage before moving to the next, so a partial/broken state never gets pushed:
+1. Lecture swipe navigation structure (section 1)
+2. Excel-based lecture import — Name/Link columns (section 2)
+3. Lecture File Reader page with Google Drive iframe embed (section 4)
+
+## Important Notes
+- Google Drive files used for lectures must be set to "Anyone with the link" (Viewer access), or the iframe will show an access-denied screen instead of the file content.
+- No Google Cloud Console, OAuth, API keys, service accounts, or Cloudflare R2 (or any other storage service) are required anywhere in this feature.
