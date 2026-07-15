@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useRoute, useLocation } from "wouter";
-import { ArrowLeft, Trash2, Layers, Brain, Settings as SettingsIcon } from "lucide-react";
+import { ArrowLeft, Trash2, Layers, Brain, Settings as SettingsIcon, Upload, ChevronLeft, ChevronRight } from "lucide-react";
 import { useStudyData, StudyType } from "@/hooks/useStudyData";
 import { GlassCard } from "@/components/shared/GlassCard";
+import { BottomSheet } from "@/components/shared/BottomSheet";
 import { ConfirmSheet } from "@/components/shared/ConfirmSheet";
 import { LectureCoverBadge } from "@/components/study/LectureCoverBadge";
 
@@ -22,6 +23,8 @@ export function LectureEdit() {
   const lecture = subject?.lectures.find(l => l.id === params?.lectureId);
 
   const [isDeleting, setIsDeleting] = useState(false);
+  const [flashcardsOpen, setFlashcardsOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm({
     defaultValues: { name: lecture?.name || "", link: lecture?.link || "" },
@@ -66,12 +69,23 @@ export function LectureEdit() {
         <LectureCoverBadge percentage={lecture.readerLastPercentage} />
       </div>
 
+      {/* Navigation strip — swipe hint for mobile, arrows for desktop */}
+      <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground font-medium select-none">
+        <ChevronLeft className="w-3.5 h-3.5 opacity-50" />
+        <span className="opacity-60">Flashcards</span>
+        <span className="mx-1.5 opacity-30">·</span>
+        <span className="font-bold text-foreground px-1.5 py-0.5 rounded-md bg-secondary/60 border border-border/50 text-xs">Lecture</span>
+        <span className="mx-1.5 opacity-30">·</span>
+        <span className="opacity-60">File Reader</span>
+        <ChevronRight className="w-3.5 h-3.5 opacity-50" />
+      </div>
+
       <div className="flex gap-3">
         <button
-          onClick={() => setLocation(`/subjects/${subject.id}/lectures/${lecture.id}/flashcards`)}
+          onClick={() => setFlashcardsOpen(true)}
           className="flex-1 flex items-center justify-center gap-2 rounded-2xl py-3.5 font-semibold text-primary-foreground bg-primary hover:bg-primary/90 transition-colors"
         >
-          <Layers className="w-4 h-4" /> Flashcards Maker
+          <Layers className="w-4 h-4" /> Flashcards
         </button>
         <button
           onClick={() => setLocation(`/subjects/${subject.id}/lectures/${lecture.id}/study`)}
@@ -89,9 +103,21 @@ export function LectureEdit() {
           </div>
           <div>
             <label className="block text-sm font-medium mb-2">
-              Link <span className="text-muted-foreground font-normal">(optional)</span>
+              Lecture File Link <span className="text-muted-foreground font-normal">(optional URL)</span>
             </label>
             <input {...form.register("link")} className={inputCls} placeholder="https://..." />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-2">Upload Lecture File</label>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-border rounded-2xl p-4 text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-all font-medium"
+            >
+              <Upload className="w-4 h-4" /> Upload File (PDF, DOCX, PPTX, image…)
+            </button>
+            <input ref={fileInputRef} type="file" accept="*/*" className="hidden" onChange={() => {}} />
+            <p className="text-xs text-muted-foreground mt-2">File storage via Google Drive — connect in Settings.</p>
           </div>
           <button
             type="submit"
@@ -131,6 +157,48 @@ export function LectureEdit() {
       >
         <Trash2 className="w-4 h-4" /> Delete Lecture
       </button>
+
+      {/* Flashcards panel — opened by Flashcards button */}
+      <BottomSheet isOpen={flashcardsOpen} onClose={() => setFlashcardsOpen(false)} title="Flashcards">
+        <div className="space-y-3 pb-2">
+          <button
+            onClick={() => { setLocation(`/subjects/${subject.id}/lectures/${lecture.id}/flashcards`); setFlashcardsOpen(false); }}
+            className="w-full flex items-center gap-3 rounded-2xl p-4 bg-secondary/60 hover:bg-secondary transition-colors text-left"
+          >
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0">
+              <Layers className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <p className="font-semibold text-foreground">Make Flashcards</p>
+              <p className="text-xs text-muted-foreground">Create front / back cards manually</p>
+            </div>
+          </button>
+          <button
+            onClick={() => { setLocation(`/subjects/${subject.id}/lectures/${lecture.id}/study`); setFlashcardsOpen(false); }}
+            className="w-full flex items-center gap-3 rounded-2xl p-4 bg-secondary/60 hover:bg-secondary transition-colors text-left"
+          >
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 shrink-0">
+              <Brain className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <div>
+              <p className="font-semibold text-foreground">Study Flashcards</p>
+              <p className="text-xs text-muted-foreground">Flip-card review mode</p>
+            </div>
+          </button>
+          <button
+            onClick={() => { setLocation(`/subjects/${subject.id}/lectures/${lecture.id}/flashcards`); setFlashcardsOpen(false); }}
+            className="w-full flex items-center gap-3 rounded-2xl p-4 bg-secondary/60 hover:bg-secondary transition-colors text-left"
+          >
+            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20 shrink-0">
+              <Upload className="w-5 h-5 text-indigo-500" />
+            </div>
+            <div>
+              <p className="font-semibold text-foreground">Upload Flashcards</p>
+              <p className="text-xs text-muted-foreground">Bulk-import from Excel / CSV (Col A = front, Col B = back)</p>
+            </div>
+          </button>
+        </div>
+      </BottomSheet>
 
       <ConfirmSheet
         isOpen={isDeleting}
