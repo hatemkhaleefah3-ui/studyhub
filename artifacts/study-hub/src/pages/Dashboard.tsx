@@ -41,66 +41,121 @@ function NextExamsSection({ plans, subjects }: { plans: SchedulePlan[]; subjects
             const isFirst = idx === 0;
 
             if (isFirst) {
-              // Featured card — red left border accent, "NEXT" badge, larger name
+              // ── Countdown hero card ──────────────────────────────────────────
+              // Urgency palette: red (≤3 d) → amber (4–7 d) → blue (>7 d)
+              const countColor =
+                days <= 3 ? "#f87171" : days <= 7 ? "#fbbf24" : "#60a5fa";
+              const glowColor =
+                days <= 3 ? "rgba(239,68,68,0.12)" : days <= 7 ? "rgba(251,191,36,0.10)" : "rgba(96,165,250,0.10)";
+              // Bar fills left → right as the exam approaches (capped at 60 days)
+              const barPct = days >= 60 ? 2 : Math.round(((60 - days) / 60) * 100);
+
               return (
-                <GlassCard key={item.id} className="p-5 relative overflow-hidden border-l-4 border-destructive/70">
-                  <div className="absolute inset-0 opacity-[0.02] bg-destructive pointer-events-none" />
-                  <div className="relative z-10 flex items-start justify-between gap-4">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-destructive/10 text-destructive border border-destructive/20 uppercase tracking-wider">
-                          NEXT
+                <div
+                  key={item.id}
+                  className="rounded-3xl overflow-hidden border border-white/[0.06] shadow-xl"
+                  style={{ background: "linear-gradient(145deg,#18181b 0%,#111113 100%)" }}
+                >
+                  {/* Radial glow blob top-right */}
+                  <div
+                    className="absolute top-0 right-0 w-56 h-56 rounded-full pointer-events-none blur-2xl"
+                    style={{ background: glowColor, transform: "translate(30%,-30%)" }}
+                  />
+
+                  <div className="relative flex items-stretch gap-0 px-5 py-5">
+                    {/* ── Left: badges + name + date ── */}
+                    <div className="flex-1 min-w-0 flex flex-col">
+                      {/* Badge row */}
+                      <div className="flex items-center gap-2 flex-wrap mb-2">
+                        <span
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border"
+                          style={{ color: countColor, background: countColor + "1a", borderColor: countColor + "40" }}
+                        >
+                          ● Next Exam
                         </span>
-                        <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider truncate">
+                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest truncate">
                           {item.subjectName}
                         </span>
                       </div>
-                      <h3 className="font-bold text-foreground text-base leading-tight">{item.planTitle}</h3>
-                      <p className="text-xs text-muted-foreground mt-1">
+
+                      {/* Exam title */}
+                      <h3 className="text-white font-bold text-lg leading-snug flex-1">
+                        {item.planTitle}
+                      </h3>
+
+                      {/* Date */}
+                      <p className="text-zinc-500 text-xs flex items-center gap-1.5 mt-3">
+                        <CalendarIcon className="w-3 h-3 shrink-0" />
                         {format(new Date(item.date!), "EEEE, MMM d, yyyy")}
                       </p>
                     </div>
-                    <div className="shrink-0 text-center min-w-[56px]">
-                      <p
-                        className="text-2xl font-black leading-none"
-                        style={{ color: days <= 3 ? "hsl(var(--destructive))" : "hsl(var(--primary))" }}
-                      >
-                        {days === 0 ? "Today" : days === 1 ? "1" : String(days)}
-                      </p>
-                      {days > 1 && (
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mt-0.5">
-                          days
-                        </p>
+
+                    {/* ── Vertical divider ── */}
+                    <div className="w-px bg-white/10 mx-5 self-stretch" />
+
+                    {/* ── Right: countdown number ── */}
+                    <div className="flex flex-col items-center justify-center min-w-[68px]">
+                      {days === 0 ? (
+                        <span className="text-sm font-black uppercase tracking-widest text-center" style={{ color: countColor }}>
+                          Today!
+                        </span>
+                      ) : (
+                        <>
+                          <span
+                            className="text-6xl font-black leading-none tabular-nums"
+                            style={{ color: countColor }}
+                          >
+                            {days}
+                          </span>
+                          <span
+                            className="text-[10px] font-black uppercase tracking-widest mt-1 text-center"
+                            style={{ color: countColor + "99" }}
+                          >
+                            {days === 1 ? "day" : "days"}
+                          </span>
+                        </>
                       )}
                     </div>
                   </div>
-                </GlassCard>
+
+                  {/* ── Urgency bar ── */}
+                  <div className="h-[3px] bg-white/5">
+                    <div
+                      className="h-full rounded-full transition-all duration-700"
+                      style={{ width: `${barPct}%`, background: `linear-gradient(90deg, ${countColor}66, ${countColor})` }}
+                    />
+                  </div>
+                </div>
               );
             }
 
-            // Second card — standard styling
+            // ── Second exam — compact companion card ────────────────────────
+            const days2Color =
+              days <= 3 ? "hsl(var(--destructive))" : days <= 7 ? "#f59e0b" : "hsl(var(--foreground))";
             return (
-              <GlassCard key={item.id} className="p-5 relative overflow-hidden border-l-4" style={{ borderLeftColor: `${accentColor}60` }}>
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1 truncate">
-                      {item.subjectName}
-                    </p>
-                    <h3 className="font-bold text-foreground text-sm leading-tight">{item.planTitle}</h3>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {format(new Date(item.date!), "EEE, MMM d, yyyy")}
-                    </p>
-                  </div>
-                  <div className="shrink-0 text-center min-w-[48px]">
-                    <p className="text-lg font-black text-foreground leading-none">
-                      {days === 0 ? "Today" : String(days)}
-                    </p>
-                    {days > 0 && (
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                        days
-                      </p>
-                    )}
-                  </div>
+              <GlassCard
+                key={item.id}
+                className="p-4 flex items-center gap-4 border-l-[3px]"
+                style={{ borderLeftColor: `${accentColor}80` }}
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-0.5 truncate">
+                    {item.subjectName}
+                  </p>
+                  <h3 className="font-semibold text-foreground text-sm leading-tight">{item.planTitle}</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {format(new Date(item.date!), "EEE, MMM d, yyyy")}
+                  </p>
+                </div>
+                <div className="shrink-0 flex flex-col items-center min-w-[44px]">
+                  <span className="text-2xl font-black leading-none tabular-nums" style={{ color: days2Color }}>
+                    {days === 0 ? "!" : String(days)}
+                  </span>
+                  {days > 0 && (
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground mt-0.5">
+                      {days === 1 ? "day" : "days"}
+                    </span>
+                  )}
                 </div>
               </GlassCard>
             );
