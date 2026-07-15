@@ -360,6 +360,8 @@ export function SubjectDetail() {
                       onTap={() => setLocation(`/subjects/${subject.id}/lectures/${lec.id}`)}
                       onSwipeRight={() => setFlashcardsSheetLecId(lec.id)}
                       rightLabel="Flashcards" rightIcon={Layers} rightColor="#6366f1"
+                      onSwipeLeft={() => setLocation(`/subjects/${subject.id}/lectures/${lec.id}/study`)}
+                      leftLabel="Study" leftIcon={Brain} leftColor="#10b981"
                     >
                       <GlassCard className="p-4 flex items-center gap-4 cursor-pointer hover:shadow-md transition-all border-border/60 hover:border-border bg-card group">
                         <div className="w-10 h-10 rounded-[14px] bg-secondary flex items-center justify-center shrink-0 border border-border/50 text-muted-foreground group-hover:text-foreground transition-colors">
