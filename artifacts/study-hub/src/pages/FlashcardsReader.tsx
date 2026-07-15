@@ -162,10 +162,16 @@ export function FlashcardsReader() {
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold leading-snug">{card.front}</p>
-                  <p className="text-xs text-muted-foreground mt-1 leading-snug line-clamp-2">
-                    {card.back}
-                  </p>
+                  {/^https?:\/\//.test(card.front) ? (
+                    <img src={card.front} alt="Question" className="max-h-16 object-contain rounded-lg mb-1" />
+                  ) : (
+                    <p className="text-sm font-semibold leading-snug">{card.front}</p>
+                  )}
+                  {/^https?:\/\//.test(card.back) ? (
+                    <img src={card.back} alt="Answer" className="max-h-12 object-contain rounded-lg mt-1 opacity-70" />
+                  ) : (
+                    <p className="text-xs text-muted-foreground mt-1 leading-snug line-clamp-2">{card.back}</p>
+                  )}
                 </div>
               </div>
             );
@@ -276,7 +282,11 @@ export function FlashcardsReader() {
                 </div>
                 {/* Text */}
                 <div className="flex-1 flex items-center justify-center px-8 py-4">
-                  <p className="text-xl font-bold text-center leading-relaxed">{card.front}</p>
+                  {/^https?:\/\//.test(card.front) ? (
+                    <img src={card.front} alt="Question" className="max-h-48 max-w-full object-contain rounded-xl" />
+                  ) : (
+                    <p className="text-xl font-bold text-center leading-relaxed">{card.front}</p>
+                  )}
                 </div>
                 {/* Hint */}
                 <div className="px-6 pb-5 flex items-center justify-center gap-1.5 text-muted-foreground">
@@ -304,7 +314,11 @@ export function FlashcardsReader() {
                 </div>
                 {/* Text */}
                 <div className="flex-1 flex items-center justify-center px-8 py-4">
-                  <p className="text-xl font-bold text-center leading-relaxed">{card.back}</p>
+                  {/^https?:\/\//.test(card.back) ? (
+                    <img src={card.back} alt="Answer" className="max-h-48 max-w-full object-contain rounded-xl" />
+                  ) : (
+                    <p className="text-xl font-bold text-center leading-relaxed">{card.back}</p>
+                  )}
                 </div>
                 {/* Hint */}
                 <div className="px-6 pb-5 flex items-center justify-center">
