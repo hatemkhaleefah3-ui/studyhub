@@ -1,7 +1,8 @@
 import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useRoute, useLocation } from "wouter";
-import { ArrowLeft, Trash2, Layers, Brain, Settings as SettingsIcon, Upload, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, Trash2, Layers, Brain, Settings as SettingsIcon, Upload, ChevronLeft, ChevronRight, FileText } from "lucide-react";
+import { motion, PanInfo } from "framer-motion";
 import { useStudyData, StudyType } from "@/hooks/useStudyData";
 import { GlassCard } from "@/components/shared/GlassCard";
 import { BottomSheet } from "@/components/shared/BottomSheet";
@@ -69,15 +70,27 @@ export function LectureEdit() {
         <LectureCoverBadge percentage={lecture.readerLastPercentage} />
       </div>
 
-      {/* Navigation strip — swipe hint for mobile, arrows for desktop */}
-      <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground font-medium select-none">
-        <ChevronLeft className="w-3.5 h-3.5 opacity-50" />
-        <span className="opacity-60">Flashcards</span>
-        <span className="mx-1.5 opacity-30">·</span>
-        <span className="font-bold text-foreground px-1.5 py-0.5 rounded-md bg-secondary/60 border border-border/50 text-xs">Lecture</span>
-        <span className="mx-1.5 opacity-30">·</span>
-        <span className="opacity-60">File Reader</span>
-        <ChevronRight className="w-3.5 h-3.5 opacity-50" />
+      {/* Navigation strip — clickable arrows + swipe hint */}
+      <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground font-medium">
+        <button
+          onClick={() => setFlashcardsOpen(true)}
+          className="flex items-center gap-1 hover:text-foreground transition-colors rounded-lg px-2 py-1 hover:bg-secondary/60"
+          title="Open Flashcards"
+        >
+          <ChevronLeft className="w-3.5 h-3.5" />
+          <span>Flashcards</span>
+        </button>
+        <span className="mx-1 opacity-30">·</span>
+        <span className="font-bold text-foreground px-1.5 py-0.5 rounded-md bg-secondary/60 border border-border/50 text-xs select-none">Lecture</span>
+        <span className="mx-1 opacity-30">·</span>
+        <button
+          onClick={() => setLocation(`/subjects/${subject.id}/lectures/${lecture.id}/reader`)}
+          className="flex items-center gap-1 hover:text-foreground transition-colors rounded-lg px-2 py-1 hover:bg-secondary/60"
+          title="Open File Reader"
+        >
+          <span>File Reader</span>
+          <ChevronRight className="w-3.5 h-3.5" />
+        </button>
       </div>
 
       <div className="flex gap-3">
@@ -88,10 +101,10 @@ export function LectureEdit() {
           <Layers className="w-4 h-4" /> Flashcards
         </button>
         <button
-          onClick={() => setLocation(`/subjects/${subject.id}/lectures/${lecture.id}/study`)}
+          onClick={() => setLocation(`/subjects/${subject.id}/lectures/${lecture.id}/reader`)}
           className="flex-1 flex items-center justify-center gap-2 rounded-2xl py-3.5 font-semibold bg-secondary hover:bg-secondary/80 transition-colors"
         >
-          <Brain className="w-4 h-4" /> Study (Reader)
+          <FileText className="w-4 h-4" /> File Reader
         </button>
       </div>
 

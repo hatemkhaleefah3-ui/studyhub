@@ -15,6 +15,7 @@ import { ExamEdit } from '@/pages/ExamEdit';
 import { ExamTake } from '@/pages/ExamTake';
 import { FlashcardsMaker } from '@/pages/FlashcardsMaker';
 import { FlashcardsReader } from '@/pages/FlashcardsReader';
+import { LectureReader } from '@/pages/LectureReader';
 import { Schedule } from '@/pages/Schedule';
 import { Checklist } from '@/pages/Checklist';
 import { TaskListDetail } from '@/pages/TaskListDetail';
@@ -33,6 +34,7 @@ function Router() {
       <Route path="/subjects/:subjectId/lectures/:lectureId" component={LectureEdit} />
       <Route path="/subjects/:subjectId/lectures/:lectureId/flashcards" component={FlashcardsMaker} />
       <Route path="/subjects/:subjectId/lectures/:lectureId/study" component={FlashcardsReader} />
+      <Route path="/subjects/:subjectId/lectures/:lectureId/reader" component={LectureReader} />
       <Route path="/subjects/:subjectId/exams/:examId/edit" component={ExamEdit} />
       <Route path="/subjects/:subjectId/exams/:examId/take" component={ExamTake} />
       <Route path="/schedule" component={Schedule} />
