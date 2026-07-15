@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
+import * as XLSX from "xlsx";
 import { useForm } from "react-hook-form";
 import { Link, useRoute, useLocation } from "wouter";
-import { ArrowLeft, Plus, Trash2, Brain, Layers, Pencil } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Brain, Layers, Pencil, FileSpreadsheet, ImageIcon } from "lucide-react";
 import { useStudyData } from "@/hooks/useStudyData";
 import { GlassCard } from "@/components/shared/GlassCard";
 import { BottomSheet } from "@/components/shared/BottomSheet";
@@ -25,6 +26,12 @@ export function FlashcardsMaker() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [excelError, setExcelError] = useState<string | null>(null);
+  const [addFrontIsImage, setAddFrontIsImage] = useState(false);
+  const [addBackIsImage, setAddBackIsImage] = useState(false);
+  const [editFrontIsImage, setEditFrontIsImage] = useState(false);
+  const [editBackIsImage, setEditBackIsImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const addForm = useForm({ defaultValues: { front: "", back: "" } });
   const editForm = useForm({ defaultValues: { front: "", back: "" } });
@@ -43,6 +50,8 @@ export function FlashcardsMaker() {
     if (!data.front.trim() || !data.back.trim()) return;
     addFlashcard(subject.id, lecture.id, { front: data.front.trim(), back: data.back.trim() });
     addForm.reset();
+    setAddFrontIsImage(false);
+    setAddBackIsImage(false);
     setIsAddOpen(false);
   };
 
@@ -50,7 +59,34 @@ export function FlashcardsMaker() {
     const card = cards.find(c => c.id === id);
     if (!card) return;
     editForm.reset({ front: card.front, back: card.back });
+    setEditFrontIsImage(/^https?:\/\//.test(card.front));
+    setEditBackIsImage(/^https?:\/\//.test(card.back));
     setEditingId(id);
+  };
+
+  const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      const data = await file.arrayBuffer();
+      const wb = XLSX.read(data, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<Record<string, string>>(ws);
+      if (!rows.length || !("Front face" in rows[0]) || !("Back face" in rows[0])) {
+        setExcelError("Invalid file: first column must be 'Front face', second must be 'Back face'.");
+        return;
+      }
+      let added = 0;
+      rows.forEach(row => {
+        const front = String(row["Front face"] ?? "").trim();
+        const back  = String(row["Back face"]  ?? "").trim();
+        if (front && back) { addFlashcard(subject.id, lecture.id, { front, back }); added++; }
+      });
+      setExcelError(added ? null : "No valid rows found in the file.");
+    } catch {
+      setExcelError("Could not parse the file. Please upload a valid .xlsx file.");
+    }
   };
 
   const onEdit = (data: any) => {
@@ -177,7 +213,11 @@ export function FlashcardsMaker() {
                       >
                         Q
                       </p>
-                      <p className="font-semibold text-sm leading-relaxed">{card.front}</p>
+                      {/^https?:\/\//.test(card.front) ? (
+                        <img src={card.front} alt="[Image unavailable]" className="max-h-28 object-contain rounded-lg mx-auto" />
+                      ) : (
+                        <p className="font-semibold text-sm leading-relaxed">{card.front}</p>
+                      )}
                     </div>
 
                     {/* Divider */}
@@ -188,7 +228,11 @@ export function FlashcardsMaker() {
                       <p className="text-[10px] font-black uppercase tracking-widest mb-1.5 text-muted-foreground">
                         A
                       </p>
-                      <p className="text-sm text-muted-foreground leading-relaxed">{card.back}</p>
+                      {/^https?:\/\//.test(card.back) ? (
+                        <img src={card.back} alt="[Image unavailable]" className="max-h-28 object-contain rounded-lg mx-auto" />
+                      ) : (
+                        <p className="text-sm text-muted-foreground leading-relaxed">{card.back}</p>
+                      )}
                     </div>
                   </GlassCard>
                 </SwipeRow>
@@ -211,35 +255,72 @@ export function FlashcardsMaker() {
       {/* ── Add sheet ───────────────────────────────────────────────── */}
       <BottomSheet
         isOpen={isAddOpen}
-        onClose={() => { setIsAddOpen(false); addForm.reset(); }}
+        onClose={() => { setIsAddOpen(false); addForm.reset(); setAddFrontIsImage(false); setAddBackIsImage(false); }}
         title="New Flashcard"
       >
+        {/* Excel bulk import */}
+        <div className="mb-5">
+          <button
+            type="button"
+            onClick={() => { setExcelError(null); fileInputRef.current?.click(); }}
+            className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-border rounded-xl p-3 text-sm text-muted-foreground hover:border-primary/40 hover:text-foreground transition-all font-medium"
+          >
+            <FileSpreadsheet className="w-4 h-4" /> Import from Excel (.xlsx)
+          </button>
+          <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleExcelUpload} />
+          {excelError && <p className="text-xs text-destructive mt-2">{excelError}</p>}
+          <p className="text-xs text-muted-foreground mt-1.5 text-center">Columns: "Front face" · "Back face"</p>
+        </div>
+
         <form onSubmit={addForm.handleSubmit(onAdd)} className="space-y-5">
+          {/* Front face */}
           <div>
-            <label className="block text-sm font-semibold mb-2">
-              Question{" "}
-              <span className="text-muted-foreground font-normal text-xs">(front side)</span>
-            </label>
-            <textarea
-              {...addForm.register("front", { required: true })}
-              className={inputCls}
-              rows={3}
-              placeholder="What is…?"
-              onKeyDown={textareaNext}
-            />
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-semibold">
+                Question <span className="text-muted-foreground font-normal text-xs">(front side)</span>
+              </label>
+              <div className="flex rounded-lg border border-border overflow-hidden text-xs font-semibold">
+                <button type="button" onClick={() => setAddFrontIsImage(false)}
+                  className={`px-2.5 py-1 transition-colors ${!addFrontIsImage ? "bg-primary text-primary-foreground" : "bg-secondary/50 text-muted-foreground"}`}>
+                  Text
+                </button>
+                <button type="button" onClick={() => setAddFrontIsImage(true)}
+                  className={`px-2.5 py-1 transition-colors flex items-center gap-1 ${addFrontIsImage ? "bg-primary text-primary-foreground" : "bg-secondary/50 text-muted-foreground"}`}>
+                  <ImageIcon className="w-3 h-3" /> URL
+                </button>
+              </div>
+            </div>
+            {addFrontIsImage ? (
+              <input type="url" {...addForm.register("front", { required: true })} className={inputCls} placeholder="https://example.com/image.jpg" />
+            ) : (
+              <textarea {...addForm.register("front", { required: true })} className={inputCls} rows={3} placeholder="What is…?" onKeyDown={textareaNext} />
+            )}
           </div>
+
+          {/* Back face */}
           <div>
-            <label className="block text-sm font-semibold mb-2">
-              Answer{" "}
-              <span className="text-muted-foreground font-normal text-xs">(back side)</span>
-            </label>
-            <textarea
-              {...addForm.register("back", { required: true })}
-              className={inputCls}
-              rows={3}
-              placeholder="The answer is…"
-            />
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-semibold">
+                Answer <span className="text-muted-foreground font-normal text-xs">(back side)</span>
+              </label>
+              <div className="flex rounded-lg border border-border overflow-hidden text-xs font-semibold">
+                <button type="button" onClick={() => setAddBackIsImage(false)}
+                  className={`px-2.5 py-1 transition-colors ${!addBackIsImage ? "bg-primary text-primary-foreground" : "bg-secondary/50 text-muted-foreground"}`}>
+                  Text
+                </button>
+                <button type="button" onClick={() => setAddBackIsImage(true)}
+                  className={`px-2.5 py-1 transition-colors flex items-center gap-1 ${addBackIsImage ? "bg-primary text-primary-foreground" : "bg-secondary/50 text-muted-foreground"}`}>
+                  <ImageIcon className="w-3 h-3" /> URL
+                </button>
+              </div>
+            </div>
+            {addBackIsImage ? (
+              <input type="url" {...addForm.register("back", { required: true })} className={inputCls} placeholder="https://example.com/image.jpg" />
+            ) : (
+              <textarea {...addForm.register("back", { required: true })} className={inputCls} rows={3} placeholder="The answer is…" />
+            )}
           </div>
+
           <button
             type="submit"
             className="w-full text-primary-foreground bg-primary font-semibold rounded-xl py-3.5 transition-opacity hover:opacity-90 active:scale-[0.98]"
@@ -250,27 +331,56 @@ export function FlashcardsMaker() {
       </BottomSheet>
 
       {/* ── Edit sheet ──────────────────────────────────────────────── */}
-      <BottomSheet isOpen={!!editingId} onClose={() => setEditingId(null)} title="Edit Flashcard">
+      <BottomSheet isOpen={!!editingId} onClose={() => { setEditingId(null); setEditFrontIsImage(false); setEditBackIsImage(false); }} title="Edit Flashcard">
         <form onSubmit={editForm.handleSubmit(onEdit)} className="space-y-5">
+          {/* Front face */}
           <div>
-            <label className="block text-sm font-semibold mb-2">
-              Question{" "}
-              <span className="text-muted-foreground font-normal text-xs">(front side)</span>
-            </label>
-            <textarea
-              {...editForm.register("front", { required: true })}
-              className={inputCls}
-              rows={3}
-              onKeyDown={textareaNext}
-            />
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-semibold">
+                Question <span className="text-muted-foreground font-normal text-xs">(front side)</span>
+              </label>
+              <div className="flex rounded-lg border border-border overflow-hidden text-xs font-semibold">
+                <button type="button" onClick={() => setEditFrontIsImage(false)}
+                  className={`px-2.5 py-1 transition-colors ${!editFrontIsImage ? "bg-primary text-primary-foreground" : "bg-secondary/50 text-muted-foreground"}`}>
+                  Text
+                </button>
+                <button type="button" onClick={() => setEditFrontIsImage(true)}
+                  className={`px-2.5 py-1 transition-colors flex items-center gap-1 ${editFrontIsImage ? "bg-primary text-primary-foreground" : "bg-secondary/50 text-muted-foreground"}`}>
+                  <ImageIcon className="w-3 h-3" /> URL
+                </button>
+              </div>
+            </div>
+            {editFrontIsImage ? (
+              <input type="url" {...editForm.register("front", { required: true })} className={inputCls} placeholder="https://example.com/image.jpg" />
+            ) : (
+              <textarea {...editForm.register("front", { required: true })} className={inputCls} rows={3} onKeyDown={textareaNext} />
+            )}
           </div>
+
+          {/* Back face */}
           <div>
-            <label className="block text-sm font-semibold mb-2">
-              Answer{" "}
-              <span className="text-muted-foreground font-normal text-xs">(back side)</span>
-            </label>
-            <textarea {...editForm.register("back", { required: true })} className={inputCls} rows={3} />
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-semibold">
+                Answer <span className="text-muted-foreground font-normal text-xs">(back side)</span>
+              </label>
+              <div className="flex rounded-lg border border-border overflow-hidden text-xs font-semibold">
+                <button type="button" onClick={() => setEditBackIsImage(false)}
+                  className={`px-2.5 py-1 transition-colors ${!editBackIsImage ? "bg-primary text-primary-foreground" : "bg-secondary/50 text-muted-foreground"}`}>
+                  Text
+                </button>
+                <button type="button" onClick={() => setEditBackIsImage(true)}
+                  className={`px-2.5 py-1 transition-colors flex items-center gap-1 ${editBackIsImage ? "bg-primary text-primary-foreground" : "bg-secondary/50 text-muted-foreground"}`}>
+                  <ImageIcon className="w-3 h-3" /> URL
+                </button>
+              </div>
+            </div>
+            {editBackIsImage ? (
+              <input type="url" {...editForm.register("back", { required: true })} className={inputCls} placeholder="https://example.com/image.jpg" />
+            ) : (
+              <textarea {...editForm.register("back", { required: true })} className={inputCls} rows={3} />
+            )}
           </div>
+
           <button
             type="submit"
             className="w-full text-primary-foreground bg-primary font-semibold rounded-xl py-3.5 transition-opacity hover:opacity-90 active:scale-[0.98]"
