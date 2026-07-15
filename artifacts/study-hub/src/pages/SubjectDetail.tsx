@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { focusNext } from "@/lib/focusNext";
 import { useStudyData, AttachmentFormat, AttachmentPriority, AttachmentType, StudyType } from "@/hooks/useStudyData";
 import { GlassCard } from "@/components/shared/GlassCard";
@@ -6,9 +6,11 @@ import { BottomSheet } from "@/components/shared/BottomSheet";
 import { ConfirmSheet } from "@/components/shared/ConfirmSheet";
 import { SwipeRow } from "@/components/shared/SwipeRow";
 import { LectureCoverBadge } from "@/components/study/LectureCoverBadge";
+import { parseLectureExcel } from "@/lib/excelImport";
 import {
   Plus, Trash2, ArrowLeft, ExternalLink, BookOpen, FileText, Pencil,
   FolderOpen, BarChart2, Link2, Paperclip, Info, Layers, Brain, ChevronRight, CheckSquare,
+  Upload, ChevronLeft, FileSpreadsheet,
 } from "lucide-react";
 import { Link, useRoute, useLocation, useSearch } from "wouter";
 import { useForm } from "react-hook-form";
@@ -56,6 +58,13 @@ export function SubjectDetail() {
   const [isEditDriveLinkOpen, setIsEditDriveLinkOpen] = useState(false);
   const [isDeletingSubject, setIsDeletingSubject] = useState(false);
 
+  // Lecture swipe → flashcards panel per-card
+  const [flashcardsSheetLecId, setFlashcardsSheetLecId] = useState<string | null>(null);
+  // Lecture Excel bulk-import
+  const lectureImportRef = useRef<HTMLInputElement>(null);
+  const [lectureImportSummary, setLectureImportSummary] = useState<{ imported: number; skipped: number } | null>(null);
+  const [isImportingLectures, setIsImportingLectures] = useState(false);
+
   const lecForm = useForm({ defaultValues: { name: "", link: "" } });
   const examForm = useForm({ defaultValues: { name: "", link: "", date: "", weight: 1 } });
   const attachForm = useForm({ defaultValues: { url: "", name: "" } });
@@ -86,6 +95,24 @@ export function SubjectDetail() {
     addLecture(subject.id, { name: data.name, link: data.link, type: lectureTypeTab });
     lecForm.reset();
     setIsAddLectureOpen(false);
+  };
+
+  const handleLectureImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsImportingLectures(true);
+    try {
+      const { rows, skipped } = await parseLectureExcel(file);
+      for (const row of rows) {
+        addLecture(subject.id, { name: row.name, link: row.link, type: lectureTypeTab });
+      }
+      setLectureImportSummary({ imported: rows.length, skipped });
+    } catch {
+      setLectureImportSummary({ imported: 0, skipped: -1 }); // -1 signals parse error
+    } finally {
+      setIsImportingLectures(false);
+      e.target.value = "";
+    }
   };
 
   const onAddExam = (data: any) => {
@@ -331,12 +358,12 @@ export function SubjectDetail() {
                     <SwipeRow
                       key={lec.id}
                       onTap={() => setLocation(`/subjects/${subject.id}/lectures/${lec.id}`)}
-                      onSwipeRight={() => setLocation(`/subjects/${subject.id}/lectures/${lec.id}/flashcards`)}
+                      onSwipeRight={() => setFlashcardsSheetLecId(lec.id)}
                       rightLabel="Flashcards" rightIcon={Layers} rightColor="#6366f1"
                       onSwipeLeft={() => setLocation(`/subjects/${subject.id}/lectures/${lec.id}/study`)}
-                      leftLabel="Study" leftIcon={Brain} leftColor="#0ea5e9"
+                      leftLabel="Study" leftIcon={Brain} leftColor="#10b981"
                     >
-                      <GlassCard className="p-4 flex items-center gap-4 cursor-pointer hover:shadow-md transition-all border-border/60 hover:border-border bg-card group ">
+                      <GlassCard className="p-4 flex items-center gap-4 cursor-pointer hover:shadow-md transition-all border-border/60 hover:border-border bg-card group">
                         <div className="w-10 h-10 rounded-[14px] bg-secondary flex items-center justify-center shrink-0 border border-border/50 text-muted-foreground group-hover:text-foreground transition-colors">
                           <BookOpen className="w-5 h-5" />
                         </div>
@@ -344,23 +371,52 @@ export function SubjectDetail() {
                           <p className="font-semibold text-sm truncate text-foreground">{lec.name}</p>
                           {lec.link && (
                             <span className="text-[11px] flex items-center gap-1 mt-0.5 text-primary/80 font-medium">
-                              <Link2 className="w-3 h-3" /> External Link
+                              <Link2 className="w-3 h-3" /> Drive link set
                             </span>
                           )}
                         </div>
                         <LectureCoverBadge percentage={lec.readerLastPercentage} />
-                        <ChevronRight className="w-4 h-4 text-muted-foreground/40 shrink-0 ml-1" />
+                        {/* Desktop arrow shortcuts */}
+                        <div className="hidden md:flex items-center gap-1 ml-1 shrink-0">
+                          <button
+                            onClick={e => { e.stopPropagation(); setFlashcardsSheetLecId(lec.id); }}
+                            className="p-1.5 rounded-lg hover:bg-indigo-500/15 text-muted-foreground hover:text-indigo-500 transition-colors"
+                            title="Flashcards"
+                          >
+                            <Layers className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground/40 shrink-0 ml-1 md:hidden" />
                       </GlassCard>
                     </SwipeRow>
                   ))}
                 </div>
               )}
-              <button
-                onClick={() => setIsAddLectureOpen(true)}
-                className="w-full border-2 border-dashed border-border/60 rounded-2xl p-4 text-muted-foreground hover:text-foreground hover:border-foreground/30 hover:bg-secondary/20 transition-all flex items-center justify-center gap-2 font-semibold shadow-sm"
-              >
-                <Plus className="w-4 h-4" /> Add {lectureTypeTab === "theoretical" ? "Theoretical" : "Practical"} Lecture
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setIsAddLectureOpen(true)}
+                  className="flex-1 border-2 border-dashed border-border/60 rounded-2xl p-4 text-muted-foreground hover:text-foreground hover:border-foreground/30 hover:bg-secondary/20 transition-all flex items-center justify-center gap-2 font-semibold shadow-sm"
+                >
+                  <Plus className="w-4 h-4" /> Add {lectureTypeTab === "theoretical" ? "Theoretical" : "Practical"} Lecture
+                </button>
+                <button
+                  onClick={() => lectureImportRef.current?.click()}
+                  disabled={isImportingLectures}
+                  className="border-2 border-dashed border-border/60 rounded-2xl px-4 py-4 text-muted-foreground hover:text-foreground hover:border-indigo-400/50 hover:bg-indigo-500/5 transition-all flex items-center justify-center gap-2 font-semibold shadow-sm shrink-0 disabled:opacity-50"
+                  title="Upload Lectures from Excel/CSV"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  <span className="hidden sm:inline">Import</span>
+                </button>
+              </div>
+              {/* Hidden file input for lecture import */}
+              <input
+                ref={lectureImportRef}
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                className="hidden"
+                onChange={handleLectureImport}
+              />
             </div>
           )}
 
@@ -496,6 +552,84 @@ export function SubjectDetail() {
       </AnimatePresence>
 
       {/* MODALS */}
+
+      {/* Flashcards panel — opens when swiping right on a lecture card */}
+      <BottomSheet
+        isOpen={!!flashcardsSheetLecId}
+        onClose={() => setFlashcardsSheetLecId(null)}
+        title="Flashcards"
+      >
+        <div className="space-y-3 pb-2">
+          <button
+            onClick={() => { setLocation(`/subjects/${subject.id}/lectures/${flashcardsSheetLecId}/flashcards`); setFlashcardsSheetLecId(null); }}
+            className="w-full flex items-center gap-3 rounded-2xl p-4 bg-secondary/60 hover:bg-secondary transition-colors text-left"
+          >
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0">
+              <Layers className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <p className="font-semibold text-foreground">Make Flashcards</p>
+              <p className="text-xs text-muted-foreground">Create front / back cards manually</p>
+            </div>
+          </button>
+          <button
+            onClick={() => { setLocation(`/subjects/${subject.id}/lectures/${flashcardsSheetLecId}/study`); setFlashcardsSheetLecId(null); }}
+            className="w-full flex items-center gap-3 rounded-2xl p-4 bg-secondary/60 hover:bg-secondary transition-colors text-left"
+          >
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 shrink-0">
+              <Brain className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <div>
+              <p className="font-semibold text-foreground">Study Flashcards</p>
+              <p className="text-xs text-muted-foreground">Flip-card review mode</p>
+            </div>
+          </button>
+          <button
+            onClick={() => { setLocation(`/subjects/${subject.id}/lectures/${flashcardsSheetLecId}/flashcards`); setFlashcardsSheetLecId(null); }}
+            className="w-full flex items-center gap-3 rounded-2xl p-4 bg-secondary/60 hover:bg-secondary transition-colors text-left"
+          >
+            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20 shrink-0">
+              <Upload className="w-5 h-5 text-indigo-500" />
+            </div>
+            <div>
+              <p className="font-semibold text-foreground">Upload Flashcards</p>
+              <p className="text-xs text-muted-foreground">Bulk-import from Excel / CSV (Col A = front, Col B = back)</p>
+            </div>
+          </button>
+        </div>
+      </BottomSheet>
+
+      {/* Lecture import summary */}
+      <BottomSheet
+        isOpen={!!lectureImportSummary}
+        onClose={() => setLectureImportSummary(null)}
+        title="Import Complete"
+      >
+        <div className="space-y-5 pb-4">
+          {lectureImportSummary?.skipped === -1 ? (
+            <p className="text-destructive font-medium text-center">Could not parse the file. Make sure it's a valid Excel or CSV with Name and Link columns.</p>
+          ) : (
+            <>
+              <p className="text-center text-foreground">
+                <span className="text-3xl font-bold text-primary">{lectureImportSummary?.imported}</span>
+                <span className="block text-sm text-muted-foreground mt-1">lectures imported</span>
+              </p>
+              {(lectureImportSummary?.skipped ?? 0) > 0 && (
+                <p className="text-center text-sm text-muted-foreground">
+                  {lectureImportSummary?.skipped} row{lectureImportSummary?.skipped !== 1 ? "s" : ""} skipped — missing Name or Link
+                </p>
+              )}
+            </>
+          )}
+          <button
+            onClick={() => setLectureImportSummary(null)}
+            className="w-full bg-primary text-primary-foreground font-semibold rounded-xl py-3"
+          >
+            Done
+          </button>
+        </div>
+      </BottomSheet>
+
       <BottomSheet isOpen={isAddLectureOpen} onClose={() => setIsAddLectureOpen(false)} title={`New ${lectureTypeTab === "theoretical" ? "Theoretical" : "Practical"} Lecture`}>
         <form onSubmit={lecForm.handleSubmit(onAddLecture)} className="space-y-5">
           <div>

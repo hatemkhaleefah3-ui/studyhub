@@ -1,6 +1,53 @@
 import * as XLSX from 'xlsx';
 import type { ExamQuestion, QuestionType } from '@/hooks/useStudyData';
 
+// ── Lecture bulk-import ────────────────────────────────────────────────────────
+
+export interface LectureImportRow {
+  name: string;
+  link: string;
+}
+
+export interface LectureImportResult {
+  rows: LectureImportRow[];
+  skipped: number;
+}
+
+/**
+ * Parses a Name/Link Excel or CSV file for bulk lecture import.
+ * Column A header: "Name", Column B header: "Link".
+ * Rows missing either value are counted as skipped.
+ */
+export async function parseLectureExcel(file: File): Promise<LectureImportResult> {
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: 'array' });
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, blankrows: false });
+
+  if (rows.length === 0) return { rows: [], skipped: 0 };
+
+  // Detect header row: skip if first cell looks like "name"
+  const firstRow = rows[0];
+  const hasHeader =
+    firstRow &&
+    typeof firstRow[0] === 'string' &&
+    firstRow[0].trim().toLowerCase() === 'name';
+
+  const dataRows = hasHeader ? rows.slice(1) : rows;
+  const result: LectureImportRow[] = [];
+  let skipped = 0;
+
+  for (const row of dataRows) {
+    if (!row || row.length === 0) continue;
+    const name = String(row[0] ?? '').trim();
+    const link = String(row[1] ?? '').trim();
+    if (!name || !link) { skipped++; continue; }
+    result.push({ name, link });
+  }
+
+  return { rows: result, skipped };
+}
+
 /**
  * Parses the exam-questions Excel file described in the feature spec
  * (section 1.6). Fixed columns, one header row, one question per row:

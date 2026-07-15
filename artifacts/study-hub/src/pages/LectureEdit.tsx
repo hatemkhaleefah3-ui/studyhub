@@ -1,19 +1,14 @@
 import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useRoute, useLocation } from "wouter";
-import { ArrowLeft, Trash2, Layers, Brain, Settings as SettingsIcon, Upload, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  ArrowLeft, Trash2, Layers, Brain, Upload, ExternalLink, BookOpen,
+} from "lucide-react";
 import { useStudyData, StudyType } from "@/hooks/useStudyData";
-import { GlassCard } from "@/components/shared/GlassCard";
 import { BottomSheet } from "@/components/shared/BottomSheet";
 import { ConfirmSheet } from "@/components/shared/ConfirmSheet";
 import { LectureCoverBadge } from "@/components/study/LectureCoverBadge";
 
-/**
- * Dedicated lecture edit page. Clicking a lecture row on the Pages
- * sub-page opens this page — editing fields and deleting the lecture
- * both live here now (spec 1.3), instead of an inline edit sheet + a
- * swipe-to-delete gesture.
- */
 export function LectureEdit() {
   const [, params] = useRoute("/subjects/:subjectId/lectures/:lectureId");
   const [, setLocation] = useLocation();
@@ -27,16 +22,12 @@ export function LectureEdit() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm({
-    defaultValues: { name: lecture?.name || "", link: lecture?.link || "" },
+    defaultValues: { name: lecture?.name ?? "", link: lecture?.link ?? "" },
   });
 
   if (!subject || !lecture) {
     return <div className="p-8 text-center text-muted-foreground">Lecture not found</div>;
   }
-
-  // No per-subject color theming anymore
-  const inputCls =
-    "w-full bg-background border border-border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 text-foreground";
 
   const onSave = (data: any) => {
     updateLecture(subject.id, lecture.id, { name: data.name, link: data.link });
@@ -48,153 +39,213 @@ export function LectureEdit() {
 
   const handleDelete = () => {
     deleteLecture(subject.id, lecture.id);
-    setLocation(`/subjects/${subject.id}`);
+    setLocation(`/subjects/${subject.id}?tab=lectures`);
   };
 
+  const inputCls =
+    "w-full bg-secondary/40 border border-border/60 rounded-2xl px-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 text-foreground placeholder:text-muted-foreground/50 transition-all text-sm";
+
   return (
-    <div className="space-y-6 pb-20">
-      <div className="flex items-center gap-3">
-        <Link
-          href={`/subjects/${subject.id}?tab=lectures`}
-          className="p-2 rounded-full bg-secondary hover:bg-secondary/80 transition-colors shrink-0"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </Link>
-        <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-bold tracking-tight truncate text-primary">
-            {lecture.name}
-          </h1>
-          <p className="text-sm text-muted-foreground">Edit lecture</p>
+    <div className="pb-24 space-y-0">
+
+      {/* ── Hero ─────────────────────────────────────────────────────── */}
+      <div className="relative -mx-4 md:-mx-6 px-4 md:px-6 pt-2 pb-6 mb-6 bg-gradient-to-b from-primary/8 via-primary/4 to-transparent border-b border-border/30">
+        <div className="flex items-start gap-3">
+          <Link
+            href={`/subjects/${subject.id}?tab=lectures`}
+            className="mt-1 p-2 rounded-full bg-background/80 hover:bg-background border border-border/50 shadow-sm transition-colors shrink-0"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </Link>
+          <div className="flex-1 min-w-0 py-1">
+            <p className="text-xs font-semibold text-primary/70 uppercase tracking-widest mb-1">
+              {subject.name} · Lecture
+            </p>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground leading-snug">
+              {lecture.name}
+            </h1>
+            <div className="flex items-center gap-2 mt-2">
+              <span className={`text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                lecture.type === "theoretical"
+                  ? "bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20"
+                  : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+              }`}>
+                {lecture.type}
+              </span>
+              {(lecture.flashcards?.length ?? 0) > 0 && (
+                <span className="text-[11px] font-semibold text-muted-foreground">
+                  {lecture.flashcards!.length} flashcard{lecture.flashcards!.length !== 1 ? "s" : ""}
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="shrink-0 mt-1">
+            <LectureCoverBadge percentage={lecture.readerLastPercentage} />
+          </div>
         </div>
-        <LectureCoverBadge percentage={lecture.readerLastPercentage} />
       </div>
 
-      {/* Navigation strip — swipe hint for mobile, arrows for desktop */}
-      <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground font-medium select-none">
-        <ChevronLeft className="w-3.5 h-3.5 opacity-50" />
-        <span className="opacity-60">Flashcards</span>
-        <span className="mx-1.5 opacity-30">·</span>
-        <span className="font-bold text-foreground px-1.5 py-0.5 rounded-md bg-secondary/60 border border-border/50 text-xs">Lecture</span>
-        <span className="mx-1.5 opacity-30">·</span>
-        <span className="opacity-60">File Reader</span>
-        <ChevronRight className="w-3.5 h-3.5 opacity-50" />
-      </div>
-
-      <div className="flex gap-3">
+      {/* ── Quick actions ─────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-3 mb-5">
         <button
           onClick={() => setFlashcardsOpen(true)}
-          className="flex-1 flex items-center justify-center gap-2 rounded-2xl py-3.5 font-semibold text-primary-foreground bg-primary hover:bg-primary/90 transition-colors"
+          className="group relative overflow-hidden rounded-2xl p-4 bg-violet-500/10 hover:bg-violet-500/15 border border-violet-500/20 hover:border-violet-500/35 transition-all text-left"
         >
-          <Layers className="w-4 h-4" /> Flashcards
+          <div className="w-9 h-9 rounded-xl bg-violet-500/15 border border-violet-500/20 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+            <Layers className="w-4.5 h-4.5 text-violet-600 dark:text-violet-400" />
+          </div>
+          <p className="font-bold text-sm text-foreground">Flashcards</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">Make · Study · Import</p>
         </button>
+
         <button
           onClick={() => setLocation(`/subjects/${subject.id}/lectures/${lecture.id}/study`)}
-          className="flex-1 flex items-center justify-center gap-2 rounded-2xl py-3.5 font-semibold bg-secondary hover:bg-secondary/80 transition-colors"
+          className="group relative overflow-hidden rounded-2xl p-4 bg-emerald-500/10 hover:bg-emerald-500/15 border border-emerald-500/20 hover:border-emerald-500/35 transition-all text-left"
         >
-          <Brain className="w-4 h-4" /> Study (Reader)
+          <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+            <Brain className="w-4.5 h-4.5 text-emerald-600 dark:text-emerald-400" />
+          </div>
+          <p className="font-bold text-sm text-foreground">Study</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">Flip-card review</p>
         </button>
       </div>
 
-      <GlassCard className="p-5 space-y-5">
-        <form onSubmit={form.handleSubmit(onSave)} onBlur={form.handleSubmit(onSave)} className="space-y-5">
-          <div>
-            <label className="block text-sm font-medium mb-2">Lecture Name</label>
-            <input {...form.register("name", { required: true })} className={inputCls} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-2">
-              Lecture File Link <span className="text-muted-foreground font-normal">(optional URL)</span>
-            </label>
-            <input {...form.register("link")} className={inputCls} placeholder="https://..." />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-2">Upload Lecture File</label>
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-border rounded-2xl p-4 text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-all font-medium"
-            >
-              <Upload className="w-4 h-4" /> Upload File (PDF, DOCX, PPTX, image…)
-            </button>
-            <input ref={fileInputRef} type="file" accept="*/*" className="hidden" onChange={() => {}} />
-            <p className="text-xs text-muted-foreground mt-2">File storage via Google Drive — connect in Settings.</p>
-          </div>
-          <button
-            type="submit"
-            className="w-full text-primary-foreground bg-primary font-semibold rounded-xl py-3 transition-opacity hover:opacity-90"
-          >
-            Save Changes
-          </button>
-        </form>
-      </GlassCard>
-
-      {/* Settings — type toggle */}
-      <GlassCard className="p-5 space-y-3">
-        <div className="flex items-center gap-2 mb-2">
-          <SettingsIcon className="w-4 h-4 text-muted-foreground" />
-          <span className="font-semibold">Settings</span>
+      {/* ── Edit form ────────────────────────────────────────────────── */}
+      <form
+        onSubmit={form.handleSubmit(onSave)}
+        onBlur={form.handleSubmit(onSave)}
+        className="space-y-3 mb-5"
+      >
+        {/* Name */}
+        <div className="bg-card border border-border/50 rounded-2xl p-4 shadow-sm space-y-2">
+          <label className="block text-xs font-bold uppercase tracking-widest text-muted-foreground">
+            Lecture Name
+          </label>
+          <input
+            {...form.register("name", { required: true })}
+            className={inputCls}
+            placeholder="Enter lecture name…"
+          />
         </div>
-        <label className="block text-sm font-medium mb-2">Type</label>
+
+        {/* Link */}
+        <div className="bg-card border border-border/50 rounded-2xl p-4 shadow-sm space-y-2">
+          <label className="block text-xs font-bold uppercase tracking-widest text-muted-foreground">
+            Link <span className="font-normal normal-case tracking-normal text-muted-foreground/60">(optional)</span>
+          </label>
+          <div className="relative">
+            <input
+              {...form.register("link")}
+              className={inputCls + " pr-10"}
+              placeholder="https://…"
+            />
+            {form.watch("link") && (
+              <a
+                href={form.watch("link")}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={e => e.stopPropagation()}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-lg text-muted-foreground hover:text-primary transition-colors"
+              >
+                <ExternalLink className="w-4 h-4" />
+              </a>
+            )}
+          </div>
+        </div>
+      </form>
+
+      {/* ── Type ─────────────────────────────────────────────────────── */}
+      <div className="bg-card border border-border/50 rounded-2xl p-4 shadow-sm mb-5">
+        <label className="block text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">
+          Type
+        </label>
         <div className="bg-secondary/50 p-1 rounded-xl flex gap-1">
           {(["theoretical", "practical"] as StudyType[]).map(t => (
             <button
               key={t}
+              type="button"
               onClick={() => setType(t)}
-              className={`flex-1 py-2 rounded-lg text-sm font-semibold capitalize transition-all ${
-                lecture.type === t ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
+              className={`flex-1 py-2.5 rounded-xl text-sm font-semibold capitalize transition-all ${
+                lecture.type === t
+                  ? "bg-background shadow-sm text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
-              
             >
               {t}
             </button>
           ))}
         </div>
-      </GlassCard>
+      </div>
 
+      {/* ── Upload placeholder ───────────────────────────────────────── */}
+      <div className="bg-card border border-dashed border-border/60 rounded-2xl p-4 shadow-sm mb-8">
+        <label className="block text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">
+          Upload File
+        </label>
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="w-full flex items-center justify-center gap-2.5 rounded-xl py-3.5 text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-secondary/40 transition-all border border-dashed border-border/50"
+        >
+          <div className="w-7 h-7 rounded-lg bg-secondary flex items-center justify-center shrink-0">
+            <BookOpen className="w-3.5 h-3.5" />
+          </div>
+          Upload PDF / DOCX / PPTX…
+        </button>
+        <input ref={fileInputRef} type="file" accept="*/*" className="hidden" onChange={() => {}} />
+        <p className="text-[11px] text-muted-foreground/60 mt-2 text-center">
+          File storage via Google Drive — connect in Settings
+        </p>
+      </div>
+
+      {/* ── Delete ───────────────────────────────────────────────────── */}
       <button
+        type="button"
         onClick={() => setIsDeleting(true)}
-        className="w-full flex items-center justify-center gap-2 rounded-2xl py-3.5 font-semibold text-destructive bg-destructive/10 hover:bg-destructive/20 transition-colors"
+        className="w-full flex items-center justify-center gap-2 rounded-2xl py-3.5 font-semibold text-destructive/80 hover:text-destructive bg-destructive/6 hover:bg-destructive/12 border border-destructive/15 hover:border-destructive/30 transition-all"
       >
         <Trash2 className="w-4 h-4" /> Delete Lecture
       </button>
 
-      {/* Flashcards panel — opened by Flashcards button */}
+      {/* ── Flashcards bottom sheet ───────────────────────────────────── */}
       <BottomSheet isOpen={flashcardsOpen} onClose={() => setFlashcardsOpen(false)} title="Flashcards">
-        <div className="space-y-3 pb-2">
+        <div className="space-y-2.5 pb-2">
           <button
             onClick={() => { setLocation(`/subjects/${subject.id}/lectures/${lecture.id}/flashcards`); setFlashcardsOpen(false); }}
-            className="w-full flex items-center gap-3 rounded-2xl p-4 bg-secondary/60 hover:bg-secondary transition-colors text-left"
+            className="w-full flex items-center gap-4 rounded-2xl p-4 bg-secondary/50 hover:bg-secondary transition-colors text-left border border-border/40 hover:border-border/60"
           >
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0">
-              <Layers className="w-5 h-5 text-primary" />
+            <div className="w-11 h-11 rounded-xl bg-violet-500/12 border border-violet-500/20 flex items-center justify-center shrink-0">
+              <Layers className="w-5 h-5 text-violet-600 dark:text-violet-400" />
             </div>
             <div>
-              <p className="font-semibold text-foreground">Make Flashcards</p>
-              <p className="text-xs text-muted-foreground">Create front / back cards manually</p>
+              <p className="font-bold text-sm text-foreground">Make Flashcards</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Create front / back cards</p>
             </div>
           </button>
+
           <button
             onClick={() => { setLocation(`/subjects/${subject.id}/lectures/${lecture.id}/study`); setFlashcardsOpen(false); }}
-            className="w-full flex items-center gap-3 rounded-2xl p-4 bg-secondary/60 hover:bg-secondary transition-colors text-left"
+            className="w-full flex items-center gap-4 rounded-2xl p-4 bg-secondary/50 hover:bg-secondary transition-colors text-left border border-border/40 hover:border-border/60"
           >
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 shrink-0">
+            <div className="w-11 h-11 rounded-xl bg-emerald-500/12 border border-emerald-500/20 flex items-center justify-center shrink-0">
               <Brain className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
             </div>
             <div>
-              <p className="font-semibold text-foreground">Study Flashcards</p>
-              <p className="text-xs text-muted-foreground">Flip-card review mode</p>
+              <p className="font-bold text-sm text-foreground">Study Flashcards</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Flip-card review mode</p>
             </div>
           </button>
+
           <button
             onClick={() => { setLocation(`/subjects/${subject.id}/lectures/${lecture.id}/flashcards`); setFlashcardsOpen(false); }}
-            className="w-full flex items-center gap-3 rounded-2xl p-4 bg-secondary/60 hover:bg-secondary transition-colors text-left"
+            className="w-full flex items-center gap-4 rounded-2xl p-4 bg-secondary/50 hover:bg-secondary transition-colors text-left border border-border/40 hover:border-border/60"
           >
-            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20 shrink-0">
-              <Upload className="w-5 h-5 text-indigo-500" />
+            <div className="w-11 h-11 rounded-xl bg-sky-500/12 border border-sky-500/20 flex items-center justify-center shrink-0">
+              <Upload className="w-5 h-5 text-sky-600 dark:text-sky-400" />
             </div>
             <div>
-              <p className="font-semibold text-foreground">Upload Flashcards</p>
-              <p className="text-xs text-muted-foreground">Bulk-import from Excel / CSV (Col A = front, Col B = back)</p>
+              <p className="font-bold text-sm text-foreground">Import Flashcards</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Bulk-upload from Excel / CSV</p>
             </div>
           </button>
         </div>
@@ -205,7 +256,7 @@ export function LectureEdit() {
         onClose={() => setIsDeleting(false)}
         onConfirm={handleDelete}
         title="Delete lecture?"
-        message="This lecture and its flashcards will be permanently removed."
+        message="This lecture and all its flashcards will be permanently removed."
       />
     </div>
   );

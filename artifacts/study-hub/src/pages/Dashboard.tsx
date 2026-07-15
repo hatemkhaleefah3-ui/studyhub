@@ -210,7 +210,7 @@ export function Dashboard() {
       {/* Greeting header */}
       <div className="flex flex-row items-center md:items-end justify-between gap-3 md:gap-4">
         <div className="min-w-0">
-          <h1 className="text-2xl md:text-4xl font-bold tracking-tight mb-1 md:mb-2">Hello Fool</h1>
+          <h1 className="text-2xl md:text-4xl font-bold tracking-tight mb-1 md:mb-2">👋 Hello Fool</h1>
           <p className="text-muted-foreground font-medium text-sm md:text-lg truncate">{format(new Date(), "EEEE, MMMM do")}</p>
         </div>
 
