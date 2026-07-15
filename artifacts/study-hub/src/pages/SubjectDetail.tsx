@@ -360,8 +360,6 @@ export function SubjectDetail() {
                       onTap={() => setLocation(`/subjects/${subject.id}/lectures/${lec.id}`)}
                       onSwipeRight={() => setFlashcardsSheetLecId(lec.id)}
                       rightLabel="Flashcards" rightIcon={Layers} rightColor="#6366f1"
-                      onSwipeLeft={() => setLocation(`/subjects/${subject.id}/lectures/${lec.id}/reader`)}
-                      leftLabel="Reader" leftIcon={FileText} leftColor="#0ea5e9"
                     >
                       <GlassCard className="p-4 flex items-center gap-4 cursor-pointer hover:shadow-md transition-all border-border/60 hover:border-border bg-card group">
                         <div className="w-10 h-10 rounded-[14px] bg-secondary flex items-center justify-center shrink-0 border border-border/50 text-muted-foreground group-hover:text-foreground transition-colors">
@@ -384,13 +382,6 @@ export function SubjectDetail() {
                             title="Flashcards"
                           >
                             <Layers className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={e => { e.stopPropagation(); setLocation(`/subjects/${subject.id}/lectures/${lec.id}/reader`); }}
-                            className="p-1.5 rounded-lg hover:bg-sky-500/15 text-muted-foreground hover:text-sky-500 transition-colors"
-                            title="File Reader"
-                          >
-                            <FileText className="w-3.5 h-3.5" />
                           </button>
                         </div>
                         <ChevronRight className="w-4 h-4 text-muted-foreground/40 shrink-0 ml-1 md:hidden" />
