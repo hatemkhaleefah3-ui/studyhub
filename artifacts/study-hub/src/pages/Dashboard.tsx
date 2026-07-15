@@ -53,10 +53,10 @@ function NextExamsSection({ plans, subjects }: { plans: SchedulePlan[]; subjects
               return (
                 <div
                   key={item.id}
-                  className="rounded-3xl overflow-hidden border border-white/[0.06] shadow-xl"
+                  className="relative rounded-3xl overflow-hidden border border-white/[0.06] shadow-xl"
                   style={{ background: "linear-gradient(145deg,#18181b 0%,#111113 100%)" }}
                 >
-                  {/* Radial glow blob top-right */}
+                  {/* Radial glow blob top-right — contained by relative+overflow-hidden */}
                   <div
                     className="absolute top-0 right-0 w-56 h-56 rounded-full pointer-events-none blur-2xl"
                     style={{ background: glowColor, transform: "translate(30%,-30%)" }}

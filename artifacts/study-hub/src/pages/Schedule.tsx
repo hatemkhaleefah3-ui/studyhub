@@ -216,100 +216,6 @@ function NextExamSection({ plans }: { plans: SchedulePlan[] }) {
   );
 }
 
-// ─── Exams Section ────────────────────────────────────────────────────────────
-
-function ExamsSection({
-  plans,
-  onEdit,
-  onRemoveItem,
-}: {
-  plans: SchedulePlan[];
-  onEdit: (planId: string) => void;
-  onRemoveItem: (planId: string, itemId: string) => void;
-}) {
-  const examPlans = plans.filter((p) => p.type === "exam");
-  if (examPlans.length === 0) return null;
-
-  // Sort plans by their earliest exam item date
-  const sortedPlans = [...examPlans].sort((a, b) => {
-    const aFirst = a.items.filter(i => i.date).sort((x, y) => (x.date ?? "").localeCompare(y.date ?? ""))[0]?.date ?? "";
-    const bFirst = b.items.filter(i => i.date).sort((x, y) => (x.date ?? "").localeCompare(y.date ?? ""))[0]?.date ?? "";
-    return aFirst.localeCompare(bFirst);
-  });
-
-  return (
-    <section>
-      <SectionHeader title="Exams" />
-      <div className="space-y-5">
-        {sortedPlans.map((plan) => {
-          const sortedItems = [...plan.items].sort((a, b) => {
-            if (!a.date) return 1;
-            if (!b.date) return -1;
-            return a.date.localeCompare(b.date);
-          });
-          return (
-            <div key={plan.id} className="space-y-2">
-              {/* Schedule group header */}
-              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground px-1">
-                {plan.title}
-              </p>
-              {sortedItems.map((item) => {
-                const days = item.date ? daysUntil(item.date) : null;
-                const isPast = days !== null && days < 0;
-                const isChecked = !!item.checked;
-                return (
-                  <SwipeableRow
-                    key={item.id}
-                    onEdit={() => onEdit(plan.id)}
-                    onDelete={() => onRemoveItem(plan.id, item.id)}
-                  >
-                    <GlassCard
-                      className={`p-4 flex items-center gap-4 border-border/60 ${(isPast || isChecked) ? "opacity-50" : ""}`}
-                    >
-                      <div
-                        className={`w-2 h-2 rounded-full shrink-0 ${
-                          isChecked ? "bg-emerald-500"
-                          : days === null ? "bg-muted-foreground/30"
-                          : isPast ? "bg-muted-foreground/30"
-                          : days <= 2 ? "bg-destructive"
-                          : days <= 7 ? "bg-amber-500"
-                          : "bg-primary"
-                        }`}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm text-foreground truncate">{item.subjectName}</p>
-                        {item.date && (
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {format(new Date(item.date), "EEE, MMM d")}
-                            {item.time && ` · ${item.time}`}
-                          </p>
-                        )}
-                      </div>
-                      {isChecked && <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />}
-                      {!isChecked && days !== null && (
-                        <p
-                          className={`text-sm font-bold shrink-0 ${
-                            isPast ? "text-muted-foreground"
-                            : days <= 2 ? "text-destructive"
-                            : days <= 7 ? "text-amber-500"
-                            : "text-foreground"
-                          }`}
-                        >
-                          {isPast ? "Past" : days === 0 ? "Today" : days === 1 ? "Tomorrow" : `${days}d`}
-                        </p>
-                      )}
-                    </GlassCard>
-                  </SwipeableRow>
-                );
-              })}
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
 // ─── Schedule Plan Card ───────────────────────────────────────────────────────
 
 function SchedulePlanCard({ plan, onClick }: { plan: SchedulePlan; onClick?: () => void }) {
@@ -320,11 +226,115 @@ function SchedulePlanCard({ plan, onClick }: { plan: SchedulePlan; onClick?: () 
   const isActive  = daysStart <= 0 && daysEnd >= 0;
   const isPast    = daysEnd < 0;
 
-  const borderColor = isExam
-    ? "hsl(var(--destructive))"
-    : isReview
-    ? "#d97706"
-    : "hsl(var(--primary))";
+  // For exam plans: big = subject name (single) or plan title (multi-exam)
+  // small sub-label = plan title (schedule name)
+  const examSingleItem = isExam && plan.items.length === 1 ? plan.items[0] : null;
+  const examBigTitle   = examSingleItem ? examSingleItem.subjectName : plan.title;
+  const examSubLabel   = examSingleItem ? plan.title : null;
+
+  // Urgency for exam countdown
+  const examNextDate = isExam
+    ? plan.items.map(i => i.date).filter(Boolean).sort()[0]
+    : null;
+  const examDaysLeft = examNextDate ? daysUntil(examNextDate) : null;
+  const examUrgent   = examDaysLeft !== null && examDaysLeft <= 7 && examDaysLeft >= 0;
+  const examVeryUrgent = examDaysLeft !== null && examDaysLeft <= 3 && examDaysLeft >= 0;
+
+  if (isExam) {
+    return (
+      <GlassCard
+        onClick={onClick}
+        className={`overflow-hidden cursor-pointer transition-all hover:shadow-md active:scale-[0.99] border ${
+          isPast
+            ? "border-border/40 opacity-60"
+            : examVeryUrgent
+            ? "border-destructive/40 bg-destructive/5 dark:bg-destructive/10"
+            : examUrgent
+            ? "border-amber-500/40 bg-amber-500/5 dark:bg-amber-500/10"
+            : "border-border/60 bg-card"
+        }`}
+      >
+        {/* Left accent strip */}
+        <div className="flex items-stretch gap-0">
+          <div
+            className={`w-1 shrink-0 self-stretch ${
+              isPast
+                ? "bg-muted-foreground/30"
+                : examVeryUrgent
+                ? "bg-destructive"
+                : examUrgent
+                ? "bg-amber-500"
+                : "bg-rose-400 dark:bg-rose-500"
+            }`}
+          />
+          <div className="flex-1 p-4 flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              {/* Badge row */}
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <span
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${
+                    isPast
+                      ? "bg-secondary text-muted-foreground border-border/50"
+                      : examVeryUrgent
+                      ? "bg-destructive/10 text-destructive border-destructive/20"
+                      : examUrgent
+                      ? "bg-amber-500/10 text-amber-600 border-amber-500/20"
+                      : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20"
+                  }`}
+                >
+                  <GraduationCap className="w-3 h-3" />
+                  {isPast ? "Past" : isActive ? "Today" : "Exam"}
+                </span>
+                {isActive && !isPast && (
+                  <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                    Active
+                  </span>
+                )}
+              </div>
+              {/* Big title = subject name */}
+              <h3 className="font-bold text-foreground text-base leading-snug truncate">{examBigTitle}</h3>
+              {/* Sub-label = schedule name */}
+              {examSubLabel && (
+                <p className="text-xs text-muted-foreground font-semibold mt-0.5 truncate">{examSubLabel}</p>
+              )}
+              {/* Date range */}
+              <p className="text-xs text-muted-foreground mt-1.5">
+                {format(new Date(plan.startDate), "MMM d")}
+                {plan.startDate !== plan.endDate && ` → ${format(new Date(plan.endDate), "MMM d, yyyy")}`}
+              </p>
+              {plan.items.length > 1 && (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {plan.items.length} exams
+                </p>
+              )}
+            </div>
+            {/* Countdown */}
+            {!isPast && examDaysLeft !== null && (
+              <div className="text-right shrink-0 flex flex-col items-end justify-center">
+                <p
+                  className={`text-2xl font-black leading-none tabular-nums ${
+                    examVeryUrgent
+                      ? "text-destructive"
+                      : examUrgent
+                      ? "text-amber-500"
+                      : "text-rose-500 dark:text-rose-400"
+                  }`}
+                >
+                  {examDaysLeft === 0 ? "!" : String(examDaysLeft)}
+                </p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mt-0.5">
+                  {examDaysLeft === 0 ? "today" : examDaysLeft === 1 ? "day" : "days"}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </GlassCard>
+    );
+  }
+
+  // ── Review / Study card (unchanged design) ──────────────────────────────────
+  const borderColor = isReview ? "#d97706" : "hsl(var(--primary))";
 
   return (
     <GlassCard
@@ -337,15 +347,13 @@ function SchedulePlanCard({ plan, onClick }: { plan: SchedulePlan; onClick?: () 
           <div className="flex items-center gap-2 mb-2 flex-wrap">
             <span
               className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${
-                isExam
-                  ? "bg-destructive/10 text-destructive border-destructive/20"
-                  : isReview
+                isReview
                   ? "bg-amber-500/10 text-amber-600 border-amber-500/20"
                   : "bg-primary/10 text-primary border-primary/20"
               }`}
             >
-              {isExam ? <GraduationCap className="w-3 h-3" /> : isReview ? <BookOpen className="w-3 h-3" /> : <BookMarked className="w-3 h-3" />}
-              {isExam ? "Exam" : isReview ? "Review" : "Study"}
+              {isReview ? <BookOpen className="w-3 h-3" /> : <BookMarked className="w-3 h-3" />}
+              {isReview ? "Review" : "Study"}
             </span>
             {isActive && (
               <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
@@ -363,11 +371,8 @@ function SchedulePlanCard({ plan, onClick }: { plan: SchedulePlan; onClick?: () 
             {format(new Date(plan.startDate), "MMM d")} → {format(new Date(plan.endDate), "MMM d, yyyy")}
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {plan.items.length}{" "}
-            {isExam
-              ? plan.items.length === 1 ? "exam" : "exams"
-              : plan.items.length === 1 ? "subject" : "subjects"}
-            {!isExam && !isReview && plan.items[0]?.repeatPattern && ` · ${plan.items[0].repeatPattern}`}
+            {plan.items.length} {plan.items.length === 1 ? "subject" : "subjects"}
+            {!isReview && plan.items[0]?.repeatPattern && ` · ${plan.items[0].repeatPattern}`}
           </p>
         </div>
         {!isPast && !isActive && (
@@ -1669,11 +1674,8 @@ export function Schedule() {
     return [...events, ...tasks].sort((a, b) => a.sortTime - b.sortTime);
   }, [schedule, checklist, selectedDate]);
 
-  // All non-exam schedules shown — no hide/overlap filtering
-  const visiblePlans = useMemo(
-    () => schedulePlans.filter(p => p.type !== "exam"),
-    [schedulePlans]
-  );
+  // All schedules shown (exam + review + study) — no hide/overlap filtering
+  const visiblePlans = useMemo(() => schedulePlans, [schedulePlans]);
 
   // Color helper for the day-strip — mirrors MonthView's getCellBg
   // Use all schedulePlans (not just visiblePlans) so review/study coloring is
@@ -1897,14 +1899,7 @@ export function Schedule() {
         )}
       </section>
 
-      {/* ── 3. EXAMS ── */}
-      <ExamsSection
-        plans={schedulePlans}
-        onEdit={handleEditPlan}
-        onRemoveItem={handleRemoveExamItem}
-      />
-
-      {/* ── 4. SCHEDULES ── */}
+      {/* ── 3. SCHEDULES ── */}
       <SchedulesSection
         plans={visiblePlans}
         onEdit={setEditingPlan}
