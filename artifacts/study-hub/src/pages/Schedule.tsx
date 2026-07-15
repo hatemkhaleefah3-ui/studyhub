@@ -1659,8 +1659,8 @@ export function Schedule() {
 
   // ── Derived data ────────────────────────────────────────────────────────────
 
-  const startDate = startOfWeek(selectedDate, { weekStartsOn: 1 });
-  const weekDays  = Array.from({ length: 7 }).map((_, i) => addDays(startDate, i));
+  const monthStart = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+  const weekDays   = Array.from({ length: getDaysInMonth(selectedDate) }).map((_, i) => addDays(monthStart, i));
 
   const dayEntries = useMemo(() => {
     const events = schedule
@@ -1679,6 +1679,28 @@ export function Schedule() {
     () => resolveConflicts(schedulePlans),
     [schedulePlans]
   );
+
+  // Color helper for the day-strip — mirrors MonthView's getCellBg
+  const _dayARSub    = getActiveReviewSubject(schedulePlans, new Date());
+  const _dayNonExam  = visiblePlans.filter(p => p.type !== "exam");
+  const _dayTopPlan  = _dayNonExam.length > 0
+    ? _dayNonExam.reduce((best, p) => ((p.importance ?? 2) < (best.importance ?? 2) ? p : best))
+    : null;
+  const getDayBg = (date: Date): string | undefined => {
+    const s = format(date, "yyyy-MM-dd");
+    if (schedulePlans.some(p => p.type === "exam" && p.items.some(i => i.date === s)))
+      return "rgba(239,68,68,0.18)";
+    if (_dayARSub?.reviewStartDate && _dayARSub?.reviewEndDate &&
+        s >= _dayARSub.reviewStartDate && s <= _dayARSub.reviewEndDate)
+      return "rgba(34,197,94,0.18)";
+    if (_dayTopPlan) {
+      if (_dayTopPlan.type === "review" && s >= _dayTopPlan.startDate && s <= _dayTopPlan.endDate)
+        return "rgba(234,179,8,0.18)";
+      if (_dayTopPlan.type === "study" && isStudyPlanDay(_dayTopPlan, date))
+        return "rgba(59,130,246,0.15)";
+    }
+    return undefined;
+  };
 
   // ── Handlers ────────────────────────────────────────────────────────────────
 
@@ -1745,11 +1767,13 @@ export function Schedule() {
                 const isNow  = isSameDay(date, new Date());
                 const isSel  = isSameDay(date, selectedDate);
                 const hasEnt = hasEntriesOnDate(schedule, checklist, schedulePlans, subjects, date);
+                const dayBg  = !isSel && !isNow ? getDayBg(date) : undefined;
                 return (
                   <button
                     key={i}
                     data-today={isNow ? "true" : undefined}
                     onClick={() => setSelectedDate(date)}
+                    style={dayBg ? { backgroundColor: dayBg } : undefined}
                     className={`snap-center flex-shrink-0 flex flex-col items-center justify-center w-[4.5rem] h-[5rem] rounded-2xl transition-all duration-200 border shadow-sm ${
                       isSel
                         ? "bg-primary text-primary-foreground border-primary shadow-primary/20 scale-105"
