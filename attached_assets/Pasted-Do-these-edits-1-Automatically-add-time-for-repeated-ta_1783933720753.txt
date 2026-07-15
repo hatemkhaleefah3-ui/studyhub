@@ -1,0 +1,45 @@
+Do these edits 
+1. Automatically add time for repeated tasks ( 12:00 am ) if i didnt choose a time for them and make the default or specific time is the time for repeat action in the specific day of this task repeat 
+2.The sub tasks options are just ( name, link ) in add and edit settings
+3. Remove the callender nav and put a small calender includes some tasks in the dashboard with a button to open the callender page and edit the callender page 
+
+CALENDAR SYSTEM (BUILD & TEST IN ISOLATION)
+════════════════════════════════════════
+High-risk feature — second-highest in this project after Phase 5. Build
+and test this only after Phases 1–3 are confirmed stable on the live
+site.
+
+4.1 Day / Month / Year view toggle (Schedule page)
+   - Day View (existing behavior): horizontal day strip, tap a day to see
+     its tasks.
+   - Month View: full calendar grid for the selected month, weekday
+     headers (Sun–Sat), correct blank cells for days outside the month.
+     Tapping a date opens Day View for that date.
+   - Year View: grid of 12 months for the selected year. Tapping a month
+     opens Month View for that month.
+
+4.2 Shared slider selector (reuses existing day-strip slider design)
+   - Year selector: 50 entries starting from 1990 (1990–2039).
+   - Month selector: 12 entries starting from January.
+   - Day selector (within a specific month): dynamic count matching that
+     month's actual days (28–31), correctly handling leap years.
+
+4.3 Current date highlighting rules
+   - Year Grid: current year gets a distinct highlight.
+   - Month Grid: current month gets a distinct highlight, only when
+     viewing its actual year.
+   - Day Grid: current day gets a distinct highlight, only when viewing
+     the actual current month of the actual current year.
+
+4.4 Navigation flow
+   - Year → tap month → Month View. Month → tap day → Day View (shows
+     that day's tasks).
+   - Provide a clear way back up a level (breadcrumb, back arrow, or
+     tapping the current view's label).
+
+Acceptance criteria:
+- Accurate calendar math (correct days/month, leap years).
+- Smooth transitions with no lost state.
+- Correct highlighting per 4.3.
+- Visually consistent with existing site design.
+- Does not interfere with Exams/Lecture checklist logic

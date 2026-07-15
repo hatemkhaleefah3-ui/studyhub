@@ -1,0 +1,49 @@
+════════════════════════════════════════
+PHASE 1 — LOW-RISK UI FIXES
+════════════════════════════════════════
+
+1.1 FLOATING "+" BUTTON — REMOVE ENTRY ANIMATION
+Problem: The "+" button appears center-screen on load, then animates to 
+its fixed bottom-right position.
+Fix: Render it directly in its final fixed bottom-right position on first 
+paint. No entry animation, no layout shift.
+
+1.2 SCHEDULE "SELECTED DAY" — FIX VISUAL OVERLAP
+Problem: When a day is selected in the day strip (including auto-selected 
+"today"), its scale/pop animation overlaps and clips into the schedule 
+bar above it.
+Fix: Adjust scale amount, spacing, and stacking order so the highlight 
+animation stays fully contained within its own row on mobile and desktop.
+
+1.3 REMOVE "DATA" SECTION FROM SETTINGS
+Fix: Remove the "Data" section and its UI from Settings only. Do not 
+remove underlying data logic that other features rely on.
+
+1.4 MOBILE HEADER — MOVE ACTIVE COUNTER BESIDE GREETING
+Problem: On mobile, the active counter sits below the "Hello, [Name]" 
+greeting.
+Fix: On mobile viewports only, place it in the same row as the greeting. 
+Leave desktop layout unchanged.
+
+1.5 REMOVE "SETTINGS" FROM THE NAV BAR — MOVE TO A DASHBOARD BUTTON
+Problem: Settings currently takes up a slot in the main navigation bar.
+Fix:
+   - Remove the Settings item from the nav bar entirely.
+   - Add a Settings button/icon on the Dashboard/Home page instead 
+     (e.g., a gear icon in the header or a card/button in the dashboard 
+     layout — placement should fit the existing dashboard design).
+   - Settings page itself and all its functionality stay exactly the 
+     same — only the entry point changes.
+Acceptance: Settings is no longer accessible from the bottom/main nav; 
+it's accessible via a clearly visible button on the Dashboard; no broken 
+links remain pointing to the old nav entry.
+
+1.6 RESIZE NAV BAR TO CORRECT PROPORTIONS
+Problem: With Settings removed (1.5), the nav bar now has one fewer item 
+and may look unbalanced, oversized, or awkwardly spaced.
+Fix: Resize and re-space the nav bar so remaining items (icons + labels) 
+are evenly distributed, properly sized, and proportional to the bar's 
+height/width — it should look deliberately designed for its new item 
+count, not like an item was just deleted from it.
+Acceptance: Nav bar looks balanced and intentional on both mobile and 
+desktop, with even spacing and no leftover empty gaps or oversized icons.

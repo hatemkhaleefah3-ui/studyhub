@@ -1,0 +1,108 @@
+════════════════════════════════════════
+NAVIGATION BAR RESPONSIVE REDESIGN
+════════════════════════════════════════
+
+The navigation system must adapt based on device type while maintaining the existing design language and functionality.
+
+Layout Rules
+
+Desktop
+
+* Navigation bar must be positioned vertically on the left side of the screen.
+* Sidebar should remain visible at all times.
+* Must integrate naturally with the existing design.
+* Content area should automatically adjust to the sidebar width.
+
+iPad / Tablet
+
+* Navigation bar must be positioned vertically on the left side similar to desktop.
+* Optimized for touch interaction.
+* Slightly more compact than desktop if necessary.
+* Must maintain full responsiveness in portrait and landscape orientations.
+
+Mobile Phone
+
+* Navigation bar must remain at the bottom of the screen.
+* Fixed positioning.
+* Must remain visible while scrolling.
+* Must respect safe-area insets on modern devices.
+
+════════════════════════════════════════
+NAVIGATION ITEM ACTIVE STATE
+════════════════════════════════════════
+
+Active Icon Styling
+
+When a navigation item is active:
+
+* Only the icon becomes blue.
+* Text labels must keep their normal color unless already required by the current design.
+* The blue color should be consistent across the entire application.
+* Smooth transition animation when switching active tabs.
+
+Active Background Indicator
+
+The active navigation item must have a soft gel-like background.
+
+Requirements:
+
+* Water-like gel appearance.
+* Soft and modern.
+* No glassmorphism.
+* No glossy shine effects.
+* No reflective effects.
+* No neon effects.
+* No excessive shadows.
+* Must feel like a soft liquid capsule surrounding the selected icon.
+* Must fit naturally within both light mode and dark mode.
+* Animation should be smooth and subtle.
+
+════════════════════════════════════════
+DRAG-TO-SELECT NAVIGATION
+════════════════════════════════════════
+
+Add a gesture-based navigation interaction for touch devices.
+
+Behavior
+
+1. User long-presses a navigation item.
+2. The selected item becomes attached to the user’s finger.
+3. While holding, the user can drag horizontally (mobile) or within the navigation area (tablet/desktop touch devices).
+4. The gel indicator should follow the finger smoothly.
+5. While dragging:
+    * The currently hovered navigation item becomes highlighted.
+    * No page change occurs yet.
+    * No navigation action is triggered while the finger remains pressed.
+
+Release Behavior
+
+When the user lifts their finger:
+
+* The dragged indicator snaps to the nearest navigation item.
+* That navigation item becomes active.
+* The corresponding page immediately opens.
+* The active icon turns blue.
+* The gel indicator animates smoothly into its final position.
+
+Hold Behavior
+
+If the user keeps holding their finger:
+
+* The page must NOT change.
+* Navigation must remain in preview state only.
+* The indicator remains attached to the finger.
+* The currently open page remains unchanged.
+
+Performance Requirements
+
+* 60 FPS animations whenever possible.
+* No lag or stuttering.
+* Must work smoothly on mobile phones, tablets, and touch-enabled devices.
+* Must not interfere with normal taps.
+* Normal tap behavior should continue to work exactly as it does now.
+
+Accessibility
+
+* Keyboard navigation must continue to work.
+* Screen reader support must remain functional.
+* Drag interaction must be an enhancement, not a replacement for standard navigation.
