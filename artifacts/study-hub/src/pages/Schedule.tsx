@@ -59,22 +59,24 @@ function rangesOverlap(aS: string, aE: string, bS: string, bE: string) {
   return aS <= bE && aE >= bS;
 }
 
-function resolveConflicts(plans: SchedulePlan[]) {
-  const sorted = [...plans].sort((a, b) => {
-    if (a.type !== b.type) return a.type === "exam" ? -1 : 1;
-    return a.startDate.localeCompare(b.startDate);
-  });
-  const visible: SchedulePlan[] = [];
-  const hiddenIds = new Set<string>();
-  for (const plan of sorted) {
-    if (hiddenIds.has(plan.id)) continue;
-    const conflicts = visible.some((v) =>
-      rangesOverlap(v.startDate, v.endDate, plan.startDate, plan.endDate)
-    );
-    if (conflicts) hiddenIds.add(plan.id);
-    else visible.push(plan);
-  }
-  return { visible, hidden: sorted.filter((p) => hiddenIds.has(p.id)) };
+/**
+ * Finds an existing plan of the same type whose date range overlaps the
+ * given range, so a new/edited plan can be rejected up front instead of
+ * being silently created and then hidden later.
+ */
+function findOverlappingPlan(
+  plans: SchedulePlan[],
+  type: ScheduleType,
+  startDate: string,
+  endDate: string,
+  excludeId?: string
+): SchedulePlan | undefined {
+  return plans.find(
+    (p) =>
+      p.id !== excludeId &&
+      p.type === type &&
+      rangesOverlap(p.startDate, p.endDate, startDate, endDate)
+  );
 }
 
 function isStudyPlanDay(plan: SchedulePlan, date: Date): boolean {
@@ -228,7 +230,11 @@ function ExamsSection({
   onRemoveItem: (planId: string, itemId: string) => void;
 }) {
   const allItems = plans
-    .filter((p) => p.type === "exam")
+    // Only exams added via the single "Add Exam" quick action belong here.
+    // Multi-item "Exam Schedule" builders show up as plan cards in the
+    // Schedules section instead. Plans created before this distinction
+    // existed (no `source`) are treated as quick-added for continuity.
+    .filter((p) => p.type === "exam" && p.source !== "examSchedule")
     .flatMap((p) =>
       p.items.map((item) => ({ ...item, planId: p.id, planTitle: p.title }))
     )
@@ -373,39 +379,23 @@ function SchedulePlanCard({ plan, onClick }: { plan: SchedulePlan; onClick?: () 
 // ─── Schedules Section ────────────────────────────────────────────────────────
 
 function SchedulesSection({
-  visiblePlans,
-  hiddenPlans,
+  plans,
   onEdit,
   onDelete,
   onDetail,
-  onShowHidden,
 }: {
-  visiblePlans: SchedulePlan[];
-  hiddenPlans: SchedulePlan[];
+  plans: SchedulePlan[];
   onEdit: (p: SchedulePlan) => void;
   onDelete: (id: string) => void;
   onDetail: (p: SchedulePlan) => void;
-  onShowHidden: () => void;
 }) {
-  if (visiblePlans.length === 0 && hiddenPlans.length === 0) return null;
+  if (plans.length === 0) return null;
 
   return (
     <section>
-      <SectionHeader
-        title="Schedules"
-        action={
-          hiddenPlans.length > 0 ? (
-            <button
-              onClick={onShowHidden}
-              className="text-xs font-bold text-muted-foreground hover:text-foreground transition-colors bg-secondary/60 px-3 py-1.5 rounded-lg border border-border/50"
-            >
-              {hiddenPlans.length} hidden (overlap)
-            </button>
-          ) : undefined
-        }
-      />
+      <SectionHeader title="Schedules" />
       <div className="space-y-3">
-        {visiblePlans.map((plan) => (
+        {plans.map((plan) => (
           <motion.div
             key={plan.id}
             layout
@@ -1016,6 +1006,7 @@ function QuickExamForm({
       startDate: date,
       endDate: date,
       importance,
+      source: "quickExam",
       items: [{ id: crypto.randomUUID(), subjectName: subjectName.trim(), subjectId: subjectId || undefined, date, time: finalTime }],
     });
   };
@@ -1122,6 +1113,7 @@ function ExamScheduleForm({
       startDate: dates[0],
       endDate: dates[dates.length - 1],
       importance,
+      source: "examSchedule",
       items: finalItems,
     });
   };
@@ -1233,11 +1225,13 @@ function ExamScheduleForm({
 function StudyScheduleForm({
   initial,
   subjects,
+  plans,
   onSubmit,
   onBack,
 }: {
   initial?: SchedulePlan;
   subjects: Subject[];
+  plans: SchedulePlan[];
   onSubmit: (plan: Omit<SchedulePlan, "id" | "createdAt">) => void;
   onBack: () => void;
 }) {
@@ -1245,6 +1239,7 @@ function StudyScheduleForm({
   const [startDate, setStartDate] = useState(initial?.startDate ?? "");
   const [endDate, setEndDate]     = useState(initial?.endDate ?? "");
   const [importance, setImportance] = useState<number>(initial?.importance ?? 2);
+  const [overlapError, setOverlapError] = useState<string | null>(null);
   const [items, setItems] = useState<SchedulePlanItem[]>(
     initial?.items.length
       ? initial.items
@@ -1292,6 +1287,12 @@ function StudyScheduleForm({
   const handleSubmit = () => {
     const validItems = items.filter((i) => i.subjectName.trim());
     if (!title.trim() || !startDate || !endDate || !validItems.length) return;
+    const conflict = findOverlappingPlan(plans, "study", startDate, endDate, initial?.id);
+    if (conflict) {
+      setOverlapError(`Overlaps with "${conflict.title}" (${conflict.startDate} → ${conflict.endDate}). Adjust the dates to continue.`);
+      return;
+    }
+    setOverlapError(null);
     onSubmit({ type: "study", title: title.trim(), startDate, endDate, importance, items: validItems });
   };
 
@@ -1433,6 +1434,11 @@ function StudyScheduleForm({
           <option value={3}>3 — Least Important</option>
         </select>
       </div>
+      {overlapError && (
+        <p className="text-sm text-destructive font-medium bg-destructive/10 border border-destructive/20 rounded-xl p-3">
+          {overlapError}
+        </p>
+      )}
       <div className="flex gap-3 pt-2">
         {!initial && (
           <button
@@ -1458,11 +1464,13 @@ function StudyScheduleForm({
 function ReviewScheduleForm({
   initial,
   subjects,
+  plans,
   onSubmit,
   onBack,
 }: {
   initial?: SchedulePlan;
   subjects: Subject[];
+  plans: SchedulePlan[];
   onSubmit: (plan: Omit<SchedulePlan, "id" | "createdAt">) => void;
   onBack: () => void;
 }) {
@@ -1470,6 +1478,7 @@ function ReviewScheduleForm({
   const [startDate, setStartDate] = useState(initial?.startDate ?? "");
   const [endDate, setEndDate]     = useState(initial?.endDate ?? "");
   const [importance, setImportance] = useState<number>(initial?.importance ?? 2);
+  const [overlapError, setOverlapError] = useState<string | null>(null);
   const [items, setItems] = useState<SchedulePlanItem[]>(
     initial?.items.length
       ? initial.items
@@ -1494,6 +1503,12 @@ function ReviewScheduleForm({
   const handleSubmit = () => {
     const validItems = items.filter((i) => i.subjectName.trim());
     if (!title.trim() || !startDate || !endDate || !validItems.length) return;
+    const conflict = findOverlappingPlan(plans, "review", startDate, endDate, initial?.id);
+    if (conflict) {
+      setOverlapError(`Overlaps with "${conflict.title}" (${conflict.startDate} → ${conflict.endDate}). Adjust the dates to continue.`);
+      return;
+    }
+    setOverlapError(null);
     onSubmit({ type: "review", title: title.trim(), startDate, endDate, importance, items: validItems });
   };
 
@@ -1595,6 +1610,11 @@ function ReviewScheduleForm({
           <option value={3}>3 — Least Important</option>
         </select>
       </div>
+      {overlapError && (
+        <p className="text-sm text-destructive font-medium bg-destructive/10 border border-destructive/20 rounded-xl p-3">
+          {overlapError}
+        </p>
+      )}
       <div className="flex gap-3 pt-2">
         {!initial && (
           <button
@@ -1640,7 +1660,6 @@ export function Schedule() {
   const [editingPlan,    setEditingPlan]    = useState<SchedulePlan | null>(null);
   const [detailPlan,     setDetailPlan]     = useState<SchedulePlan | null>(null);
   const [deletingPlanId, setDeletingPlanId] = useState<string | null>(null);
-  const [showHidden,     setShowHidden]     = useState(false);
   const [scheduleSubMenu, setScheduleSubMenu] = useState(false);
 
   // Calendar state
@@ -1675,14 +1694,9 @@ export function Schedule() {
     return [...events, ...tasks].sort((a, b) => a.sortTime - b.sortTime);
   }, [schedule, checklist, selectedDate]);
 
-  const { visible: visiblePlans, hidden: hiddenPlans } = useMemo(
-    () => resolveConflicts(schedulePlans),
-    [schedulePlans]
-  );
-
   // Color helper for the day-strip — mirrors MonthView's getCellBg
   const _dayARSub    = getActiveReviewSubject(schedulePlans, new Date());
-  const _dayNonExam  = visiblePlans.filter(p => p.type !== "exam");
+  const _dayNonExam  = schedulePlans.filter(p => p.type !== "exam");
   const _dayTopPlan  = _dayNonExam.length > 0
     ? _dayNonExam.reduce((best, p) => ((p.importance ?? 2) < (best.importance ?? 2) ? p : best))
     : null;
@@ -1908,12 +1922,10 @@ export function Schedule() {
 
       {/* ── 4. SCHEDULES ── */}
       <SchedulesSection
-        visiblePlans={visiblePlans}
-        hiddenPlans={hiddenPlans}
+        plans={schedulePlans}
         onEdit={setEditingPlan}
         onDelete={setDeletingPlanId}
         onDetail={setDetailPlan}
-        onShowHidden={() => setShowHidden(true)}
       />
 
       {/* ── FAB ── */}
@@ -2042,6 +2054,7 @@ export function Schedule() {
       <BottomSheet isOpen={isCreating && createType === "study"} onClose={closeCreate} title="New Study Schedule">
         <StudyScheduleForm
           subjects={subjects}
+          plans={schedulePlans}
           onSubmit={(plan) => { addSchedulePlan(plan); closeCreate(); }}
           onBack={() => setCreateType(null)}
         />
@@ -2051,6 +2064,7 @@ export function Schedule() {
       <BottomSheet isOpen={isCreating && createType === "review"} onClose={closeCreate} title="New Review Schedule">
         <ReviewScheduleForm
           subjects={subjects}
+          plans={schedulePlans}
           onSubmit={(plan) => { addSchedulePlan(plan); closeCreate(); }}
           onBack={() => setCreateType(null)}
         />
@@ -2082,6 +2096,7 @@ export function Schedule() {
           <StudyScheduleForm
             initial={editingPlan}
             subjects={subjects}
+            plans={schedulePlans}
             onSubmit={(plan) => { updateSchedulePlan(editingPlan.id, plan); setEditingPlan(null); }}
             onBack={() => setEditingPlan(null)}
           />
@@ -2098,6 +2113,7 @@ export function Schedule() {
           <ReviewScheduleForm
             initial={editingPlan}
             subjects={subjects}
+            plans={schedulePlans}
             onSubmit={(plan) => { updateSchedulePlan(editingPlan.id, plan); setEditingPlan(null); }}
             onBack={() => setEditingPlan(null)}
           />
@@ -2111,26 +2127,6 @@ export function Schedule() {
         title={detailPlan?.title ?? "Schedule"}
       >
         {detailPlan && <SchedulePlanDetail plan={detailPlan} />}
-      </BottomSheet>
-
-      {/* ── Hidden / overlapping plans ── */}
-      <BottomSheet
-        isOpen={showHidden}
-        onClose={() => setShowHidden(false)}
-        title={`${hiddenPlans.length} Overlapping Schedule${hiddenPlans.length !== 1 ? "s" : ""}`}
-      >
-        <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            These schedules overlap with a higher-priority one and are hidden from the main list.
-          </p>
-          {hiddenPlans.map((plan) => (
-            <SchedulePlanCard
-              key={plan.id}
-              plan={plan}
-              onClick={() => { setDetailPlan(plan); setShowHidden(false); }}
-            />
-          ))}
-        </div>
       </BottomSheet>
 
       {/* ── Delete confirm ── */}

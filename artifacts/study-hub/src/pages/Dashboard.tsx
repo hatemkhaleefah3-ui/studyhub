@@ -2,20 +2,47 @@ import { useStudyData } from "@/hooks/useStudyData";
 import { type SchedulePlan } from "@/hooks/useStudyData";
 import { GlassCard } from "@/components/shared/GlassCard";
 import { MiniCalendar } from "@/components/dashboard/MiniCalendar";
-import { format, differenceInDays } from "date-fns";
+import { format } from "date-fns";
 import { Flame, Calendar as CalendarIcon, Settings as SettingsIcon } from "lucide-react";
 import { Link } from "wouter";
 
 // ─── Next Exams Section ───────────────────────────────────────────────────────
 
+/** Normalizes "today" and the target date to midnight so the day-count is never off by one. */
+function daysUntil(dateStr: string): number {
+  const target = new Date(dateStr); target.setHours(0, 0, 0, 0);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  return Math.round((target.getTime() - today.getTime()) / 86_400_000);
+}
+
+interface UpcomingExam {
+  id: string;
+  name: string;
+  subjectName: string;
+  date: string;
+}
+
 function NextExamsSection({ plans, subjects }: { plans: SchedulePlan[]; subjects: any[] }) {
   const now = new Date(); now.setHours(0, 0, 0, 0);
 
-  const upcomingExams = plans
+  // Pulled from both sources: subjects' own Exams list, and Exams Schedules —
+  // whichever exam date is soonest wins, regardless of where it came from.
+  const fromSubjectExams: UpcomingExam[] = subjects.flatMap((s: any) =>
+    (s.exams ?? [])
+      .filter((e: any) => e.date && !e.checked)
+      .map((e: any) => ({ id: e.id, name: e.name, subjectName: s.name, date: e.date }))
+  );
+
+  const fromExamSchedules: UpcomingExam[] = plans
     .filter((p) => p.type === "exam")
-    .flatMap((p) => p.items.map((item) => ({ ...item, planTitle: p.title })))
-    .filter((item) => item.date && new Date(item.date) >= now && !item.checked)
-    .sort((a, b) => new Date(a.date!).getTime() - new Date(b.date!).getTime())
+    .flatMap((p) =>
+      p.items.map((item) => ({ id: item.id, name: item.subjectName, subjectName: item.subjectName, date: item.date! }))
+    )
+    .filter((item) => item.date);
+
+  const upcomingExams = [...fromSubjectExams, ...fromExamSchedules]
+    .filter((item) => new Date(item.date) >= now)
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     .slice(0, 2);
 
   return (
@@ -35,9 +62,9 @@ function NextExamsSection({ plans, subjects }: { plans: SchedulePlan[]; subjects
       ) : (
         <div className="space-y-3">
           {upcomingExams.map((item, idx) => {
-            const subject = subjects.find((s: any) => s.name === item.subjectName || s.id === item.subjectId);
+            const subject = subjects.find((s: any) => s.name === item.subjectName);
             const accentColor = subject?.color ?? "hsl(var(--destructive))";
-            const days = differenceInDays(new Date(item.date!), new Date());
+            const days = daysUntil(item.date);
             const isFirst = idx === 0;
 
             if (isFirst) {
@@ -53,8 +80,7 @@ function NextExamsSection({ plans, subjects }: { plans: SchedulePlan[]; subjects
               return (
                 <div
                   key={item.id}
-                  className="rounded-3xl overflow-hidden border border-white/[0.06] shadow-xl"
-                  style={{ background: "linear-gradient(145deg,#18181b 0%,#111113 100%)" }}
+                  className="relative rounded-3xl overflow-hidden border border-border/60 shadow-xl bg-gradient-to-br from-secondary/60 via-card to-card dark:from-zinc-900 dark:via-zinc-900 dark:to-zinc-950"
                 >
                   {/* Radial glow blob top-right */}
                   <div
@@ -73,25 +99,25 @@ function NextExamsSection({ plans, subjects }: { plans: SchedulePlan[]; subjects
                         >
                           ● Next Exam
                         </span>
-                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest truncate">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest truncate">
                           {item.subjectName}
                         </span>
                       </div>
 
                       {/* Exam title */}
-                      <h3 className="text-white font-bold text-lg leading-snug flex-1">
-                        {item.planTitle}
+                      <h3 className="text-foreground font-bold text-lg leading-snug flex-1">
+                        {item.name}
                       </h3>
 
                       {/* Date */}
-                      <p className="text-zinc-500 text-xs flex items-center gap-1.5 mt-3">
+                      <p className="text-muted-foreground text-xs flex items-center gap-1.5 mt-3">
                         <CalendarIcon className="w-3 h-3 shrink-0" />
-                        {format(new Date(item.date!), "EEEE, MMM d, yyyy")}
+                        {format(new Date(item.date), "EEEE, MMM d, yyyy")}
                       </p>
                     </div>
 
                     {/* ── Vertical divider ── */}
-                    <div className="w-px bg-white/10 mx-5 self-stretch" />
+                    <div className="w-px bg-border/60 mx-5 self-stretch" />
 
                     {/* ── Right: countdown number ── */}
                     <div className="flex flex-col items-center justify-center min-w-[68px]">
@@ -119,7 +145,7 @@ function NextExamsSection({ plans, subjects }: { plans: SchedulePlan[]; subjects
                   </div>
 
                   {/* ── Urgency bar ── */}
-                  <div className="h-[3px] bg-white/5">
+                  <div className="h-[3px] bg-border/30">
                     <div
                       className="h-full rounded-full transition-all duration-700"
                       style={{ width: `${barPct}%`, background: `linear-gradient(90deg, ${countColor}66, ${countColor})` }}
@@ -142,9 +168,9 @@ function NextExamsSection({ plans, subjects }: { plans: SchedulePlan[]; subjects
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-0.5 truncate">
                     {item.subjectName}
                   </p>
-                  <h3 className="font-semibold text-foreground text-sm leading-tight">{item.planTitle}</h3>
+                  <h3 className="font-semibold text-foreground text-sm leading-tight">{item.name}</h3>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {format(new Date(item.date!), "EEE, MMM d, yyyy")}
+                    {format(new Date(item.date), "EEE, MMM d, yyyy")}
                   </p>
                 </div>
                 <div className="shrink-0 flex flex-col items-center min-w-[44px]">
