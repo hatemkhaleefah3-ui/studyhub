@@ -1,13 +1,14 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useRoute, useLocation } from "wouter";
 import {
-  ArrowLeft, Trash2, Layers, Brain, Upload, ExternalLink,
+  ArrowLeft, Trash2, Layers, Brain, Upload, ExternalLink, Plus,
 } from "lucide-react";
-import { useStudyData, StudyType } from "@/hooks/useStudyData";
+import { useStudyData, StudyType, Flashcard } from "@/hooks/useStudyData";
 import { BottomSheet } from "@/components/shared/BottomSheet";
 import { ConfirmSheet } from "@/components/shared/ConfirmSheet";
 import { LectureCoverBadge } from "@/components/study/LectureCoverBadge";
+import { parseFlashcardExcel } from "@/lib/excelImport";
 
 export function LectureEdit() {
   const [, params] = useRoute("/subjects/:subjectId/lectures/:lectureId");
@@ -20,6 +21,12 @@ export function LectureEdit() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [flashcardsOpen, setFlashcardsOpen] = useState(false);
 
+  // Flashcard import state
+  const addMoreRef = useRef<HTMLInputElement>(null);
+  const replaceAllRef = useRef<HTMLInputElement>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+
   const form = useForm({
     defaultValues: { name: lecture?.name ?? "", link: lecture?.link ?? "" },
   });
@@ -27,6 +34,32 @@ export function LectureEdit() {
   if (!subject || !lecture) {
     return <div className="p-8 text-center text-muted-foreground">Lecture not found</div>;
   }
+
+  const handleFlashcardImport = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    mode: "append" | "replace",
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportError(null);
+    setIsImporting(true);
+    setFlashcardsOpen(false);
+    try {
+      const { rows } = await parseFlashcardExcel(file);
+      const newCards: Flashcard[] = rows.map(r => ({
+        id: crypto.randomUUID(),
+        front: r.front,
+        back: r.back,
+      }));
+      const existing = mode === "append" ? (lecture.flashcards ?? []) : [];
+      updateLecture(subject.id, lecture.id, { flashcards: [...existing, ...newCards] });
+    } catch {
+      setImportError("Could not parse the file. Make sure it's a valid Excel/CSV with Front and Back columns.");
+    } finally {
+      setIsImporting(false);
+      if (e.target) e.target.value = "";
+    }
+  };
 
   const onSave = (data: any) => {
     updateLecture(subject.id, lecture.id, { name: data.name, link: data.link });
@@ -41,6 +74,8 @@ export function LectureEdit() {
     setLocation(`/subjects/${subject.id}?tab=lectures`);
   };
 
+  const flashcardCount = lecture.flashcards?.length ?? 0;
+
   const inputCls =
     "w-full bg-secondary/40 border border-border/60 rounded-2xl px-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 text-foreground placeholder:text-muted-foreground/50 transition-all text-sm";
 
@@ -51,7 +86,7 @@ export function LectureEdit() {
       <div className="relative -mx-4 md:-mx-6 px-4 md:px-6 pt-2 pb-6 mb-6 bg-gradient-to-b from-primary/8 via-primary/4 to-transparent border-b border-border/30">
         <div className="flex items-start gap-3">
           <Link
-            href={`/subjects/${subject.id}?tab=lectures`}
+            href={`/subjects/${subject.id}?tab=lectures&type=${lecture.type}`}
             className="mt-1 p-2 rounded-full bg-background/80 hover:bg-background border border-border/50 shadow-sm transition-colors shrink-0"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -71,9 +106,9 @@ export function LectureEdit() {
               }`}>
                 {lecture.type}
               </span>
-              {(lecture.flashcards?.length ?? 0) > 0 && (
+              {flashcardCount > 0 && (
                 <span className="text-[11px] font-semibold text-muted-foreground">
-                  {lecture.flashcards!.length} flashcard{lecture.flashcards!.length !== 1 ? "s" : ""}
+                  {flashcardCount} flashcard{flashcardCount !== 1 ? "s" : ""}
                 </span>
               )}
             </div>
@@ -87,14 +122,16 @@ export function LectureEdit() {
       {/* ── Quick actions ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-3 mb-5">
         <button
-          onClick={() => setFlashcardsOpen(true)}
+          onClick={() => { setImportError(null); setFlashcardsOpen(true); }}
           className="group relative overflow-hidden rounded-2xl p-4 bg-violet-500/10 hover:bg-violet-500/15 border border-violet-500/20 hover:border-violet-500/35 transition-all text-left"
         >
           <div className="w-9 h-9 rounded-xl bg-violet-500/15 border border-violet-500/20 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
             <Layers className="w-4.5 h-4.5 text-violet-600 dark:text-violet-400" />
           </div>
           <p className="font-bold text-sm text-foreground">Flashcards</p>
-          <p className="text-[11px] text-muted-foreground mt-0.5">Make · Study · Import</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            {flashcardCount > 0 ? `${flashcardCount} cards` : "Make · Import"}
+          </p>
         </button>
 
         <button
@@ -188,46 +225,77 @@ export function LectureEdit() {
       {/* ── Flashcards bottom sheet ───────────────────────────────────── */}
       <BottomSheet isOpen={flashcardsOpen} onClose={() => setFlashcardsOpen(false)} title="Flashcards">
         <div className="space-y-2.5 pb-2">
+
+          {/* 1 — Add more Flashcards (append from Excel) */}
           <button
-            onClick={() => { setLocation(`/subjects/${subject.id}/lectures/${lecture.id}/flashcards`); setFlashcardsOpen(false); }}
-            className="w-full flex items-center gap-4 rounded-2xl p-4 bg-secondary/50 hover:bg-secondary transition-colors text-left border border-border/40 hover:border-border/60"
+            onClick={() => addMoreRef.current?.click()}
+            disabled={isImporting}
+            className="w-full flex items-center gap-4 rounded-2xl p-4 bg-secondary/50 hover:bg-secondary transition-colors text-left border border-border/40 hover:border-border/60 disabled:opacity-50"
           >
             <div className="w-11 h-11 rounded-xl bg-violet-500/12 border border-violet-500/20 flex items-center justify-center shrink-0">
-              <Layers className="w-5 h-5 text-violet-600 dark:text-violet-400" />
+              <Upload className="w-5 h-5 text-violet-600 dark:text-violet-400" />
             </div>
             <div>
-              <p className="font-bold text-sm text-foreground">Make Flashcards</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Create front / back cards</p>
+              <p className="font-bold text-sm text-foreground">Add more Flashcards</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Import from Excel · keeps existing cards</p>
             </div>
           </button>
 
+          {/* 2 — Replace all Flashcards (replace from Excel) */}
           <button
-            onClick={() => { setLocation(`/subjects/${subject.id}/lectures/${lecture.id}/study`); setFlashcardsOpen(false); }}
-            className="w-full flex items-center gap-4 rounded-2xl p-4 bg-secondary/50 hover:bg-secondary transition-colors text-left border border-border/40 hover:border-border/60"
-          >
-            <div className="w-11 h-11 rounded-xl bg-emerald-500/12 border border-emerald-500/20 flex items-center justify-center shrink-0">
-              <Brain className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <div>
-              <p className="font-bold text-sm text-foreground">Study Flashcards</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Flip-card review mode</p>
-            </div>
-          </button>
-
-          <button
-            onClick={() => { setLocation(`/subjects/${subject.id}/lectures/${lecture.id}/flashcards`); setFlashcardsOpen(false); }}
-            className="w-full flex items-center gap-4 rounded-2xl p-4 bg-secondary/50 hover:bg-secondary transition-colors text-left border border-border/40 hover:border-border/60"
+            onClick={() => replaceAllRef.current?.click()}
+            disabled={isImporting}
+            className="w-full flex items-center gap-4 rounded-2xl p-4 bg-secondary/50 hover:bg-secondary transition-colors text-left border border-border/40 hover:border-border/60 disabled:opacity-50"
           >
             <div className="w-11 h-11 rounded-xl bg-sky-500/12 border border-sky-500/20 flex items-center justify-center shrink-0">
               <Upload className="w-5 h-5 text-sky-600 dark:text-sky-400" />
             </div>
             <div>
-              <p className="font-bold text-sm text-foreground">Import Flashcards</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Bulk-upload from Excel / CSV</p>
+              <p className="font-bold text-sm text-foreground">Replace all Flashcards</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Import from Excel · replaces all existing cards</p>
             </div>
           </button>
+
+          {/* 3 — Add a new flashcard manually */}
+          <button
+            onClick={() => {
+              setLocation(`/subjects/${subject.id}/lectures/${lecture.id}/flashcards`);
+              setFlashcardsOpen(false);
+            }}
+            className="w-full flex items-center gap-4 rounded-2xl p-4 bg-secondary/50 hover:bg-secondary transition-colors text-left border border-border/40 hover:border-border/60"
+          >
+            <div className="w-11 h-11 rounded-xl bg-emerald-500/12 border border-emerald-500/20 flex items-center justify-center shrink-0">
+              <Plus className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <div>
+              <p className="font-bold text-sm text-foreground">Add a new flashcard</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Create front / back cards manually</p>
+            </div>
+          </button>
+
+          {importError && (
+            <p className="text-sm text-destructive font-medium bg-destructive/10 border border-destructive/20 rounded-xl px-3 py-2">
+              {importError}
+            </p>
+          )}
         </div>
       </BottomSheet>
+
+      {/* Hidden file inputs */}
+      <input
+        ref={addMoreRef}
+        type="file"
+        accept=".xlsx,.xls,.csv"
+        className="hidden"
+        onChange={e => handleFlashcardImport(e, "append")}
+      />
+      <input
+        ref={replaceAllRef}
+        type="file"
+        accept=".xlsx,.xls,.csv"
+        className="hidden"
+        onChange={e => handleFlashcardImport(e, "replace")}
+      />
 
       <ConfirmSheet
         isOpen={isDeleting}

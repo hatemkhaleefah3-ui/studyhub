@@ -39,9 +39,11 @@ export function SubjectDetail() {
   const search = useSearch();
   const initialTab = (new URLSearchParams(search).get('tab') ?? 'details') as Tab;
 
+  const initialType = (new URLSearchParams(search).get('type') ?? 'theoretical') as StudyType;
+
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
-  const [lectureTypeTab, setLectureTypeTab] = useState<StudyType>("theoretical");
-  const [examTypeTab, setExamTypeTab] = useState<StudyType>("theoretical");
+  const [lectureTypeTab, setLectureTypeTab] = useState<StudyType>(initialType);
+  const [examTypeTab, setExamTypeTab] = useState<StudyType>(initialType);
 
   // State setup
   const [isAddLectureOpen, setIsAddLectureOpen] = useState(false);

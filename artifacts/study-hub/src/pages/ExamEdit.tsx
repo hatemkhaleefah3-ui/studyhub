@@ -2,10 +2,10 @@ import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useRoute, useLocation } from "wouter";
 import {
-  ArrowLeft, Trash2, FileQuestion, Calendar, BarChart2, Upload, Loader2,
+  ArrowLeft, Trash2, FileQuestion, Calendar, BarChart2, Upload, Brain,
 } from "lucide-react";
 import { useStudyData, StudyType } from "@/hooks/useStudyData";
-import { GlassCard } from "@/components/shared/GlassCard";
+import { BottomSheet } from "@/components/shared/BottomSheet";
 import { ConfirmSheet } from "@/components/shared/ConfirmSheet";
 import { parseExamExcel } from "@/lib/excelImport";
 
@@ -18,9 +18,12 @@ export function ExamEdit() {
   const exam = subject?.exams.find(e => e.id === params?.examId);
 
   const [isDeleting, setIsDeleting] = useState(false);
+  const [mcqsOpen, setMcqsOpen] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
-  const questionsFileRef = useRef<HTMLInputElement>(null);
+
+  const addMoreRef = useRef<HTMLInputElement>(null);
+  const replaceAllRef = useRef<HTMLInputElement>(null);
 
   const form = useForm({
     defaultValues: {
@@ -46,13 +49,19 @@ export function ExamEdit() {
     updateExam(subject.id, exam.id, { type });
   };
 
-  const handleImportQuestions = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]; if (!file) return;
+  const handleMcqImport = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    mode: "append" | "replace",
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
     setImportError(null);
     setIsImporting(true);
+    setMcqsOpen(false);
     try {
-      const questions = await parseExamExcel(file);
-      updateExam(subject.id, exam.id, { questions });
+      const parsed = await parseExamExcel(file);
+      const existing = mode === "append" ? (exam.questions ?? []) : [];
+      updateExam(subject.id, exam.id, { questions: [...existing, ...parsed] });
     } catch {
       setImportError("Could not parse the file. Make sure it's a valid Excel with the correct columns.");
     } finally {
@@ -78,7 +87,7 @@ export function ExamEdit() {
       <div className="relative -mx-4 md:-mx-6 px-4 md:px-6 pt-2 pb-6 mb-6 bg-gradient-to-b from-rose-500/8 via-rose-500/4 to-transparent border-b border-border/30">
         <div className="flex items-start gap-3">
           <Link
-            href={`/subjects/${subject.id}?tab=exams`}
+            href={`/subjects/${subject.id}?tab=exams&type=${exam.type}`}
             className="mt-1 p-2 rounded-full bg-background/80 hover:bg-background border border-border/50 shadow-sm transition-colors shrink-0"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -113,6 +122,33 @@ export function ExamEdit() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* ── Quick actions ─────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-3 mb-5">
+        <button
+          onClick={() => { setImportError(null); setMcqsOpen(true); }}
+          className="group relative overflow-hidden rounded-2xl p-4 bg-rose-500/10 hover:bg-rose-500/15 border border-rose-500/20 hover:border-rose-500/35 transition-all text-left"
+        >
+          <div className="w-9 h-9 rounded-xl bg-rose-500/15 border border-rose-500/20 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+            <FileQuestion className="w-4.5 h-4.5 text-rose-600 dark:text-rose-400" />
+          </div>
+          <p className="font-bold text-sm text-foreground">MCQs</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            {questionCount > 0 ? `${questionCount} questions` : "Import · Add"}
+          </p>
+        </button>
+
+        <button
+          onClick={() => setLocation(`/subjects/${subject.id}/exams/${exam.id}/take`)}
+          className="group relative overflow-hidden rounded-2xl p-4 bg-emerald-500/10 hover:bg-emerald-500/15 border border-emerald-500/20 hover:border-emerald-500/35 transition-all text-left"
+        >
+          <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+            <Brain className="w-4.5 h-4.5 text-emerald-600 dark:text-emerald-400" />
+          </div>
+          <p className="font-bold text-sm text-foreground">Take Exam</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">Start a practice session</p>
+        </button>
       </div>
 
       {/* ── Stats strip ──────────────────────────────────────────────── */}
@@ -199,59 +235,6 @@ export function ExamEdit() {
         </div>
       </div>
 
-      {/* ── Questions import ──────────────────────────────────────────── */}
-      <div className="bg-card border border-border/50 rounded-2xl p-4 shadow-sm mb-8">
-        <div className="flex items-center justify-between mb-3">
-          <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-            Questions
-          </label>
-          {questionCount > 0 && (
-            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-              {questionCount} loaded
-            </span>
-          )}
-        </div>
-
-        <button
-          type="button"
-          onClick={() => questionsFileRef.current?.click()}
-          disabled={isImporting}
-          className="w-full flex items-center gap-3 rounded-2xl p-4 border-2 border-dashed border-border/50 hover:border-primary/30 hover:bg-primary/4 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center shrink-0">
-            {isImporting
-              ? <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-              : <Upload className="w-5 h-5 text-muted-foreground" />}
-          </div>
-          <div className="text-left">
-            <p className="font-semibold text-sm text-foreground">
-              {questionCount > 0 ? "Replace Questions" : "Import Questions"}
-            </p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Excel file · MCQ &amp; Medical Case MCQ columns
-            </p>
-          </div>
-        </button>
-
-        <input
-          ref={questionsFileRef}
-          type="file"
-          accept=".xlsx,.xls,.csv"
-          className="hidden"
-          onChange={handleImportQuestions}
-        />
-
-        {importError && (
-          <p className="mt-3 text-sm text-destructive font-medium bg-destructive/10 border border-destructive/20 rounded-xl px-3 py-2">
-            {importError}
-          </p>
-        )}
-
-        <p className="text-[11px] text-muted-foreground/60 mt-3">
-          Columns: Question type · Question text · Choice 1–4 · Correct (1-4) · Labs · Histo
-        </p>
-      </div>
-
       {/* ── Delete ───────────────────────────────────────────────────── */}
       <button
         type="button"
@@ -260,6 +243,64 @@ export function ExamEdit() {
       >
         <Trash2 className="w-4 h-4" /> Delete Exam
       </button>
+
+      {/* ── MCQs bottom sheet ─────────────────────────────────────────── */}
+      <BottomSheet isOpen={mcqsOpen} onClose={() => setMcqsOpen(false)} title="MCQs">
+        <div className="space-y-2.5 pb-2">
+
+          {/* 1 — Add more MCQs (append from Excel) */}
+          <button
+            onClick={() => addMoreRef.current?.click()}
+            disabled={isImporting}
+            className="w-full flex items-center gap-4 rounded-2xl p-4 bg-secondary/50 hover:bg-secondary transition-colors text-left border border-border/40 hover:border-border/60 disabled:opacity-50"
+          >
+            <div className="w-11 h-11 rounded-xl bg-rose-500/12 border border-rose-500/20 flex items-center justify-center shrink-0">
+              <Upload className="w-5 h-5 text-rose-600 dark:text-rose-400" />
+            </div>
+            <div>
+              <p className="font-bold text-sm text-foreground">Add more MCQs</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Import from Excel · keeps existing questions</p>
+            </div>
+          </button>
+
+          {/* 2 — Replace all MCQs (replace from Excel) */}
+          <button
+            onClick={() => replaceAllRef.current?.click()}
+            disabled={isImporting}
+            className="w-full flex items-center gap-4 rounded-2xl p-4 bg-secondary/50 hover:bg-secondary transition-colors text-left border border-border/40 hover:border-border/60 disabled:opacity-50"
+          >
+            <div className="w-11 h-11 rounded-xl bg-sky-500/12 border border-sky-500/20 flex items-center justify-center shrink-0">
+              <Upload className="w-5 h-5 text-sky-600 dark:text-sky-400" />
+            </div>
+            <div>
+              <p className="font-bold text-sm text-foreground">Replace all MCQs</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Import from Excel · replaces all existing questions</p>
+            </div>
+          </button>
+
+          {importError && (
+            <p className="text-sm text-destructive font-medium bg-destructive/10 border border-destructive/20 rounded-xl px-3 py-2">
+              {importError}
+            </p>
+          )}
+        </div>
+      </BottomSheet>
+
+      {/* Hidden file inputs */}
+      <input
+        ref={addMoreRef}
+        type="file"
+        accept=".xlsx,.xls,.csv"
+        className="hidden"
+        onChange={e => handleMcqImport(e, "append")}
+      />
+      <input
+        ref={replaceAllRef}
+        type="file"
+        accept=".xlsx,.xls,.csv"
+        className="hidden"
+        onChange={e => handleMcqImport(e, "replace")}
+      />
 
       <ConfirmSheet
         isOpen={isDeleting}
