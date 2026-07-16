@@ -173,6 +173,12 @@ export interface SchedulePlan {
   items: SchedulePlanItem[];
   createdAt: string;
   importance?: number; // 1 = most important
+  /**
+   * For type "exam" plans only: distinguishes a single exam added via the
+   * "Add Exam" quick action from a multi-item "Exam Schedule". Used to keep
+   * the Schedule page's Exams section limited to quick-added exams only.
+   */
+  source?: 'quickExam' | 'examSchedule';
 }
 
 // ── Backfill helper ────────────────────────────────────────────────────────────
