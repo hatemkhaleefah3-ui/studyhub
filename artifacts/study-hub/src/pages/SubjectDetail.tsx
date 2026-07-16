@@ -6,11 +6,11 @@ import { BottomSheet } from "@/components/shared/BottomSheet";
 import { ConfirmSheet } from "@/components/shared/ConfirmSheet";
 import { SwipeRow } from "@/components/shared/SwipeRow";
 import { LectureCoverBadge } from "@/components/study/LectureCoverBadge";
-import { parseLectureExcel } from "@/lib/excelImport";
+import { parseLectureExcel, parseExamNameListExcel, parseFlashcardExcel, parseExamExcel } from "@/lib/excelImport";
 import {
   Plus, Trash2, ArrowLeft, ExternalLink, BookOpen, FileText, Pencil,
   FolderOpen, BarChart2, Link2, Paperclip, Info, Layers, Brain, ChevronRight, CheckSquare,
-  Upload, ChevronLeft, FileSpreadsheet,
+  Upload, ChevronLeft, FileSpreadsheet, FileQuestion, AlertTriangle,
 } from "lucide-react";
 import { Link, useRoute, useLocation, useSearch } from "wouter";
 import { useForm } from "react-hook-form";
@@ -30,6 +30,7 @@ export function SubjectDetail() {
     subjects,
     addLecture,
     addExam, deleteExam,
+    addFlashcard,
     deleteSubject, updateSubject,
     addAttachment, updateAttachment, deleteAttachment,
   } = useStudyData();
@@ -64,6 +65,22 @@ export function SubjectDetail() {
   const lectureImportRef = useRef<HTMLInputElement>(null);
   const [lectureImportSummary, setLectureImportSummary] = useState<{ imported: number; skipped: number } | null>(null);
   const [isImportingLectures, setIsImportingLectures] = useState(false);
+
+  // Exam Excel bulk-import (names only)
+  const examImportRef = useRef<HTMLInputElement>(null);
+  const [examImportSummary, setExamImportSummary] = useState<{ imported: number; skipped: number } | null>(null);
+  const [isImportingExams, setIsImportingExams] = useState(false);
+
+  // Flashcards Excel bulk-import (per lecture)
+  const flashcardImportRef = useRef<HTMLInputElement>(null);
+  const [flashcardImportSummary, setFlashcardImportSummary] = useState<{ imported: number; skipped: number } | null>(null);
+  const [isImportingFlashcards, setIsImportingFlashcards] = useState(false);
+
+  // Exam questions attached while creating a new exam (moved here from the Exam edit page)
+  const examQuestionsRef = useRef<HTMLInputElement>(null);
+  const [pendingExamQuestions, setPendingExamQuestions] = useState<import("@/hooks/useStudyData").ExamQuestion[] | null>(null);
+  const [examQuestionsError, setExamQuestionsError] = useState<string | null>(null);
+  const [isImportingExamQuestions, setIsImportingExamQuestions] = useState(false);
 
   const lecForm = useForm({ defaultValues: { name: "", link: "" } });
   const examForm = useForm({ defaultValues: { name: "", link: "", date: "", weight: 1 } });
@@ -102,15 +119,72 @@ export function SubjectDetail() {
     if (!file) return;
     setIsImportingLectures(true);
     try {
-      const { rows, skipped } = await parseLectureExcel(file);
-      for (const row of rows) {
-        addLecture(subject.id, { name: row.name, link: row.link, type: lectureTypeTab });
+      const { names, skipped } = await parseLectureExcel(file);
+      for (const name of names) {
+        addLecture(subject.id, { name, link: "", type: lectureTypeTab });
       }
-      setLectureImportSummary({ imported: rows.length, skipped });
+      setLectureImportSummary({ imported: names.length, skipped });
     } catch {
       setLectureImportSummary({ imported: 0, skipped: -1 }); // -1 signals parse error
     } finally {
       setIsImportingLectures(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleExamImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsImportingExams(true);
+    try {
+      const { names, skipped } = await parseExamNameListExcel(file);
+      for (const name of names) {
+        addExam(subject.id, { name, link: "", date: null, grade: null, weight: 1, type: examTypeTab });
+      }
+      setExamImportSummary({ imported: names.length, skipped });
+    } catch {
+      setExamImportSummary({ imported: 0, skipped: -1 }); // -1 signals parse error
+    } finally {
+      setIsImportingExams(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleFlashcardImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !flashcardsSheetLecId) return;
+    setIsImportingFlashcards(true);
+    try {
+      const { rows, skipped } = await parseFlashcardExcel(file);
+      for (const row of rows) {
+        addFlashcard(subject.id, flashcardsSheetLecId, { front: row.front, back: row.back });
+      }
+      setFlashcardImportSummary({ imported: rows.length, skipped });
+    } catch {
+      setFlashcardImportSummary({ imported: 0, skipped: -1 }); // -1 signals parse error
+    } finally {
+      setIsImportingFlashcards(false);
+      e.target.value = "";
+      setFlashcardsSheetLecId(null);
+    }
+  };
+
+  const handleExamQuestionsFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setExamQuestionsError(null);
+    setIsImportingExamQuestions(true);
+    try {
+      const questions = await parseExamExcel(file);
+      if (questions.length === 0) {
+        setExamQuestionsError("No questions found — check the column format.");
+      } else {
+        setPendingExamQuestions(questions);
+      }
+    } catch {
+      setExamQuestionsError("Couldn't read that file. Make sure it's a valid .xlsx/.xls spreadsheet.");
+    } finally {
+      setIsImportingExamQuestions(false);
       e.target.value = "";
     }
   };
@@ -123,8 +197,11 @@ export function SubjectDetail() {
       grade: null,
       weight: parseFloat(data.weight) || 1,
       type: examTypeTab,
+      questions: pendingExamQuestions ?? undefined,
     });
     examForm.reset();
+    setPendingExamQuestions(null);
+    setExamQuestionsError(null);
     setIsAddExamOpen(false);
   };
 
@@ -482,12 +559,31 @@ export function SubjectDetail() {
                   })}
                 </div>
               )}
-              <button
-                onClick={() => setIsAddExamOpen(true)}
-                className="w-full border-2 border-dashed border-border/60 rounded-2xl p-4 text-muted-foreground hover:text-foreground hover:border-foreground/30 hover:bg-secondary/20 transition-all flex items-center justify-center gap-2 font-semibold shadow-sm"
-              >
-                <Plus className="w-4 h-4" /> Add {examTypeTab === "theoretical" ? "Theoretical" : "Practical"} Exam
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setIsAddExamOpen(true)}
+                  className="flex-1 border-2 border-dashed border-border/60 rounded-2xl p-4 text-muted-foreground hover:text-foreground hover:border-foreground/30 hover:bg-secondary/20 transition-all flex items-center justify-center gap-2 font-semibold shadow-sm"
+                >
+                  <Plus className="w-4 h-4" /> Add {examTypeTab === "theoretical" ? "Theoretical" : "Practical"} Exam
+                </button>
+                <button
+                  onClick={() => examImportRef.current?.click()}
+                  disabled={isImportingExams}
+                  className="border-2 border-dashed border-border/60 rounded-2xl px-4 py-4 text-muted-foreground hover:text-foreground hover:border-indigo-400/50 hover:bg-indigo-500/5 transition-all flex items-center justify-center gap-2 font-semibold shadow-sm shrink-0 disabled:opacity-50"
+                  title="Upload Exams from Excel/CSV"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  <span className="hidden sm:inline">Import</span>
+                </button>
+              </div>
+              {/* Hidden file input for exam import */}
+              <input
+                ref={examImportRef}
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                className="hidden"
+                onChange={handleExamImport}
+              />
             </div>
           )}
 
@@ -585,16 +681,60 @@ export function SubjectDetail() {
             </div>
           </button>
           <button
-            onClick={() => { setLocation(`/subjects/${subject.id}/lectures/${flashcardsSheetLecId}/flashcards`); setFlashcardsSheetLecId(null); }}
-            className="w-full flex items-center gap-3 rounded-2xl p-4 bg-secondary/60 hover:bg-secondary transition-colors text-left"
+            onClick={() => flashcardImportRef.current?.click()}
+            disabled={isImportingFlashcards}
+            className="w-full flex items-center gap-3 rounded-2xl p-4 bg-secondary/60 hover:bg-secondary transition-colors text-left disabled:opacity-50"
           >
             <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20 shrink-0">
-              <Upload className="w-5 h-5 text-indigo-500" />
+              {isImportingFlashcards
+                ? <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                : <Upload className="w-5 h-5 text-indigo-500" />
+              }
             </div>
             <div>
               <p className="font-semibold text-foreground">Upload Flashcards</p>
-              <p className="text-xs text-muted-foreground">Bulk-import from Excel / CSV (Col A = front, Col B = back)</p>
+              <p className="text-xs text-muted-foreground">Bulk-import from Excel / CSV ("Front face" / "Back face" columns)</p>
             </div>
+          </button>
+        </div>
+      </BottomSheet>
+
+      {/* Hidden file input for flashcards import */}
+      <input
+        ref={flashcardImportRef}
+        type="file"
+        accept=".xlsx,.xls,.csv"
+        className="hidden"
+        onChange={handleFlashcardImport}
+      />
+
+      {/* Flashcards import summary */}
+      <BottomSheet
+        isOpen={!!flashcardImportSummary}
+        onClose={() => setFlashcardImportSummary(null)}
+        title="Import Complete"
+      >
+        <div className="space-y-5 pb-4">
+          {flashcardImportSummary?.skipped === -1 ? (
+            <p className="text-destructive font-medium text-center">Could not parse the file. Make sure it's a valid Excel or CSV with "Front face" and "Back face" columns.</p>
+          ) : (
+            <>
+              <p className="text-center text-foreground">
+                <span className="text-3xl font-bold text-primary">{flashcardImportSummary?.imported}</span>
+                <span className="block text-sm text-muted-foreground mt-1">flashcards imported</span>
+              </p>
+              {(flashcardImportSummary?.skipped ?? 0) > 0 && (
+                <p className="text-center text-sm text-muted-foreground">
+                  {flashcardImportSummary?.skipped} row{flashcardImportSummary?.skipped !== 1 ? "s" : ""} skipped — missing front or back face
+                </p>
+              )}
+            </>
+          )}
+          <button
+            onClick={() => setFlashcardImportSummary(null)}
+            className="w-full bg-primary text-primary-foreground font-semibold rounded-xl py-3"
+          >
+            Done
           </button>
         </div>
       </BottomSheet>
@@ -607,7 +747,7 @@ export function SubjectDetail() {
       >
         <div className="space-y-5 pb-4">
           {lectureImportSummary?.skipped === -1 ? (
-            <p className="text-destructive font-medium text-center">Could not parse the file. Make sure it's a valid Excel or CSV with Name and Link columns.</p>
+            <p className="text-destructive font-medium text-center">Could not parse the file. Make sure it's a valid Excel or CSV with a Name column.</p>
           ) : (
             <>
               <p className="text-center text-foreground">
@@ -616,13 +756,44 @@ export function SubjectDetail() {
               </p>
               {(lectureImportSummary?.skipped ?? 0) > 0 && (
                 <p className="text-center text-sm text-muted-foreground">
-                  {lectureImportSummary?.skipped} row{lectureImportSummary?.skipped !== 1 ? "s" : ""} skipped — missing Name or Link
+                  {lectureImportSummary?.skipped} row{lectureImportSummary?.skipped !== 1 ? "s" : ""} skipped — missing Name
                 </p>
               )}
             </>
           )}
           <button
             onClick={() => setLectureImportSummary(null)}
+            className="w-full bg-primary text-primary-foreground font-semibold rounded-xl py-3"
+          >
+            Done
+          </button>
+        </div>
+      </BottomSheet>
+
+      {/* Exam import summary */}
+      <BottomSheet
+        isOpen={!!examImportSummary}
+        onClose={() => setExamImportSummary(null)}
+        title="Import Complete"
+      >
+        <div className="space-y-5 pb-4">
+          {examImportSummary?.skipped === -1 ? (
+            <p className="text-destructive font-medium text-center">Could not parse the file. Make sure it's a valid Excel or CSV with a Name column.</p>
+          ) : (
+            <>
+              <p className="text-center text-foreground">
+                <span className="text-3xl font-bold text-primary">{examImportSummary?.imported}</span>
+                <span className="block text-sm text-muted-foreground mt-1">exams imported</span>
+              </p>
+              {(examImportSummary?.skipped ?? 0) > 0 && (
+                <p className="text-center text-sm text-muted-foreground">
+                  {examImportSummary?.skipped} row{examImportSummary?.skipped !== 1 ? "s" : ""} skipped — missing Name
+                </p>
+              )}
+            </>
+          )}
+          <button
+            onClick={() => setExamImportSummary(null)}
             className="w-full bg-primary text-primary-foreground font-semibold rounded-xl py-3"
           >
             Done
@@ -644,7 +815,11 @@ export function SubjectDetail() {
         </form>
       </BottomSheet>
 
-      <BottomSheet isOpen={isAddExamOpen} onClose={() => setIsAddExamOpen(false)} title={`New ${examTypeTab === "theoretical" ? "Theoretical" : "Practical"} Exam`}>
+      <BottomSheet
+        isOpen={isAddExamOpen}
+        onClose={() => { setIsAddExamOpen(false); setPendingExamQuestions(null); setExamQuestionsError(null); }}
+        title={`New ${examTypeTab === "theoretical" ? "Theoretical" : "Practical"} Exam`}
+      >
         <form onSubmit={examForm.handleSubmit(onAddExam)} className="space-y-5">
           <div>
             <label className="block text-sm font-medium mb-2">Exam Name</label>
@@ -654,6 +829,53 @@ export function SubjectDetail() {
             <label className="block text-sm font-medium mb-2">Weight</label>
             <input type="number" step="0.1" {...examForm.register("weight", { required: true, min: 0 })} className={inputCls} placeholder="1.0" />
           </div>
+
+          {/* Questions upload — moved here from the exam edit page */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-medium">Questions <span className="text-muted-foreground font-normal">(optional)</span></label>
+              {pendingExamQuestions && (
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                  {pendingExamQuestions.length} loaded
+                </span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => examQuestionsRef.current?.click()}
+              disabled={isImportingExamQuestions}
+              className={`w-full flex items-center gap-3 rounded-2xl p-4 border-2 border-dashed transition-all ${
+                isImportingExamQuestions
+                  ? "opacity-50 cursor-not-allowed border-border/40"
+                  : "border-border/50 hover:border-primary/30 hover:bg-primary/4"
+              }`}
+            >
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border transition-colors ${
+                isImportingExamQuestions ? "bg-secondary border-border/40" : "bg-primary/8 border-primary/20"
+              }`}>
+                {isImportingExamQuestions
+                  ? <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                  : <FileQuestion className="w-4.5 h-4.5 text-primary" />
+                }
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-semibold text-foreground">
+                  {isImportingExamQuestions ? "Importing questions…" : pendingExamQuestions ? "Replace questions" : "Upload Excel (.xlsx)"}
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Type · Question · Choices 1-4 · Answer · Labs · Histo
+                </p>
+              </div>
+            </button>
+            <input ref={examQuestionsRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleExamQuestionsFile} />
+            {examQuestionsError && (
+              <div className="flex items-start gap-2 mt-3 bg-destructive/8 border border-destructive/20 rounded-xl p-3">
+                <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+                <p className="text-xs text-destructive font-medium">{examQuestionsError}</p>
+              </div>
+            )}
+          </div>
+
           <button type="submit" className="w-full bg-primary text-primary-foreground font-semibold rounded-xl py-3.5 transition-opacity hover:opacity-90">Add Exam</button>
         </form>
       </BottomSheet>

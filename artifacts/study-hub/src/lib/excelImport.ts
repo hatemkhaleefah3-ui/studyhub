@@ -3,28 +3,23 @@ import type { ExamQuestion, QuestionType } from '@/hooks/useStudyData';
 
 // ── Lecture bulk-import ────────────────────────────────────────────────────────
 
-export interface LectureImportRow {
-  name: string;
-  link: string;
-}
-
-export interface LectureImportResult {
-  rows: LectureImportRow[];
+export interface NameImportResult {
+  names: string[];
   skipped: number;
 }
 
 /**
- * Parses a Name/Link Excel or CSV file for bulk lecture import.
- * Column A header: "Name", Column B header: "Link".
- * Rows missing either value are counted as skipped.
+ * Parses a single-column "Name" Excel or CSV file for bulk import.
+ * Column A header: "Name" (optional — detected and skipped if present).
+ * Blank rows are counted as skipped.
  */
-export async function parseLectureExcel(file: File): Promise<LectureImportResult> {
+export async function parseNameListExcel(file: File): Promise<NameImportResult> {
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: 'array' });
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
   const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, blankrows: false });
 
-  if (rows.length === 0) return { rows: [], skipped: 0 };
+  if (rows.length === 0) return { names: [], skipped: 0 };
 
   // Detect header row: skip if first cell looks like "name"
   const firstRow = rows[0];
@@ -34,15 +29,64 @@ export async function parseLectureExcel(file: File): Promise<LectureImportResult
     firstRow[0].trim().toLowerCase() === 'name';
 
   const dataRows = hasHeader ? rows.slice(1) : rows;
-  const result: LectureImportRow[] = [];
+  const names: string[] = [];
   let skipped = 0;
 
   for (const row of dataRows) {
     if (!row || row.length === 0) continue;
     const name = String(row[0] ?? '').trim();
-    const link = String(row[1] ?? '').trim();
-    if (!name || !link) { skipped++; continue; }
-    result.push({ name, link });
+    if (!name) { skipped++; continue; }
+    names.push(name);
+  }
+
+  return { names, skipped };
+}
+
+// Kept as an alias for callers that think in terms of "Lectures" / "Exams" —
+// both bulk-import a single "Name" column.
+export const parseLectureExcel = parseNameListExcel;
+export const parseExamNameListExcel = parseNameListExcel;
+
+// ── Flashcards bulk-import ──────────────────────────────────────────────────────
+
+export interface FlashcardImportRow {
+  front: string;
+  back: string;
+}
+
+export interface FlashcardImportResult {
+  rows: FlashcardImportRow[];
+  skipped: number;
+}
+
+/**
+ * Parses a "Front face" / "Back face" Excel or CSV file for bulk flashcard import.
+ * Column A: front face, Column B: back face. Rows missing either value are skipped.
+ */
+export async function parseFlashcardExcel(file: File): Promise<FlashcardImportResult> {
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: 'array' });
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, blankrows: false });
+
+  if (rows.length === 0) return { rows: [], skipped: 0 };
+
+  const firstRow = rows[0];
+  const hasHeader =
+    firstRow &&
+    typeof firstRow[0] === 'string' &&
+    firstRow[0].trim().toLowerCase() === 'front face';
+
+  const dataRows = hasHeader ? rows.slice(1) : rows;
+  const result: FlashcardImportRow[] = [];
+  let skipped = 0;
+
+  for (const row of dataRows) {
+    if (!row || row.length === 0) continue;
+    const front = String(row[0] ?? '').trim();
+    const back = String(row[1] ?? '').trim();
+    if (!front || !back) { skipped++; continue; }
+    result.push({ front, back });
   }
 
   return { rows: result, skipped };

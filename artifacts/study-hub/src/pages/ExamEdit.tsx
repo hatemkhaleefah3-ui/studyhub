@@ -1,27 +1,23 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useRoute, useLocation } from "wouter";
 import {
-  ArrowLeft, Trash2, Upload, CheckSquare, Square, AlertTriangle,
+  ArrowLeft, Trash2, CheckSquare, Square, AlertTriangle,
   FileQuestion, BookOpen, Calendar, BarChart2, Link2,
 } from "lucide-react";
 import { useStudyData, StudyType } from "@/hooks/useStudyData";
 import { GlassCard } from "@/components/shared/GlassCard";
 import { ConfirmSheet } from "@/components/shared/ConfirmSheet";
-import { parseExamExcel } from "@/lib/excelImport";
 
 export function ExamEdit() {
   const [, params] = useRoute("/subjects/:subjectId/exams/:examId/edit");
   const [, setLocation] = useLocation();
   const { subjects, updateExam, deleteExam } = useStudyData();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const subject = subjects.find(s => s.id === params?.subjectId);
   const exam = subject?.exams.find(e => e.id === params?.examId);
 
   const [isDeleting, setIsDeleting] = useState(false);
-  const [importError, setImportError] = useState<string | null>(null);
-  const [importing, setImporting] = useState(false);
 
   const form = useForm({
     defaultValues: {
@@ -45,26 +41,6 @@ export function ExamEdit() {
 
   const setType = (type: StudyType) => {
     updateExam(subject.id, exam.id, { type });
-  };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setImportError(null);
-    setImporting(true);
-    try {
-      const questions = await parseExamExcel(file);
-      if (questions.length === 0) {
-        setImportError("No questions found — check the column format.");
-      } else {
-        updateExam(subject.id, exam.id, { questions });
-      }
-    } catch {
-      setImportError("Couldn't read that file. Make sure it's a valid .xlsx/.xls spreadsheet.");
-    } finally {
-      setImporting(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
   };
 
   const sameTypeLectures = subject.lectures.filter(l => l.type === exam.type);
@@ -220,56 +196,6 @@ export function ExamEdit() {
             </button>
           ))}
         </div>
-      </div>
-
-      {/* ── Questions import ─────────────────────────────────────────── */}
-      <div className="bg-card border border-border/50 rounded-2xl p-4 shadow-sm mb-5">
-        <div className="flex items-center justify-between mb-3">
-          <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-            Questions
-          </label>
-          {questionCount > 0 && (
-            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-              {questionCount} loaded
-            </span>
-          )}
-        </div>
-
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={importing}
-          className={`w-full flex items-center gap-3 rounded-2xl p-4 border-2 border-dashed transition-all ${
-            importing
-              ? "opacity-50 cursor-not-allowed border-border/40"
-              : "border-border/50 hover:border-primary/30 hover:bg-primary/4"
-          }`}
-        >
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border transition-colors ${
-            importing ? "bg-secondary border-border/40" : "bg-primary/8 border-primary/20"
-          }`}>
-            {importing
-              ? <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              : <Upload className="w-4.5 h-4.5 text-primary" />
-            }
-          </div>
-          <div className="text-left">
-            <p className="text-sm font-semibold text-foreground">
-              {importing ? "Importing questions…" : questionCount > 0 ? "Replace questions" : "Upload Excel (.xlsx)"}
-            </p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
-              Type · Question · Choices 1-4 · Answer · Labs · Histo
-            </p>
-          </div>
-        </button>
-        <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileChange} />
-
-        {importError && (
-          <div className="flex items-start gap-2 mt-3 bg-destructive/8 border border-destructive/20 rounded-xl p-3">
-            <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
-            <p className="text-xs text-destructive font-medium">{importError}</p>
-          </div>
-        )}
       </div>
 
       {/* ── Linked lectures ───────────────────────────────────────────── */}
