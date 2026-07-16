@@ -1,13 +1,13 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useRoute, useLocation } from "wouter";
 import {
-  ArrowLeft, Trash2, CheckSquare, Square, AlertTriangle,
-  FileQuestion, BookOpen, Calendar, BarChart2, Link2,
+  ArrowLeft, Trash2, FileQuestion, Calendar, BarChart2, Upload, Loader2,
 } from "lucide-react";
 import { useStudyData, StudyType } from "@/hooks/useStudyData";
 import { GlassCard } from "@/components/shared/GlassCard";
 import { ConfirmSheet } from "@/components/shared/ConfirmSheet";
+import { parseExamExcel } from "@/lib/excelImport";
 
 export function ExamEdit() {
   const [, params] = useRoute("/subjects/:subjectId/exams/:examId/edit");
@@ -18,6 +18,9 @@ export function ExamEdit() {
   const exam = subject?.exams.find(e => e.id === params?.examId);
 
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const questionsFileRef = useRef<HTMLInputElement>(null);
 
   const form = useForm({
     defaultValues: {
@@ -43,17 +46,19 @@ export function ExamEdit() {
     updateExam(subject.id, exam.id, { type });
   };
 
-  const sameTypeLectures = subject.lectures.filter(l => l.type === exam.type);
-  const linkedIds = new Set(exam.linkedLectureIds || []);
-  const mismatchedLinks = (exam.linkedLectureIds || [])
-    .map(id => subject.lectures.find(l => l.id === id))
-    .filter(l => l && l.type !== exam.type);
-
-  const toggleLink = (lectureId: string) => {
-    const next = new Set(linkedIds);
-    if (next.has(lectureId)) next.delete(lectureId);
-    else next.add(lectureId);
-    updateExam(subject.id, exam.id, { linkedLectureIds: Array.from(next) });
+  const handleImportQuestions = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]; if (!file) return;
+    setImportError(null);
+    setIsImporting(true);
+    try {
+      const questions = await parseExamExcel(file);
+      updateExam(subject.id, exam.id, { questions });
+    } catch {
+      setImportError("Could not parse the file. Make sure it's a valid Excel with the correct columns.");
+    } finally {
+      setIsImporting(false);
+      if (e.target) e.target.value = "";
+    }
   };
 
   const handleDelete = () => {
@@ -111,7 +116,7 @@ export function ExamEdit() {
       </div>
 
       {/* ── Stats strip ──────────────────────────────────────────────── */}
-      <div className="grid grid-cols-3 gap-2.5 mb-5">
+      <div className="grid grid-cols-2 gap-2.5 mb-5">
         <div className="bg-card border border-border/50 rounded-2xl p-3 text-center shadow-sm">
           <p className="text-xl font-bold text-foreground">{questionCount}</p>
           <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mt-0.5">Questions</p>
@@ -119,10 +124,6 @@ export function ExamEdit() {
         <div className="bg-card border border-border/50 rounded-2xl p-3 text-center shadow-sm">
           <p className="text-xl font-bold text-foreground">{exam.weight ?? 1}%</p>
           <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mt-0.5">Weight</p>
-        </div>
-        <div className="bg-card border border-border/50 rounded-2xl p-3 text-center shadow-sm">
-          <p className="text-xl font-bold text-foreground">{linkedIds.size}</p>
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mt-0.5">Linked</p>
         </div>
       </div>
 
@@ -198,71 +199,57 @@ export function ExamEdit() {
         </div>
       </div>
 
-      {/* ── Linked lectures ───────────────────────────────────────────── */}
+      {/* ── Questions import ──────────────────────────────────────────── */}
       <div className="bg-card border border-border/50 rounded-2xl p-4 shadow-sm mb-8">
-        <div className="flex items-start justify-between mb-1">
+        <div className="flex items-center justify-between mb-3">
           <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-            Linked Lectures
+            Questions
           </label>
-          <span className="text-[11px] font-semibold text-muted-foreground">{exam.type} only</span>
+          {questionCount > 0 && (
+            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+              {questionCount} loaded
+            </span>
+          )}
         </div>
 
-        {mismatchedLinks.length > 0 && (
-          <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 mb-3 text-xs">
-            <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-            <span className="text-amber-700 dark:text-amber-300 font-medium">
-              Some linked lectures don't match this exam's type.
-            </span>
+        <button
+          type="button"
+          onClick={() => questionsFileRef.current?.click()}
+          disabled={isImporting}
+          className="w-full flex items-center gap-3 rounded-2xl p-4 border-2 border-dashed border-border/50 hover:border-primary/30 hover:bg-primary/4 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center shrink-0">
+            {isImporting
+              ? <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+              : <Upload className="w-5 h-5 text-muted-foreground" />}
           </div>
-        )}
-
-        {sameTypeLectures.length === 0 ? (
-          <div className="flex flex-col items-center py-6 text-center gap-2">
-            <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center">
-              <BookOpen className="w-5 h-5 text-muted-foreground/50" />
-            </div>
-            <p className="text-sm text-muted-foreground">
-              No {exam.type} lectures yet
+          <div className="text-left">
+            <p className="font-semibold text-sm text-foreground">
+              {questionCount > 0 ? "Replace Questions" : "Import Questions"}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Excel file · MCQ &amp; Medical Case MCQ columns
             </p>
           </div>
-        ) : (
-          <div className="space-y-1.5 mt-3">
-            {sameTypeLectures.map(lec => {
-              const isLinked = linkedIds.has(lec.id);
-              return (
-                <button
-                  key={lec.id}
-                  onClick={() => toggleLink(lec.id)}
-                  className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl transition-all text-left border ${
-                    isLinked
-                      ? "bg-primary/6 border-primary/20 hover:bg-primary/10"
-                      : "bg-secondary/30 border-transparent hover:bg-secondary/60"
-                  }`}
-                >
-                  <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors ${
-                    isLinked
-                      ? "bg-primary border-primary"
-                      : "border-border/60"
-                  }`}>
-                    {isLinked && (
-                      <svg className="w-3 h-3 text-primary-foreground" fill="none" viewBox="0 0 12 12">
-                        <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-semibold truncate transition-colors ${isLinked ? "text-foreground" : "text-muted-foreground"}`}>
-                      {lec.name}
-                    </p>
-                  </div>
-                  {lec.link && (
-                    <Link2 className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
+        </button>
+
+        <input
+          ref={questionsFileRef}
+          type="file"
+          accept=".xlsx,.xls,.csv"
+          className="hidden"
+          onChange={handleImportQuestions}
+        />
+
+        {importError && (
+          <p className="mt-3 text-sm text-destructive font-medium bg-destructive/10 border border-destructive/20 rounded-xl px-3 py-2">
+            {importError}
+          </p>
         )}
+
+        <p className="text-[11px] text-muted-foreground/60 mt-3">
+          Columns: Question type · Question text · Choice 1–4 · Correct (1-4) · Labs · Histo
+        </p>
       </div>
 
       {/* ── Delete ───────────────────────────────────────────────────── */}

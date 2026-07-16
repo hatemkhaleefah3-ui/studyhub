@@ -1,8 +1,8 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useRoute, useLocation } from "wouter";
 import {
-  ArrowLeft, Trash2, Layers, Brain, Upload, ExternalLink, BookOpen,
+  ArrowLeft, Trash2, Layers, Brain, Upload, ExternalLink,
 } from "lucide-react";
 import { useStudyData, StudyType } from "@/hooks/useStudyData";
 import { BottomSheet } from "@/components/shared/BottomSheet";
@@ -19,7 +19,6 @@ export function LectureEdit() {
 
   const [isDeleting, setIsDeleting] = useState(false);
   const [flashcardsOpen, setFlashcardsOpen] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm({
     defaultValues: { name: lecture?.name ?? "", link: lecture?.link ?? "" },
@@ -175,27 +174,6 @@ export function LectureEdit() {
             </button>
           ))}
         </div>
-      </div>
-
-      {/* ── Upload placeholder ───────────────────────────────────────── */}
-      <div className="bg-card border border-dashed border-border/60 rounded-2xl p-4 shadow-sm mb-8">
-        <label className="block text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">
-          Upload File
-        </label>
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          className="w-full flex items-center justify-center gap-2.5 rounded-xl py-3.5 text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-secondary/40 transition-all border border-dashed border-border/50"
-        >
-          <div className="w-7 h-7 rounded-lg bg-secondary flex items-center justify-center shrink-0">
-            <BookOpen className="w-3.5 h-3.5" />
-          </div>
-          Upload PDF / DOCX / PPTX…
-        </button>
-        <input ref={fileInputRef} type="file" accept="*/*" className="hidden" onChange={() => {}} />
-        <p className="text-[11px] text-muted-foreground/60 mt-2 text-center">
-          File storage via Google Drive — connect in Settings
-        </p>
       </div>
 
       {/* ── Delete ───────────────────────────────────────────────────── */}
