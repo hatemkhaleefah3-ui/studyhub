@@ -6,7 +6,7 @@ import { BottomSheet } from "@/components/shared/BottomSheet";
 import { ConfirmSheet } from "@/components/shared/ConfirmSheet";
 import { SwipeRow } from "@/components/shared/SwipeRow";
 import { LectureCoverBadge } from "@/components/study/LectureCoverBadge";
-import { parseLectureExcel, parseExamNameListExcel, parseFlashcardExcel, parseExamExcel } from "@/lib/excelImport";
+import { parseExamNameListExcel, parseFlashcardExcel, parseExamExcel } from "@/lib/excelImport";
 import {
   Plus, Trash2, ArrowLeft, ExternalLink, BookOpen, FileText, Pencil,
   FolderOpen, BarChart2, Link2, Paperclip, Info, Layers, Brain, ChevronRight, CheckSquare,
@@ -61,11 +61,6 @@ export function SubjectDetail() {
 
   // Lecture swipe → flashcards panel per-card
   const [flashcardsSheetLecId, setFlashcardsSheetLecId] = useState<string | null>(null);
-  // Lecture Excel bulk-import
-  const lectureImportRef = useRef<HTMLInputElement>(null);
-  const [lectureImportSummary, setLectureImportSummary] = useState<{ imported: number; skipped: number } | null>(null);
-  const [isImportingLectures, setIsImportingLectures] = useState(false);
-
   // Exam Excel bulk-import (names only)
   const examImportRef = useRef<HTMLInputElement>(null);
   const [examImportSummary, setExamImportSummary] = useState<{ imported: number; skipped: number } | null>(null);
@@ -112,24 +107,6 @@ export function SubjectDetail() {
     addLecture(subject.id, { name: data.name, link: data.link, type: lectureTypeTab });
     lecForm.reset();
     setIsAddLectureOpen(false);
-  };
-
-  const handleLectureImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setIsImportingLectures(true);
-    try {
-      const { names, skipped } = await parseLectureExcel(file);
-      for (const name of names) {
-        addLecture(subject.id, { name, link: "", type: lectureTypeTab });
-      }
-      setLectureImportSummary({ imported: names.length, skipped });
-    } catch {
-      setLectureImportSummary({ imported: 0, skipped: -1 }); // -1 signals parse error
-    } finally {
-      setIsImportingLectures(false);
-      e.target.value = "";
-    }
   };
 
   const handleExamImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -469,31 +446,12 @@ export function SubjectDetail() {
                   ))}
                 </div>
               )}
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setIsAddLectureOpen(true)}
-                  className="flex-1 border-2 border-dashed border-border/60 rounded-2xl p-4 text-muted-foreground hover:text-foreground hover:border-foreground/30 hover:bg-secondary/20 transition-all flex items-center justify-center gap-2 font-semibold shadow-sm"
-                >
-                  <Plus className="w-4 h-4" /> Add {lectureTypeTab === "theoretical" ? "Theoretical" : "Practical"} Lecture
-                </button>
-                <button
-                  onClick={() => lectureImportRef.current?.click()}
-                  disabled={isImportingLectures}
-                  className="border-2 border-dashed border-border/60 rounded-2xl px-4 py-4 text-muted-foreground hover:text-foreground hover:border-indigo-400/50 hover:bg-indigo-500/5 transition-all flex items-center justify-center gap-2 font-semibold shadow-sm shrink-0 disabled:opacity-50"
-                  title="Upload Lectures from Excel/CSV"
-                >
-                  <FileSpreadsheet className="w-4 h-4" />
-                  <span className="hidden sm:inline">Import</span>
-                </button>
-              </div>
-              {/* Hidden file input for lecture import */}
-              <input
-                ref={lectureImportRef}
-                type="file"
-                accept=".xlsx,.xls,.csv"
-                className="hidden"
-                onChange={handleLectureImport}
-              />
+              <button
+                onClick={() => setIsAddLectureOpen(true)}
+                className="w-full border-2 border-dashed border-border/60 rounded-2xl p-4 text-muted-foreground hover:text-foreground hover:border-foreground/30 hover:bg-secondary/20 transition-all flex items-center justify-center gap-2 font-semibold shadow-sm"
+              >
+                <Plus className="w-4 h-4" /> Add {lectureTypeTab === "theoretical" ? "Theoretical" : "Practical"} Lecture
+              </button>
             </div>
           )}
 
@@ -732,37 +690,6 @@ export function SubjectDetail() {
           )}
           <button
             onClick={() => setFlashcardImportSummary(null)}
-            className="w-full bg-primary text-primary-foreground font-semibold rounded-xl py-3"
-          >
-            Done
-          </button>
-        </div>
-      </BottomSheet>
-
-      {/* Lecture import summary */}
-      <BottomSheet
-        isOpen={!!lectureImportSummary}
-        onClose={() => setLectureImportSummary(null)}
-        title="Import Complete"
-      >
-        <div className="space-y-5 pb-4">
-          {lectureImportSummary?.skipped === -1 ? (
-            <p className="text-destructive font-medium text-center">Could not parse the file. Make sure it's a valid Excel or CSV with a Name column.</p>
-          ) : (
-            <>
-              <p className="text-center text-foreground">
-                <span className="text-3xl font-bold text-primary">{lectureImportSummary?.imported}</span>
-                <span className="block text-sm text-muted-foreground mt-1">lectures imported</span>
-              </p>
-              {(lectureImportSummary?.skipped ?? 0) > 0 && (
-                <p className="text-center text-sm text-muted-foreground">
-                  {lectureImportSummary?.skipped} row{lectureImportSummary?.skipped !== 1 ? "s" : ""} skipped — missing Name
-                </p>
-              )}
-            </>
-          )}
-          <button
-            onClick={() => setLectureImportSummary(null)}
             className="w-full bg-primary text-primary-foreground font-semibold rounded-xl py-3"
           >
             Done
