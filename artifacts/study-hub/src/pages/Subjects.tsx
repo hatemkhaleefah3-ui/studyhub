@@ -1,28 +1,56 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { useStudyData, DEFAULT_SUBJECT_EMOJIS, type Subject } from "@/hooks/useStudyData";
+import { useStudyData, type Subject } from "@/hooks/useStudyData";
 import { GlassCard } from "@/components/shared/GlassCard";
 import { BottomSheet } from "@/components/shared/BottomSheet";
 import { ConfirmSheet } from "@/components/shared/ConfirmSheet";
 import { SwipeableRow } from "@/components/shared/SwipeableRow";
 import { SortableCardList } from "@/components/shared/SortableCardList";
-import { ArrowLeft, CheckCircle2, GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  ArrowLeft, Atom, BookOpen, Brain, Calculator, ChartNoAxesColumnIncreasing,
+  CheckCircle2, Dna, FlaskConical, Globe2, GripVertical, Landmark, Laptop,
+  Leaf, Microscope, Music2, NotebookPen, Palette, Pencil, Pill, Plus, Scale,
+  Stethoscope, Target, Telescope, Trash2, type LucideIcon,
+} from "lucide-react";
 import { Link } from "wouter";
 import { useForm } from "react-hook-form";
 
 const ACCENT_COLORS = ["#007aff", "#34c759", "#ff9500", "#ff3b30", "#af52de", "#5ac8fa", "#ff2d55", "#30d158", "#ffcc00", "#32ade6"];
+const SUBJECT_ICONS = [
+  ["book-open", BookOpen], ["brain", Brain], ["microscope", Microscope],
+  ["calculator", Calculator], ["flask", FlaskConical], ["atom", Atom],
+  ["dna", Dna], ["stethoscope", Stethoscope], ["pill", Pill], ["scale", Scale],
+  ["laptop", Laptop], ["globe", Globe2], ["palette", Palette], ["music", Music2],
+  ["chart", ChartNoAxesColumnIncreasing], ["telescope", Telescope],
+  ["landmark", Landmark], ["leaf", Leaf], ["notes", NotebookPen], ["target", Target],
+] as const satisfies readonly (readonly [string, LucideIcon])[];
+type SubjectIconName = (typeof SUBJECT_ICONS)[number][0];
+type OrderedSubject = Subject & { sortOrder?: number; icon?: SubjectIconName };
+
 const inputCls = "w-full rounded-xl border border-border bg-background px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50";
 const toolbarMotion = { initial: { opacity: 0, y: -6, scale: .98 }, animate: { opacity: 1, y: 0, scale: 1 }, exit: { opacity: 0, y: 6, scale: .98 }, transition: { duration: .22, ease: [.4, 0, .2, 1] as const } };
 const actionBarMotion = { initial: { opacity: 0, y: 24, scale: .98 }, animate: { opacity: 1, y: 0, scale: 1 }, exit: { opacity: 0, y: 24, scale: .98 }, transition: { duration: .24, ease: [.4, 0, .2, 1] as const } };
 type Mode = "normal" | "manage" | "select";
-type OrderedSubject = Subject & { sortOrder?: number };
 
-function IconAction({ icon: Icon, label, onClick, active = false, destructive = false, disabled = false }: { icon: any; label: string; onClick: () => void; active?: boolean; destructive?: boolean; disabled?: boolean }) {
+function iconFor(name?: SubjectIconName) {
+  return SUBJECT_ICONS.find(([key]) => key === name)?.[1] ?? BookOpen;
+}
+
+function IconAction({ icon: Icon, label, onClick, active = false, destructive = false, disabled = false }: { icon: LucideIcon; label: string; onClick: () => void; active?: boolean; destructive?: boolean; disabled?: boolean }) {
   const state = destructive ? "border-destructive/25 bg-destructive/10 text-destructive hover:bg-destructive/15" : active ? "border-primary/30 bg-primary/15 text-primary shadow-sm" : "border-border/60 bg-card text-muted-foreground hover:border-primary/30 hover:bg-primary/5 hover:text-primary";
   return <button type="button" aria-label={label} aria-pressed={active || undefined} disabled={disabled} onClick={onClick} className={`flex min-h-11 min-w-11 flex-1 items-center justify-center rounded-2xl border px-3 shadow-sm transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40 motion-reduce:transform-none ${state}`}><Icon className="h-5 w-5" /></button>;
 }
-function EmojiPicker({ selected, onSelect }: { selected: string; onSelect: (emoji: string) => void }) { return <div className="flex flex-wrap gap-2">{DEFAULT_SUBJECT_EMOJIS.map(emoji => <button key={emoji} type="button" onClick={() => onSelect(emoji)} className={`flex h-10 w-10 items-center justify-center rounded-xl border text-xl transition-all ${selected === emoji ? "scale-110 border-primary bg-primary/10 shadow-sm" : "border-border/50 bg-secondary/50 hover:scale-105 hover:bg-secondary"}`}>{emoji}</button>)}</div>; }
-function ColorPicker({ selected, onSelect }: { selected: string; onSelect: (color: string) => void }) { return <div className="flex flex-wrap gap-2">{ACCENT_COLORS.map(color => <button key={color} type="button" onClick={() => onSelect(color)} className={`h-8 w-8 rounded-full border-2 transition-all ${selected === color ? "scale-125 border-foreground/40" : "border-transparent hover:scale-110"}`} style={{ backgroundColor: color }} />)}</div>; }
+
+function SubjectIconPicker({ selected, onSelect }: { selected: SubjectIconName; onSelect: (icon: SubjectIconName) => void }) {
+  return <div className="grid grid-cols-5 gap-2 sm:grid-cols-8">{SUBJECT_ICONS.map(([name, Icon]) => {
+    const active = selected === name;
+    return <motion.button key={name} type="button" aria-label={`Use ${name.replace("-", " ")} icon`} aria-pressed={active} onClick={() => onSelect(name)} whileHover={{ y: -2, scale: 1.06 }} whileTap={{ scale: .94 }} className={`group flex aspect-square min-h-11 items-center justify-center rounded-xl border shadow-sm transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active ? "border-primary bg-primary/15 text-primary ring-2 ring-primary/20" : "border-border/50 bg-secondary/50 text-muted-foreground hover:border-primary/30 hover:bg-primary/5 hover:text-primary"}`}><Icon className={`h-5 w-5 transition-transform duration-200 ${active ? "scale-110" : "group-hover:rotate-[-5deg] group-hover:scale-110"}`} /></motion.button>;
+  })}</div>;
+}
+
+function ColorPicker({ selected, onSelect }: { selected: string; onSelect: (color: string) => void }) {
+  return <div className="flex flex-wrap gap-2">{ACCENT_COLORS.map(color => <button key={color} type="button" onClick={() => onSelect(color)} className={`h-8 w-8 rounded-full border-2 transition-all ${selected === color ? "scale-125 border-foreground/40" : "border-transparent hover:scale-110"}`} style={{ backgroundColor: color }} />)}</div>;
+}
 
 export function Subjects() {
   const { subjects, addSubject, updateSubject, deleteSubject } = useStudyData();
@@ -35,33 +63,35 @@ export function Subjects() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const { register, handleSubmit, reset } = useForm({ defaultValues: { name: "" } });
-  const [addEmoji, setAddEmoji] = useState(DEFAULT_SUBJECT_EMOJIS[0]);
+  const [addIcon, setAddIcon] = useState<SubjectIconName>("book-open");
   const [addColor, setAddColor] = useState(ACCENT_COLORS[0]);
   const { register: regEdit, handleSubmit: handleEditSubmit, reset: resetEdit } = useForm({ defaultValues: { name: "" } });
-  const [editEmoji, setEditEmoji] = useState(DEFAULT_SUBJECT_EMOJIS[0]);
+  const [editIcon, setEditIcon] = useState<SubjectIconName>("book-open");
   const [editColor, setEditColor] = useState(ACCENT_COLORS[0]);
 
   useEffect(() => { if (!reorder) { setOrderedSubjects(sortedSubjects); setSelected(new Set()); } }, [subjects, reorder]);
-  const onSubmit = (data: { name: string }) => { addSubject({ name: data.name, emoji: addEmoji, color: addColor }); reset(); setAddEmoji(DEFAULT_SUBJECT_EMOJIS[0]); setAddColor(ACCENT_COLORS[0]); setIsAddOpen(false); };
-  const openEdit = (id: string) => { const subject = subjects.find(item => item.id === id); if (!subject) return; resetEdit({ name: subject.name }); setEditEmoji(subject.emoji ?? DEFAULT_SUBJECT_EMOJIS[0]); setEditColor(subject.color ?? ACCENT_COLORS[0]); setEditingId(id); };
-  const onEditSubmit = (data: { name: string }) => { if (!editingId) return; updateSubject(editingId, { name: data.name, emoji: editEmoji, color: editColor }); setEditingId(null); };
+  const onSubmit = (data: { name: string }) => { addSubject({ name: data.name, color: addColor, icon: addIcon } as any); reset(); setAddIcon("book-open"); setAddColor(ACCENT_COLORS[0]); setIsAddOpen(false); };
+  const openEdit = (id: string) => { const subject = subjects.find(item => item.id === id) as OrderedSubject | undefined; if (!subject) return; resetEdit({ name: subject.name }); setEditIcon(subject.icon ?? "book-open"); setEditColor(subject.color ?? ACCENT_COLORS[0]); setEditingId(id); };
+  const onEditSubmit = (data: { name: string }) => { if (!editingId) return; updateSubject(editingId, { name: data.name, icon: editIcon, color: editColor } as any); setEditingId(null); };
   const toggle = (id: string) => setSelected(current => { const next = new Set(current); next.has(id) ? next.delete(id) : next.add(id); return next; });
   const applyOrder = (next: OrderedSubject[]) => { setOrderedSubjects(next); next.forEach((subject, index) => updateSubject(subject.id, { sortOrder: index } as any)); };
   const deleteSelected = () => { if (!selected.size) return; selected.forEach(deleteSubject); setSelected(new Set()); setMode("manage"); setReorder(false); };
 
   const subjectCard = (subject: OrderedSubject, interaction: "normal" | "manage" | "select" | "drag" = "normal") => {
     const completedLectures = subject.lectures.filter(lecture => lecture.checked).length;
-    const completedExams = subject.exams.filter(exam => exam.checked || exam.lastScore).length;
-    const totalItems = subject.lectures.length + subject.exams.length;
-    const progress = totalItems ? Math.round(((completedLectures + completedExams) / totalItems) * 100) : 0;
+    const reviewedAttachments = (() => { try { const ids = JSON.parse(localStorage.getItem(`studyhub:reviewed-attachments:${subject.id}`) ?? "[]") as string[]; return subject.attachments?.filter(attachment => ids.includes(attachment.id)).length ?? 0; } catch { return 0; } })();
+    const attachmentCount = subject.attachments?.length ?? 0;
+    const totalItems = subject.lectures.length + attachmentCount;
+    const progress = totalItems ? Math.round(((completedLectures + reviewedAttachments) / totalItems) * 100) : 0;
     const isSelected = selected.has(subject.id);
     const compact = interaction === "drag";
-    const card = <GlassCard className={`relative flex h-full ${compact ? "min-h-20 p-3" : "min-h-56 p-5"} flex-col overflow-hidden border bg-card shadow-sm transition-all duration-200 ease-in-out ${isSelected ? "border-primary ring-2 ring-primary/30 shadow-md" : "border-border/60"}`}>
-      <div className="absolute inset-x-0 top-0 h-1" style={{ backgroundColor: subject.color }} />
+    const SubjectIcon = iconFor(subject.icon);
+    const card = <GlassCard className={`group/card relative flex h-full ${compact ? "min-h-20 p-3" : "min-h-56 p-5"} flex-col overflow-hidden border bg-card shadow-sm transition-all duration-200 ease-in-out ${isSelected ? "border-primary ring-2 ring-primary/30 shadow-md" : "border-border/60"}`}>
+      <div className="absolute inset-x-0 top-0 h-1 origin-left transition-transform duration-200 group-hover/card:scale-x-[1.04]" style={{ backgroundColor: subject.color }} />
       <AnimatePresence>{isSelected && <motion.span initial={{ opacity: 0, scale: .6 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .6 }} className="absolute right-3 top-3 z-20 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm"><CheckCircle2 className="h-4 w-4" /></motion.span>}</AnimatePresence>
-      {!compact && <div className="absolute -right-10 -top-10 h-28 w-28 rounded-full opacity-10 blur-2xl" style={{ backgroundColor: subject.color }} />}
-      <div className="relative z-10 flex items-center justify-between gap-4"><div className="flex min-w-0 items-center gap-3"><div className={`flex ${compact ? "h-11 w-11" : "h-12 w-12"} shrink-0 items-center justify-center rounded-2xl border text-2xl shadow-sm`} style={{ backgroundColor: `${subject.color}14`, borderColor: `${subject.color}30` }}>{subject.emoji ?? "📚"}</div><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-[.18em] text-muted-foreground">Subject</p><h3 className={`${compact ? "truncate text-lg" : "mt-1 line-clamp-2 text-xl"} font-bold leading-tight tracking-tight text-foreground`}>{subject.name}</h3>{compact && <p className="mt-1 text-xs text-muted-foreground">{subject.lectures.length} lectures · {subject.exams.length} exams</p>}</div></div>{interaction === "drag" && <GripVertical className="h-7 w-7 shrink-0 text-primary" />}</div>
-      {!compact && <div className="relative z-10 mt-auto pt-7"><div className="mb-2 flex items-center justify-between text-xs"><span className="font-semibold text-muted-foreground">Study progress</span><span className="font-bold text-foreground">{progress}%</span></div><div className="h-2 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full transition-[width] duration-300 ease-in-out motion-reduce:transition-none" style={{ width: `${progress}%`, backgroundColor: subject.color }} /></div><div className="mt-4 grid grid-cols-2 gap-2"><div className="rounded-xl border border-border/40 bg-secondary/35 px-3 py-2.5"><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Lectures</p><p className="mt-1 text-base font-bold text-foreground">{subject.lectures.length}</p></div><div className="rounded-xl border border-border/40 bg-secondary/35 px-3 py-2.5"><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Exams</p><p className="mt-1 text-base font-bold text-foreground">{subject.exams.length}</p></div></div></div>}
+      {!compact && <div className="absolute -right-10 -top-10 h-28 w-28 rounded-full opacity-10 blur-2xl transition-transform duration-300 group-hover/card:scale-125" style={{ backgroundColor: subject.color }} />}
+      <div className="relative z-10 flex items-center justify-between gap-4"><div className="flex min-w-0 items-center gap-3"><motion.div whileHover={{ rotate: -6, scale: 1.08 }} transition={{ type: "spring", stiffness: 420, damping: 22 }} className={`flex ${compact ? "h-11 w-11" : "h-12 w-12"} shrink-0 items-center justify-center rounded-2xl border shadow-sm`} style={{ backgroundColor: `${subject.color}14`, borderColor: `${subject.color}30`, color: subject.color }}><SubjectIcon className={`${compact ? "h-5 w-5" : "h-6 w-6"}`} strokeWidth={2.1} /></motion.div><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-[.18em] text-muted-foreground">Subject</p><h3 className={`${compact ? "truncate text-lg" : "mt-1 line-clamp-2 text-xl"} font-bold leading-tight tracking-tight text-foreground`}>{subject.name}</h3>{compact && <p className="mt-1 text-xs text-muted-foreground">{subject.lectures.length} lectures · {attachmentCount} attachments</p>}</div></div>{interaction === "drag" && <GripVertical className="h-7 w-7 shrink-0 text-primary" />}</div>
+      {!compact && <div className="relative z-10 mt-auto pt-7"><div className="mb-2 flex items-center justify-between text-xs"><span className="font-semibold text-muted-foreground">Study progress</span><span className="font-bold text-foreground">{progress}%</span></div><div className="h-2 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full transition-[width] duration-300 ease-in-out motion-reduce:transition-none" style={{ width: `${progress}%`, backgroundColor: subject.color }} /></div><div className="mt-4 grid grid-cols-2 gap-2"><div className="rounded-xl border border-border/40 bg-secondary/35 px-3 py-2.5"><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Lectures</p><p className="mt-1 text-base font-bold text-foreground">{subject.lectures.length}</p></div><div className="rounded-xl border border-border/40 bg-secondary/35 px-3 py-2.5"><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Attachments</p><p className="mt-1 text-base font-bold text-foreground">{attachmentCount}</p></div></div></div>}
     </GlassCard>;
     if (interaction === "select") return <button type="button" onClick={() => toggle(subject.id)} className="h-full w-full rounded-3xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{card}</button>;
     if (interaction === "manage" || interaction === "drag") return card;
@@ -75,10 +105,10 @@ export function Subjects() {
       {mode === "manage" && <motion.div key="manage" {...toolbarMotion} className="flex items-center justify-between gap-3"><button onClick={() => { setMode("normal"); setReorder(false); }} className="flex min-h-11 items-center gap-2 rounded-2xl border border-border/60 bg-card px-4 font-semibold shadow-sm transition-all duration-200 hover:bg-secondary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><ArrowLeft className="h-4 w-4" />Back</button><div className="flex gap-2"><IconAction icon={Trash2} label="Select subjects to delete" destructive onClick={() => { setMode("select"); setReorder(false); }} /><IconAction icon={GripVertical} label="Toggle subject reordering" active={reorder} onClick={() => { if (!reorder) setOrderedSubjects(sortedSubjects); setReorder(current => !current); }} /></div></motion.div>}
       {mode === "select" && <motion.div key="select" {...toolbarMotion} className="flex items-center justify-between"><span aria-hidden="true" /><div className="w-11"><IconAction icon={CheckCircle2} label="Select all subjects" active={sortedSubjects.length > 0 && selected.size === sortedSubjects.length} disabled={!sortedSubjects.length} onClick={() => setSelected(current => current.size === sortedSubjects.length ? new Set() : new Set(sortedSubjects.map(item => item.id)))} /></div></motion.div>}
     </AnimatePresence>
-    {mode === "manage" && reorder ? <SortableCardList items={orderedSubjects} onChange={applyOrder} renderItem={subject => subjectCard(subject, "drag")} /> : sortedSubjects.length === 0 ? <GlassCard className="mt-12 flex flex-col items-center justify-center border-2 border-dashed bg-transparent p-12 text-center"><div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full border border-border/50 bg-secondary/50 text-3xl">📚</div><h2 className="mb-2 text-2xl font-semibold tracking-tight">No subjects yet</h2><p className="max-w-md text-muted-foreground">Create your first subject to start organizing your lectures, exams, and tasks.</p></GlassCard> : <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">{sortedSubjects.map(subject => <div key={subject.id}>{subjectCard(subject, mode === "select" ? "select" : mode === "manage" ? "manage" : "normal")}</div>)}</div>}
+    {mode === "manage" && reorder ? <SortableCardList items={orderedSubjects} onChange={applyOrder} renderItem={subject => subjectCard(subject, "drag")} /> : sortedSubjects.length === 0 ? <GlassCard className="mt-12 flex flex-col items-center justify-center border-2 border-dashed bg-transparent p-12 text-center"><div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full border border-border/50 bg-secondary/50 text-primary"><BookOpen className="h-7 w-7" /></div><h2 className="mb-2 text-2xl font-semibold tracking-tight">No subjects yet</h2><p className="max-w-md text-muted-foreground">Create your first subject to start organizing your lectures, attachments, and tasks.</p></GlassCard> : <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">{sortedSubjects.map(subject => <div key={subject.id}>{subjectCard(subject, mode === "select" ? "select" : mode === "manage" ? "manage" : "normal")}</div>)}</div>}
     <AnimatePresence>{mode === "select" && <motion.div {...actionBarMotion} className="fixed inset-x-4 bottom-20 z-40 mx-auto flex max-w-md gap-3 rounded-3xl border border-border/60 bg-card p-3 shadow-xl md:bottom-8"><button type="button" disabled={!selected.size} onClick={deleteSelected} className="min-h-12 flex-1 rounded-2xl bg-destructive px-4 font-semibold text-destructive-foreground transition-all duration-200 hover:opacity-90 active:scale-[.98] disabled:opacity-40"><Trash2 className="mr-2 inline h-4 w-4" />Delete</button><button type="button" onClick={() => { setMode("manage"); setSelected(new Set()); }} className="min-h-12 flex-1 rounded-2xl border border-border/60 bg-secondary px-4 font-semibold text-foreground">Cancel</button></motion.div>}</AnimatePresence>
-    <BottomSheet isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} title="New Subject"><form onSubmit={handleSubmit(onSubmit)} className="space-y-6"><div><label className="mb-2 block text-sm font-medium">Subject Name</label><input {...register("name", { required: true })} className={inputCls} placeholder="e.g. Advanced Mathematics" /></div><div><label className="mb-3 block text-sm font-medium">Icon</label><EmojiPicker selected={addEmoji} onSelect={setAddEmoji} /></div><div><label className="mb-3 block text-sm font-medium">Color</label><ColorPicker selected={addColor} onSelect={setAddColor} /></div><button type="submit" className="w-full rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-opacity hover:opacity-90">Create Subject</button></form></BottomSheet>
-    <BottomSheet isOpen={!!editingId} onClose={() => setEditingId(null)} title="Edit Subject"><form onSubmit={handleEditSubmit(onEditSubmit)} className="space-y-6"><div><label className="mb-2 block text-sm font-medium">Subject Name</label><input {...regEdit("name", { required: true })} className={inputCls} /></div><div><label className="mb-3 block text-sm font-medium">Icon</label><EmojiPicker selected={editEmoji} onSelect={setEditEmoji} /></div><div><label className="mb-3 block text-sm font-medium">Color</label><ColorPicker selected={editColor} onSelect={setEditColor} /></div><button type="submit" className="w-full rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-opacity hover:opacity-90">Save Changes</button></form></BottomSheet>
+    <BottomSheet isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} title="New Subject"><form onSubmit={handleSubmit(onSubmit)} className="space-y-6"><div><label className="mb-2 block text-sm font-medium">Subject Name</label><input {...register("name", { required: true })} className={inputCls} placeholder="e.g. Advanced Mathematics" /></div><div><label className="mb-3 block text-sm font-medium">Icon</label><SubjectIconPicker selected={addIcon} onSelect={setAddIcon} /></div><div><label className="mb-3 block text-sm font-medium">Color</label><ColorPicker selected={addColor} onSelect={setAddColor} /></div><button type="submit" className="w-full rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-opacity hover:opacity-90">Create Subject</button></form></BottomSheet>
+    <BottomSheet isOpen={!!editingId} onClose={() => setEditingId(null)} title="Edit Subject"><form onSubmit={handleEditSubmit(onEditSubmit)} className="space-y-6"><div><label className="mb-2 block text-sm font-medium">Subject Name</label><input {...regEdit("name", { required: true })} className={inputCls} /></div><div><label className="mb-3 block text-sm font-medium">Icon</label><SubjectIconPicker selected={editIcon} onSelect={setEditIcon} /></div><div><label className="mb-3 block text-sm font-medium">Color</label><ColorPicker selected={editColor} onSelect={setEditColor} /></div><button type="submit" className="w-full rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-opacity hover:opacity-90">Save Changes</button></form></BottomSheet>
     <ConfirmSheet isOpen={!!deletingId} onClose={() => setDeletingId(null)} onConfirm={() => { if (deletingId) { deleteSubject(deletingId); setDeletingId(null); } }} title="Delete subject?" message="This will move the subject, along with its lectures, exams, and linked tasks, to the Archive. You can restore it later from Settings." confirmLabel="Move to Archive" />
   </div>;
 }
