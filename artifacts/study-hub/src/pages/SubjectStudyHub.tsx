@@ -67,6 +67,7 @@ export function SubjectStudyHub() {
   const [selectedLectures, setSelectedLectures] = useState<Set<string>>(new Set());
   const [reorderMode, setReorderMode] = useState(false);
   const [orderedLectures, setOrderedLectures] = useState<Lecture[]>([]);
+  const orderedLecturesRef = useRef<Lecture[]>([]);
   const [notice, setNotice] = useState("");
   const [importRequest, setImportRequest] = useState<ImportRequest>(null);
   const [finalImportOpen, setFinalImportOpen] = useState(false);
@@ -104,9 +105,11 @@ export function SubjectStudyHub() {
   const overall = total ? Math.round((completedLectures + completedExams + reviewedCount) / total * 100) : 0;
 
   useEffect(() => {
+    if (reorderMode) return;
+    orderedLecturesRef.current = lectures;
     setOrderedLectures(lectures);
     setSelectedLectures(new Set());
-  }, [lectureType, subject.lectures]);
+  }, [lectureType, subject.lectures, reorderMode]);
 
   const lectureExam = (lectureId: string) => subject.exams.find(item => item.linkedLectureIds?.includes(lectureId));
   const changeType = (next: StudyType) => { setLectureType(next); setLectureMode("normal"); setLocation(`/subjects/${subject.id}/lectures?type=${next}`, { replace: true }); };
@@ -123,8 +126,12 @@ export function SubjectStudyHub() {
   const cancelSelect = () => { setLectureMode("manage"); setSelectedLectures(new Set()); setReorderMode(false); };
   const toggleLecture = (lectureId: string) => setSelectedLectures(current => { const next = new Set(current); next.has(lectureId) ? next.delete(lectureId) : next.add(lectureId); return next; });
   const toggleSelectAll = () => setSelectedLectures(current => current.size === lectures.length ? new Set() : new Set(lectures.map(item => item.id)));
-  const persistReorder = (next: Lecture[]) => {
+  const handleReorder = (next: Lecture[]) => {
+    orderedLecturesRef.current = next;
     setOrderedLectures(next);
+  };
+  const commitReorder = () => {
+    const next = orderedLecturesRef.current;
     let index = 0;
     const merged = subject.lectures.map(item => item.type === lectureType ? next[index++] : item);
     updateSubject(subject.id, { lectures: merged });
@@ -173,7 +180,7 @@ export function SubjectStudyHub() {
           {lectureMode === "select" && <motion.div key="select-toolbar" {...toolbarMotion} className="flex items-center justify-between"><span aria-hidden="true" /><div className="w-11"><IconAction icon={CheckCircle2} label="Select all lectures" active={lectures.length > 0 && selectedLectures.size === lectures.length} disabled={!lectures.length} onClick={toggleSelectAll} /></div></motion.div>}
         </AnimatePresence>
         {lectureMode === "manage" && reorderMode
-          ? <Reorder.Group axis="y" values={orderedLectures} onReorder={persistReorder} className="flex flex-col gap-3">{orderedLectures.map((lecture, index) => <Reorder.Item key={lecture.id} value={lecture} dragListener dragElastic={0.08} dragMomentum={false} layout="position" style={{ touchAction: "none" }} className="list-none cursor-grab select-none active:cursor-grabbing" whileDrag={{ scale: 1.025, boxShadow: "0 16px 34px hsl(var(--foreground) / 0.14)", zIndex: 20 }} transition={{ duration: .18, ease: [.4, 0, .2, 1] }}>{renderLectureCard(lecture, index, "drag")}</Reorder.Item>)}</Reorder.Group>
+          ? <Reorder.Group axis="y" values={orderedLectures} onReorder={handleReorder} className="flex flex-col gap-3">{orderedLectures.map((lecture, index) => <Reorder.Item key={lecture.id} value={lecture} dragListener dragElastic={0.08} dragMomentum={false} layout="position" style={{ touchAction: "none" }} className="list-none cursor-grab select-none active:cursor-grabbing" onDragEnd={commitReorder} whileDrag={{ scale: 1.025, boxShadow: "0 16px 34px hsl(var(--foreground) / 0.14)", zIndex: 20 }} transition={{ duration: .18, ease: [.4, 0, .2, 1] }}>{renderLectureCard(lecture, index, "drag")}</Reorder.Item>)}</Reorder.Group>
           : lectureMode === "select"
             ? <div className="grid gap-3 md:grid-cols-2">{lectures.map((lecture, index) => <div key={lecture.id}>{renderLectureCard(lecture, index, "select")}</div>)}</div>
             : <div className="grid gap-3 md:grid-cols-2">{lectures.map((lecture, index) => <div key={lecture.id}>{renderLectureCard(lecture, index, lectureMode === "manage" ? "manage" : "normal")}</div>)}</div>}
