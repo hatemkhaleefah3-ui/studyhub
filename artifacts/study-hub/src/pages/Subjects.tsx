@@ -9,62 +9,15 @@ import { Plus, Pencil, Trash2 } from "lucide-react";
 import { Link } from "wouter";
 import { useForm } from "react-hook-form";
 
-const ACCENT_COLORS = [
-  "#007aff","#34c759","#ff9500","#ff3b30","#af52de",
-  "#5ac8fa","#ff2d55","#30d158","#ffcc00","#32ade6",
-];
+const ACCENT_COLORS = ["#007aff", "#34c759", "#ff9500", "#ff3b30", "#af52de", "#5ac8fa", "#ff2d55", "#30d158", "#ffcc00", "#32ade6"];
+const inputCls = "w-full rounded-xl border border-border bg-background px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50";
 
-const inputCls = "w-full bg-background border border-border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 text-foreground";
-
-function EmojiPicker({
-  selected,
-  onSelect,
-}: {
-  selected: string;
-  onSelect: (e: string) => void;
-}) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {DEFAULT_SUBJECT_EMOJIS.map((em) => (
-        <button
-          key={em}
-          type="button"
-          onClick={() => onSelect(em)}
-          className={`w-10 h-10 rounded-xl text-xl flex items-center justify-center transition-all border ${
-            selected === em
-              ? "bg-primary/10 border-primary scale-110 shadow-sm"
-              : "bg-secondary/50 border-border/50 hover:bg-secondary hover:scale-105"
-          }`}
-        >
-          {em}
-        </button>
-      ))}
-    </div>
-  );
+function EmojiPicker({ selected, onSelect }: { selected: string; onSelect: (emoji: string) => void }) {
+  return <div className="flex flex-wrap gap-2">{DEFAULT_SUBJECT_EMOJIS.map(emoji => <button key={emoji} type="button" onClick={() => onSelect(emoji)} className={`flex h-10 w-10 items-center justify-center rounded-xl border text-xl transition-all ${selected === emoji ? "scale-110 border-primary bg-primary/10 shadow-sm" : "border-border/50 bg-secondary/50 hover:scale-105 hover:bg-secondary"}`}>{emoji}</button>)}</div>;
 }
 
-function ColorPicker({
-  selected,
-  onSelect,
-}: {
-  selected: string;
-  onSelect: (c: string) => void;
-}) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {ACCENT_COLORS.map((c) => (
-        <button
-          key={c}
-          type="button"
-          onClick={() => onSelect(c)}
-          className={`w-8 h-8 rounded-full border-2 transition-all ${
-            selected === c ? "scale-125 border-foreground/40" : "border-transparent hover:scale-110"
-          }`}
-          style={{ backgroundColor: c }}
-        />
-      ))}
-    </div>
-  );
+function ColorPicker({ selected, onSelect }: { selected: string; onSelect: (color: string) => void }) {
+  return <div className="flex flex-wrap gap-2">{ACCENT_COLORS.map(color => <button key={color} type="button" onClick={() => onSelect(color)} className={`h-8 w-8 rounded-full border-2 transition-all ${selected === color ? "scale-125 border-foreground/40" : "border-transparent hover:scale-110"}`} style={{ backgroundColor: color }} />)}</div>;
 }
 
 export function Subjects() {
@@ -72,239 +25,51 @@ export function Subjects() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-
-  // Add form state
   const { register, handleSubmit, reset } = useForm({ defaultValues: { name: "" } });
   const [addEmoji, setAddEmoji] = useState(DEFAULT_SUBJECT_EMOJIS[0]);
   const [addColor, setAddColor] = useState(ACCENT_COLORS[0]);
-
-  // Edit form state
   const { register: regEdit, handleSubmit: handleEditSubmit, reset: resetEdit } = useForm({ defaultValues: { name: "" } });
   const [editEmoji, setEditEmoji] = useState(DEFAULT_SUBJECT_EMOJIS[0]);
   const [editColor, setEditColor] = useState(ACCENT_COLORS[0]);
 
-  const onSubmit = (data: any) => {
+  const onSubmit = (data: { name: string }) => {
     addSubject({ name: data.name, emoji: addEmoji, color: addColor });
-    reset();
-    setAddEmoji(DEFAULT_SUBJECT_EMOJIS[0]);
-    setAddColor(ACCENT_COLORS[0]);
-    setIsAddOpen(false);
+    reset(); setAddEmoji(DEFAULT_SUBJECT_EMOJIS[0]); setAddColor(ACCENT_COLORS[0]); setIsAddOpen(false);
   };
-
   const openEdit = (id: string) => {
-    const sub = subjects.find((s) => s.id === id);
-    if (!sub) return;
-    resetEdit({ name: sub.name });
-    setEditEmoji(sub.emoji ?? DEFAULT_SUBJECT_EMOJIS[0]);
-    setEditColor(sub.color ?? ACCENT_COLORS[0]);
-    setEditingId(id);
+    const subject = subjects.find(item => item.id === id); if (!subject) return;
+    resetEdit({ name: subject.name }); setEditEmoji(subject.emoji ?? DEFAULT_SUBJECT_EMOJIS[0]); setEditColor(subject.color ?? ACCENT_COLORS[0]); setEditingId(id);
   };
+  const onEditSubmit = (data: { name: string }) => { if (!editingId) return; updateSubject(editingId, { name: data.name, emoji: editEmoji, color: editColor }); setEditingId(null); };
 
-  const onEditSubmit = (data: any) => {
-    if (!editingId) return;
-    updateSubject(editingId, { name: data.name, emoji: editEmoji, color: editColor });
-    setEditingId(null);
-  };
+  return <div className="space-y-8 pb-20">
+    <header><h1 className="mb-2 text-4xl font-bold tracking-tight">Subjects</h1><p className="text-lg text-muted-foreground">Manage your courses</p></header>
+    {subjects.length === 0 ? <GlassCard className="mt-12 flex flex-col items-center justify-center border-2 border-dashed bg-transparent p-12 text-center"><div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full border border-border/50 bg-secondary/50 text-3xl">📚</div><h2 className="mb-2 text-2xl font-semibold tracking-tight">No subjects yet</h2><p className="mb-8 max-w-md text-muted-foreground">Create your first subject to start organizing your lectures, exams, and tasks.</p></GlassCard> :
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">{subjects.map(subject => {
+        const completedLectures = subject.lectures.filter(lecture => lecture.checked).length;
+        const completedExams = subject.exams.filter(exam => exam.checked || exam.lastScore).length;
+        const totalItems = subject.lectures.length + subject.exams.length;
+        const progress = totalItems ? Math.round(((completedLectures + completedExams) / totalItems) * 100) : 0;
+        return <SwipeableRow key={subject.id} onEdit={() => openEdit(subject.id)} onDelete={() => setDeletingId(subject.id)} className="h-full">
+          <Link href={`/subjects/${subject.id}`} className="group block h-full rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <GlassCard className="relative flex h-full min-h-56 cursor-pointer flex-col overflow-hidden border border-border/60 bg-card p-5 shadow-sm transition-all duration-200 ease-in-out group-hover:-translate-y-1 group-hover:shadow-xl group-active:scale-[.99] motion-reduce:transform-none">
+              <div className="absolute inset-x-0 top-0 h-1" style={{ backgroundColor: subject.color }} />
+              <div className="absolute -right-10 -top-10 h-28 w-28 rounded-full opacity-10 blur-2xl" style={{ backgroundColor: subject.color }} />
+              <div className="relative z-10 flex items-start justify-between gap-4">
+                <div className="flex min-w-0 items-center gap-3"><div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border text-2xl shadow-sm" style={{ backgroundColor: `${subject.color}14`, borderColor: `${subject.color}30` }}>{subject.emoji ?? "📚"}</div><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-[.18em] text-muted-foreground">Subject</p><h3 className="mt-1 line-clamp-2 text-xl font-bold leading-tight tracking-tight text-foreground">{subject.name}</h3></div></div>
+                <div className="flex gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100"><button onClick={event => { event.preventDefault(); event.stopPropagation(); openEdit(subject.id); }} className="flex h-8 w-8 items-center justify-center rounded-full border border-border/50 bg-background/90 text-muted-foreground shadow-sm transition-colors hover:bg-secondary hover:text-foreground"><Pencil className="h-3.5 w-3.5" /></button><button onClick={event => { event.preventDefault(); event.stopPropagation(); setDeletingId(subject.id); }} className="flex h-8 w-8 items-center justify-center rounded-full border border-border/50 bg-background/90 text-muted-foreground shadow-sm transition-colors hover:bg-destructive/10 hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></button></div>
+              </div>
+              <div className="relative z-10 mt-auto pt-7"><div className="mb-2 flex items-center justify-between text-xs"><span className="font-semibold text-muted-foreground">Study progress</span><span className="font-bold text-foreground">{progress}%</span></div><div className="h-2 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full transition-[width] duration-300 ease-in-out motion-reduce:transition-none" style={{ width: `${progress}%`, backgroundColor: subject.color }} /></div>
+                <div className="mt-4 grid grid-cols-2 gap-2"><div className="rounded-xl border border-border/40 bg-secondary/35 px-3 py-2.5"><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Lectures</p><p className="mt-1 text-base font-bold text-foreground">{subject.lectures.length}</p></div><div className="rounded-xl border border-border/40 bg-secondary/35 px-3 py-2.5"><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Exams</p><p className="mt-1 text-base font-bold text-foreground">{subject.exams.length}</p></div></div>
+              </div>
+            </GlassCard>
+          </Link>
+        </SwipeableRow>;
+      })}</div>}
 
-  return (
-    <div className="space-y-8 pb-20">
-      <div>
-        <h1 className="text-4xl font-bold tracking-tight mb-2">Subjects</h1>
-        <p className="text-muted-foreground text-lg">Manage your courses</p>
-      </div>
-
-      {subjects.length === 0 ? (
-        <GlassCard className="p-12 text-center flex flex-col items-center justify-center border-dashed border-2 bg-transparent mt-12">
-          <div className="w-16 h-16 bg-secondary/50 rounded-full flex items-center justify-center mb-6 border border-border/50 text-3xl">
-            📚
-          </div>
-          <h2 className="text-2xl font-semibold mb-2 tracking-tight">No subjects yet</h2>
-          <p className="text-muted-foreground mb-8 max-w-md mx-auto">
-            Create your first subject to start organizing your lectures, exams, and tasks.
-          </p>
-        </GlassCard>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {subjects.map((subject) => {
-            const gradedExams = subject.exams.filter((e) => e.grade);
-            const avg =
-              gradedExams.length
-                ? Math.round(
-                    gradedExams.reduce((acc, curr) => acc + (parseFloat(curr.grade!) || 0), 0) /
-                      gradedExams.length
-                  )
-                : null;
-
-            return (
-              <SwipeableRow
-                key={subject.id}
-                onEdit={() => openEdit(subject.id)}
-                onDelete={() => setDeletingId(subject.id)}
-                className="h-full"
-              >
-                <Link href={`/subjects/${subject.id}`} className="block h-full">
-                  <GlassCard
-                    className="p-5 hover:-translate-y-1 transition-all duration-300 cursor-pointer relative group h-full flex flex-col bg-card/60 hover:bg-card hover:shadow-xl border border-border/50 overflow-hidden"
-                    style={{ borderTopColor: subject.color, borderTopWidth: 3 }}
-                  >
-                    {/* Subtle color tint overlay */}
-                    <div
-                      className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
-                      style={{ background: `linear-gradient(135deg, ${subject.color}08 0%, transparent 60%)` }}
-                    />
-
-                    {/* Edit / Delete hover buttons */}
-                    <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-                      <button
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEdit(subject.id); }}
-                        className="w-8 h-8 rounded-full bg-background/90 backdrop-blur flex items-center justify-center hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors border border-border/50 shadow-sm"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeletingId(subject.id); }}
-                        className="w-8 h-8 rounded-full bg-background/90 backdrop-blur flex items-center justify-center hover:bg-destructive/10 hover:text-destructive text-muted-foreground transition-colors border border-border/50 shadow-sm"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-
-                    <div className="relative z-10 flex-1 flex flex-col">
-                      <h3 className="text-xl font-bold mb-4 text-foreground tracking-tight pr-12 leading-snug line-clamp-2 flex items-start gap-2">
-                        <span className="text-2xl leading-tight shrink-0">{subject.emoji ?? "📚"}</span>
-                        <span>{subject.name}</span>
-                      </h3>
-                    </div>
-
-                    <div className="relative z-10 flex gap-2 mt-2 pt-4 border-t border-border/40">
-                      <div className="bg-secondary/40 border border-border/40 rounded-xl px-3 py-2.5 flex-1 flex flex-col justify-center group-hover:bg-secondary/60 transition-colors">
-                        <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider mb-0.5">
-                          Avg Grade
-                        </p>
-                        <p className="text-sm font-bold text-foreground">{avg !== null ? `${avg}%` : "—"}</p>
-                      </div>
-                      <div className="bg-secondary/40 border border-border/40 rounded-xl px-3 py-2.5 flex-1 flex flex-col justify-center group-hover:bg-secondary/60 transition-colors">
-                        <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider mb-0.5">
-                          Exams
-                        </p>
-                        <p className="text-sm font-bold text-foreground">{subject.exams.length}</p>
-                      </div>
-                      <div className="bg-secondary/40 border border-border/40 rounded-xl px-3 py-2.5 flex-1 flex flex-col justify-center group-hover:bg-secondary/60 transition-colors">
-                        <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider mb-0.5">
-                          Lectures
-                        </p>
-                        <p className="text-sm font-bold text-foreground">{subject.lectures.length}</p>
-                      </div>
-                    </div>
-                  </GlassCard>
-                </Link>
-              </SwipeableRow>
-            );
-          })}
-        </div>
-      )}
-
-      {/* FAB */}
-      <FabPortal>
-        <button
-          onClick={() => setIsAddOpen(true)}
-          className="fixed bottom-24 md:bottom-10 right-6 md:right-10 w-14 h-14 bg-primary text-primary-foreground rounded-full shadow-lg shadow-primary/30 flex items-center justify-center hover:scale-105 transition-transform z-40"
-        >
-          <Plus className="w-6 h-6" />
-        </button>
-      </FabPortal>
-
-      {/* Add Subject sheet */}
-      <BottomSheet isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} title="New Subject">
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium mb-2">Subject Name</label>
-            <input
-              {...register("name", { required: true })}
-              className={inputCls}
-              placeholder="e.g. Advanced Mathematics"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-3">Icon</label>
-            <EmojiPicker selected={addEmoji} onSelect={setAddEmoji} />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-3">Color</label>
-            <ColorPicker selected={addColor} onSelect={setAddColor} />
-          </div>
-
-          {/* Preview */}
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-secondary/40 border border-border/40">
-            <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center text-xl border"
-              style={{ backgroundColor: `${addColor}18`, borderColor: `${addColor}30` }}
-            >
-              {addEmoji}
-            </div>
-            <span className="font-semibold text-foreground">Preview</span>
-          </div>
-
-          <button
-            type="submit"
-            className="w-full bg-primary text-primary-foreground font-semibold rounded-xl py-3.5 hover:opacity-90 transition-opacity"
-          >
-            Create Subject
-          </button>
-        </form>
-      </BottomSheet>
-
-      {/* Edit Subject sheet */}
-      <BottomSheet isOpen={!!editingId} onClose={() => setEditingId(null)} title="Edit Subject">
-        <form onSubmit={handleEditSubmit(onEditSubmit)} className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium mb-2">Subject Name</label>
-            <input {...regEdit("name", { required: true })} className={inputCls} />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-3">Icon</label>
-            <EmojiPicker selected={editEmoji} onSelect={setEditEmoji} />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-3">Color</label>
-            <ColorPicker selected={editColor} onSelect={setEditColor} />
-          </div>
-
-          {/* Preview */}
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-secondary/40 border border-border/40">
-            <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center text-xl border"
-              style={{ backgroundColor: `${editColor}18`, borderColor: `${editColor}30` }}
-            >
-              {editEmoji}
-            </div>
-            <span className="font-semibold text-foreground">Preview</span>
-          </div>
-
-          <button
-            type="submit"
-            className="w-full bg-primary text-primary-foreground font-semibold rounded-xl py-3.5 hover:opacity-90 transition-opacity"
-          >
-            Save Changes
-          </button>
-        </form>
-      </BottomSheet>
-
-      {/* Delete confirm */}
-      <ConfirmSheet
-        isOpen={!!deletingId}
-        onClose={() => setDeletingId(null)}
-        onConfirm={() => {
-          if (deletingId) { deleteSubject(deletingId); setDeletingId(null); }
-        }}
-        title="Delete subject?"
-        message="This will move the subject, along with its lectures, exams, and linked tasks, to the Archive. You can restore it later from Settings."
-        confirmLabel="Move to Archive"
-      />
-    </div>
-  );
+    <FabPortal><button onClick={() => setIsAddOpen(true)} className="fixed bottom-24 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 transition-transform hover:scale-105 md:bottom-10 md:right-10"><Plus className="h-6 w-6" /></button></FabPortal>
+    <BottomSheet isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} title="New Subject"><form onSubmit={handleSubmit(onSubmit)} className="space-y-6"><div><label className="mb-2 block text-sm font-medium">Subject Name</label><input {...register("name", { required: true })} className={inputCls} placeholder="e.g. Advanced Mathematics" /></div><div><label className="mb-3 block text-sm font-medium">Icon</label><EmojiPicker selected={addEmoji} onSelect={setAddEmoji} /></div><div><label className="mb-3 block text-sm font-medium">Color</label><ColorPicker selected={addColor} onSelect={setAddColor} /></div><div className="flex items-center gap-3 rounded-xl border border-border/40 bg-secondary/40 p-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl border text-xl" style={{ backgroundColor: `${addColor}18`, borderColor: `${addColor}30` }}>{addEmoji}</div><span className="font-semibold text-foreground">Preview</span></div><button type="submit" className="w-full rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-opacity hover:opacity-90">Create Subject</button></form></BottomSheet>
+    <BottomSheet isOpen={!!editingId} onClose={() => setEditingId(null)} title="Edit Subject"><form onSubmit={handleEditSubmit(onEditSubmit)} className="space-y-6"><div><label className="mb-2 block text-sm font-medium">Subject Name</label><input {...regEdit("name", { required: true })} className={inputCls} /></div><div><label className="mb-3 block text-sm font-medium">Icon</label><EmojiPicker selected={editEmoji} onSelect={setEditEmoji} /></div><div><label className="mb-3 block text-sm font-medium">Color</label><ColorPicker selected={editColor} onSelect={setEditColor} /></div><div className="flex items-center gap-3 rounded-xl border border-border/40 bg-secondary/40 p-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl border text-xl" style={{ backgroundColor: `${editColor}18`, borderColor: `${editColor}30` }}>{editEmoji}</div><span className="font-semibold text-foreground">Preview</span></div><button type="submit" className="w-full rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-opacity hover:opacity-90">Save Changes</button></form></BottomSheet>
+    <ConfirmSheet isOpen={!!deletingId} onClose={() => setDeletingId(null)} onConfirm={() => { if (deletingId) { deleteSubject(deletingId); setDeletingId(null); } }} title="Delete subject?" message="This will move the subject, along with its lectures, exams, and linked tasks, to the Archive. You can restore it later from Settings." confirmLabel="Move to Archive" />
+  </div>;
 }
