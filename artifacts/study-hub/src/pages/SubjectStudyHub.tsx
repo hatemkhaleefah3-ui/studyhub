@@ -218,13 +218,57 @@ export function SubjectStudyHub() {
 
 function FinalExamCard({ subjectId, examId, questionCount, lastScore, type }: { subjectId: string; examId?: string; questionCount: number; lastScore?: number; type: StudyType }) {
   const [, setLocation] = useLocation();
+  const { subjects, updateSubject } = useStudyData();
   const hasQuestions = questionCount > 0;
+
+  const ensureFinalExam = () => {
+    if (examId) return examId;
+    const subject = subjects.find((item) => item.id === subjectId);
+    const newExamId = crypto.randomUUID();
+    if (subject) {
+      updateSubject(subjectId, {
+        exams: [
+          ...subject.exams,
+          {
+            id: newExamId,
+            name: "Final Exam",
+            link: "",
+            grade: null,
+            date: null,
+            weight: 1,
+            type,
+            checked: false,
+            linkedLectureIds: [],
+            questions: [],
+            lastScore: null,
+          },
+        ],
+      });
+    }
+    return newExamId;
+  };
+
+  const openSettings = () => {
+    const id = ensureFinalExam();
+    setLocation(`/subjects/${subjectId}/exams/${id}/edit`);
+  };
+
+  const examineOrAddQuestions = () => {
+    const id = ensureFinalExam();
+    setLocation(hasQuestions ? `/subjects/${subjectId}/exams/${id}/take` : `/subjects/${subjectId}/exams/${id}/edit`);
+  };
+
   return (
     <SwipeRow
-      onSwipeRight={examId ? () => setLocation(`/subjects/${subjectId}/exams/${examId}/edit`) : undefined}
-      rightLabel="Edit" rightIcon={FileQuestion} rightColor={examAccent}
-      onSwipeLeft={hasQuestions && examId ? () => setLocation(`/subjects/${subjectId}/exams/${examId}/take`) : undefined}
-      leftLabel={hasQuestions ? "Examine" : "No questions"} leftIcon={BookOpen} leftColor={examAccent}
+      onTap={openSettings}
+      onSwipeRight={openSettings}
+      rightLabel="Edit"
+      rightIcon={FileQuestion}
+      rightColor={examAccent}
+      onSwipeLeft={examineOrAddQuestions}
+      leftLabel={hasQuestions ? "Examine" : "Add questions"}
+      leftIcon={BookOpen}
+      leftColor={examAccent}
     >
       <GlassCard className="overflow-hidden border-border/60 bg-card p-0 shadow-sm">
         <div className="h-1" style={{ backgroundColor: examAccent }} />
