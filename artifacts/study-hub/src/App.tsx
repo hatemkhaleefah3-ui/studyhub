@@ -5,6 +5,7 @@ import NotFound from '@/pages/not-found';
 import { Route, Switch, Router as WouterRouter, useSearch } from 'wouter';
 import { StudyDataProvider } from '@/hooks/useStudyData';
 import { AppShell } from '@/components/layout/AppShell';
+import { AttachmentFormatNormalizer } from '@/components/shared/AttachmentFormatNormalizer';
 import { Dashboard } from '@/pages/Dashboard';
 import { Subjects } from '@/pages/Subjects';
 import { SubjectStudyHub } from '@/pages/SubjectStudyHub';
@@ -29,5 +30,5 @@ function Router() { return <Switch>
   <Route path="/subjects/:subjectId/exams/:examId/questions" component={FinalExamQuestions} /><Route path="/subjects/:subjectId/exams/:examId/edit" component={ExamEdit} /><Route path="/subjects/:subjectId/exams/:examId/take" component={ExamTake} />
   <Route path="/schedule" component={Schedule} /><Route path="/checklist" component={Checklist} /><Route path="/checklist/:id" component={TaskListDetail} /><Route path="/progress" component={Progress} /><Route path="/settings" component={Settings} /><Route path="/archive" component={Archive} /><Route component={NotFound} />
 </Switch>; }
-function App() { return <QueryClientProvider client={queryClient}><TooltipProvider><StudyDataProvider><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><AppShell><Router /></AppShell></WouterRouter></StudyDataProvider><Toaster /></TooltipProvider></QueryClientProvider>; }
+function App() { return <QueryClientProvider client={queryClient}><TooltipProvider><StudyDataProvider><AttachmentFormatNormalizer /><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><AppShell><Router /></AppShell></WouterRouter></StudyDataProvider><Toaster /></TooltipProvider></QueryClientProvider>; }
 export default App;
