@@ -29,6 +29,9 @@ function Router() {
     <Switch>
       <Route path="/" component={Dashboard} />
       <Route path="/subjects" component={Subjects} />
+      <Route path="/subjects/:id/progress" component={SubjectStudyHub} />
+      <Route path="/subjects/:id/lectures" component={SubjectStudyHub} />
+      <Route path="/subjects/:id/attachments" component={SubjectStudyHub} />
       <Route path="/subjects/:id" component={SubjectStudyHub} />
       <Route path="/subjects/:subjectId/lectures/:lectureId" component={LectureEdit} />
       <Route path="/subjects/:subjectId/lectures/:lectureId/flashcards" component={FlashcardsMaker} />
@@ -52,9 +55,7 @@ function App() {
       <TooltipProvider>
         <StudyDataProvider>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-            <AppShell>
-              <Router />
-            </AppShell>
+            <AppShell><Router /></AppShell>
           </WouterRouter>
         </StudyDataProvider>
         <Toaster />
