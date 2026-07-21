@@ -1,34 +1,23 @@
 import { useEffect } from "react";
 
-const EDGE_SIZE = 112;
-const MAX_SPEED = 24;
+const EDGE_SIZE = 176;
+const MIN_SPEED = 8;
+const MAX_SPEED = 72;
 
 type ScrollTarget = HTMLElement | Window;
-type RestorableContainer = {
+type RestorableStyle = {
   element: HTMLElement;
-  maxHeight: string;
-  overflowY: string;
-  overscrollBehavior: string;
+  contentVisibility: string;
+  containIntrinsicSize: string;
+  willChange: string;
 };
 
-function findInnerScrollContainer(element: HTMLElement): HTMLElement | null {
+function findScrollTarget(element: HTMLElement): ScrollTarget {
   let current = element.parentElement;
   while (current) {
     const style = window.getComputedStyle(current);
-    if (/(auto|scroll)/.test(style.overflowY) && current.scrollHeight > current.clientHeight) return current;
-    current = current.parentElement;
-  }
-  return null;
-}
-
-function findPageScrollTarget(element: HTMLElement, excluded: HTMLElement | null): ScrollTarget {
-  let current = element.parentElement;
-  while (current) {
-    if (current !== excluded) {
-      const style = window.getComputedStyle(current);
-      const canScroll = /(auto|scroll)/.test(style.overflowY) && current.scrollHeight > current.clientHeight;
-      if (canScroll) return current;
-    }
+    const canScroll = /(auto|scroll)/.test(style.overflowY) && current.scrollHeight > current.clientHeight;
+    if (canScroll) return current;
     current = current.parentElement;
   }
   return window;
@@ -45,22 +34,42 @@ function scrollTarget(target: ScrollTarget, amount: number) {
   else (target as HTMLElement).scrollTop += amount;
 }
 
+function optimizeRows(activeRow: HTMLElement): RestorableStyle[] {
+  const list = activeRow.parentElement;
+  if (!list) return [];
+
+  return Array.from(list.children)
+    .filter((child): child is HTMLElement => child instanceof HTMLElement)
+    .map(element => {
+      const previous = {
+        element,
+        contentVisibility: element.style.contentVisibility,
+        containIntrinsicSize: element.style.containIntrinsicSize,
+        willChange: element.style.willChange,
+      };
+
+      element.style.contentVisibility = element === activeRow ? "visible" : "auto";
+      element.style.containIntrinsicSize = "72px";
+      element.style.willChange = element === activeRow ? "transform" : "auto";
+      return previous;
+    });
+}
+
+function restoreRows(rows: RestorableStyle[]) {
+  rows.forEach(({ element, contentVisibility, containIntrinsicSize, willChange }) => {
+    element.style.contentVisibility = contentVisibility;
+    element.style.containIntrinsicSize = containIntrinsicSize;
+    element.style.willChange = willChange;
+  });
+}
+
 export function DragEdgeAutoScroll() {
   useEffect(() => {
     let active = false;
     let pointerY = 0;
     let target: ScrollTarget = window;
-    let expanded: RestorableContainer | null = null;
     let frame = 0;
-    let restoreFrame = 0;
-
-    const restoreContainer = () => {
-      if (!expanded) return;
-      expanded.element.style.maxHeight = expanded.maxHeight;
-      expanded.element.style.overflowY = expanded.overflowY;
-      expanded.element.style.overscrollBehavior = expanded.overscrollBehavior;
-      expanded = null;
-    };
+    let optimizedRows: RestorableStyle[] = [];
 
     const tick = () => {
       if (!active) return;
@@ -69,10 +78,10 @@ export function DragEdgeAutoScroll() {
 
       if (pointerY < top + EDGE_SIZE) {
         const strength = Math.min(1, Math.max(0, (top + EDGE_SIZE - pointerY) / EDGE_SIZE));
-        speed = -Math.max(5, strength * MAX_SPEED);
+        speed = -Math.max(MIN_SPEED, strength * strength * MAX_SPEED);
       } else if (pointerY > bottom - EDGE_SIZE) {
         const strength = Math.min(1, Math.max(0, (pointerY - (bottom - EDGE_SIZE)) / EDGE_SIZE));
-        speed = Math.max(5, strength * MAX_SPEED);
+        speed = Math.max(MIN_SPEED, strength * strength * MAX_SPEED);
       }
 
       if (speed) scrollTarget(target, speed);
@@ -83,25 +92,11 @@ export function DragEdgeAutoScroll() {
       const element = event.target instanceof HTMLElement ? event.target.closest<HTMLElement>(".cursor-grab") : null;
       if (!element) return;
 
-      window.cancelAnimationFrame(restoreFrame);
-      restoreContainer();
-
-      const inner = findInnerScrollContainer(element);
-      if (inner) {
-        expanded = {
-          element: inner,
-          maxHeight: inner.style.maxHeight,
-          overflowY: inner.style.overflowY,
-          overscrollBehavior: inner.style.overscrollBehavior,
-        };
-        inner.style.maxHeight = "none";
-        inner.style.overflowY = "visible";
-        inner.style.overscrollBehavior = "auto";
-      }
-
+      restoreRows(optimizedRows);
+      optimizedRows = optimizeRows(element);
       active = true;
       pointerY = event.clientY;
-      target = findPageScrollTarget(element, inner);
+      target = findScrollTarget(element);
       window.cancelAnimationFrame(frame);
       frame = window.requestAnimationFrame(tick);
     };
@@ -113,7 +108,8 @@ export function DragEdgeAutoScroll() {
     const stop = () => {
       active = false;
       window.cancelAnimationFrame(frame);
-      restoreFrame = window.requestAnimationFrame(restoreContainer);
+      restoreRows(optimizedRows);
+      optimizedRows = [];
     };
 
     window.addEventListener("pointerdown", onPointerDown, true);
@@ -122,10 +118,7 @@ export function DragEdgeAutoScroll() {
     window.addEventListener("pointercancel", stop, true);
 
     return () => {
-      active = false;
-      window.cancelAnimationFrame(frame);
-      window.cancelAnimationFrame(restoreFrame);
-      restoreContainer();
+      stop();
       window.removeEventListener("pointerdown", onPointerDown, true);
       window.removeEventListener("pointermove", onPointerMove, true);
       window.removeEventListener("pointerup", stop, true);
