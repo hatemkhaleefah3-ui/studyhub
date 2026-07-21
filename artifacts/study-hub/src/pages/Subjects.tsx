@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion, Reorder } from "framer-motion";
+import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useStudyData, DEFAULT_SUBJECT_EMOJIS, type Subject } from "@/hooks/useStudyData";
 import { GlassCard } from "@/components/shared/GlassCard";
 import { BottomSheet } from "@/components/shared/BottomSheet";
 import { ConfirmSheet } from "@/components/shared/ConfirmSheet";
 import { SwipeableRow } from "@/components/shared/SwipeableRow";
+import { SortableCardList } from "@/components/shared/SortableCardList";
 import { ArrowLeft, CheckCircle2, GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { Link } from "wouter";
 import { useForm } from "react-hook-form";
@@ -20,14 +21,8 @@ function IconAction({ icon: Icon, label, onClick, active = false, destructive = 
   const state = destructive ? "border-destructive/25 bg-destructive/10 text-destructive hover:bg-destructive/15" : active ? "border-primary/30 bg-primary/15 text-primary shadow-sm" : "border-border/60 bg-card text-muted-foreground hover:border-primary/30 hover:bg-primary/5 hover:text-primary";
   return <button type="button" aria-label={label} aria-pressed={active || undefined} disabled={disabled} onClick={onClick} className={`flex min-h-11 min-w-11 flex-1 items-center justify-center rounded-2xl border px-3 shadow-sm transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40 motion-reduce:transform-none ${state}`}><Icon className="h-5 w-5" /></button>;
 }
-
-function EmojiPicker({ selected, onSelect }: { selected: string; onSelect: (emoji: string) => void }) {
-  return <div className="flex flex-wrap gap-2">{DEFAULT_SUBJECT_EMOJIS.map(emoji => <button key={emoji} type="button" onClick={() => onSelect(emoji)} className={`flex h-10 w-10 items-center justify-center rounded-xl border text-xl transition-all ${selected === emoji ? "scale-110 border-primary bg-primary/10 shadow-sm" : "border-border/50 bg-secondary/50 hover:scale-105 hover:bg-secondary"}`}>{emoji}</button>)}</div>;
-}
-
-function ColorPicker({ selected, onSelect }: { selected: string; onSelect: (color: string) => void }) {
-  return <div className="flex flex-wrap gap-2">{ACCENT_COLORS.map(color => <button key={color} type="button" onClick={() => onSelect(color)} className={`h-8 w-8 rounded-full border-2 transition-all ${selected === color ? "scale-125 border-foreground/40" : "border-transparent hover:scale-110"}`} style={{ backgroundColor: color }} />)}</div>;
-}
+function EmojiPicker({ selected, onSelect }: { selected: string; onSelect: (emoji: string) => void }) { return <div className="flex flex-wrap gap-2">{DEFAULT_SUBJECT_EMOJIS.map(emoji => <button key={emoji} type="button" onClick={() => onSelect(emoji)} className={`flex h-10 w-10 items-center justify-center rounded-xl border text-xl transition-all ${selected === emoji ? "scale-110 border-primary bg-primary/10 shadow-sm" : "border-border/50 bg-secondary/50 hover:scale-105 hover:bg-secondary"}`}>{emoji}</button>)}</div>; }
+function ColorPicker({ selected, onSelect }: { selected: string; onSelect: (color: string) => void }) { return <div className="flex flex-wrap gap-2">{ACCENT_COLORS.map(color => <button key={color} type="button" onClick={() => onSelect(color)} className={`h-8 w-8 rounded-full border-2 transition-all ${selected === color ? "scale-125 border-foreground/40" : "border-transparent hover:scale-110"}`} style={{ backgroundColor: color }} />)}</div>; }
 
 export function Subjects() {
   const { subjects, addSubject, updateSubject, deleteSubject } = useStudyData();
@@ -36,7 +31,6 @@ export function Subjects() {
   const [reorder, setReorder] = useState(false);
   const sortedSubjects = subjects.map((subject, index) => ({ subject: subject as OrderedSubject, index })).sort((a, b) => (a.subject.sortOrder ?? a.index) - (b.subject.sortOrder ?? b.index)).map(item => item.subject);
   const [orderedSubjects, setOrderedSubjects] = useState<OrderedSubject[]>(sortedSubjects);
-  const orderedRef = useRef<OrderedSubject[]>(sortedSubjects);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -47,19 +41,12 @@ export function Subjects() {
   const [editEmoji, setEditEmoji] = useState(DEFAULT_SUBJECT_EMOJIS[0]);
   const [editColor, setEditColor] = useState(ACCENT_COLORS[0]);
 
-  useEffect(() => {
-    if (reorder) return;
-    orderedRef.current = sortedSubjects;
-    setOrderedSubjects(sortedSubjects);
-    setSelected(new Set());
-  }, [subjects, reorder]);
-
+  useEffect(() => { if (!reorder) { setOrderedSubjects(sortedSubjects); setSelected(new Set()); } }, [subjects, reorder]);
   const onSubmit = (data: { name: string }) => { addSubject({ name: data.name, emoji: addEmoji, color: addColor }); reset(); setAddEmoji(DEFAULT_SUBJECT_EMOJIS[0]); setAddColor(ACCENT_COLORS[0]); setIsAddOpen(false); };
   const openEdit = (id: string) => { const subject = subjects.find(item => item.id === id); if (!subject) return; resetEdit({ name: subject.name }); setEditEmoji(subject.emoji ?? DEFAULT_SUBJECT_EMOJIS[0]); setEditColor(subject.color ?? ACCENT_COLORS[0]); setEditingId(id); };
   const onEditSubmit = (data: { name: string }) => { if (!editingId) return; updateSubject(editingId, { name: data.name, emoji: editEmoji, color: editColor }); setEditingId(null); };
   const toggle = (id: string) => setSelected(current => { const next = new Set(current); next.has(id) ? next.delete(id) : next.add(id); return next; });
-  const handleReorder = (next: OrderedSubject[]) => { orderedRef.current = next; setOrderedSubjects(next); };
-  const commitReorder = () => orderedRef.current.forEach((subject, index) => updateSubject(subject.id, { sortOrder: index } as any));
+  const applyOrder = (next: OrderedSubject[]) => { setOrderedSubjects(next); next.forEach((subject, index) => updateSubject(subject.id, { sortOrder: index } as any)); };
   const deleteSelected = () => { if (!selected.size) return; selected.forEach(deleteSubject); setSelected(new Set()); setMode("manage"); setReorder(false); };
 
   const subjectCard = (subject: OrderedSubject, interaction: "normal" | "manage" | "select" | "drag" = "normal") => {
@@ -84,17 +71,12 @@ export function Subjects() {
   return <div className="space-y-6 pb-24">
     {mode === "normal" && <header><h1 className="mb-2 text-4xl font-bold tracking-tight">Subjects</h1><p className="text-lg text-muted-foreground">Manage your courses</p></header>}
     <AnimatePresence mode="wait" initial={false}>
-      {mode === "normal" && <motion.div key="normal" {...toolbarMotion} className="flex w-full gap-3"><IconAction icon={Plus} label="Add subject" onClick={() => setIsAddOpen(true)} /><IconAction icon={Pencil} label="Edit subjects" onClick={() => { orderedRef.current = sortedSubjects; setOrderedSubjects(sortedSubjects); setMode("manage"); setReorder(false); }} /></motion.div>}
-      {mode === "manage" && <motion.div key="manage" {...toolbarMotion} className="flex items-center justify-between gap-3"><button onClick={() => { setMode("normal"); setReorder(false); }} className="flex min-h-11 items-center gap-2 rounded-2xl border border-border/60 bg-card px-4 font-semibold shadow-sm transition-all duration-200 hover:bg-secondary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><ArrowLeft className="h-4 w-4" />Back</button><div className="flex gap-2"><IconAction icon={Trash2} label="Select subjects to delete" destructive onClick={() => { setMode("select"); setReorder(false); }} /><IconAction icon={GripVertical} label="Toggle subject reordering" active={reorder} onClick={() => { if (!reorder) { orderedRef.current = sortedSubjects; setOrderedSubjects(sortedSubjects); } setReorder(current => !current); }} /></div></motion.div>}
+      {mode === "normal" && <motion.div key="normal" {...toolbarMotion} className="flex w-full gap-3"><IconAction icon={Plus} label="Add subject" onClick={() => setIsAddOpen(true)} /><IconAction icon={Pencil} label="Edit subjects" onClick={() => { setOrderedSubjects(sortedSubjects); setMode("manage"); setReorder(false); }} /></motion.div>}
+      {mode === "manage" && <motion.div key="manage" {...toolbarMotion} className="flex items-center justify-between gap-3"><button onClick={() => { setMode("normal"); setReorder(false); }} className="flex min-h-11 items-center gap-2 rounded-2xl border border-border/60 bg-card px-4 font-semibold shadow-sm transition-all duration-200 hover:bg-secondary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><ArrowLeft className="h-4 w-4" />Back</button><div className="flex gap-2"><IconAction icon={Trash2} label="Select subjects to delete" destructive onClick={() => { setMode("select"); setReorder(false); }} /><IconAction icon={GripVertical} label="Toggle subject reordering" active={reorder} onClick={() => { if (!reorder) setOrderedSubjects(sortedSubjects); setReorder(current => !current); }} /></div></motion.div>}
       {mode === "select" && <motion.div key="select" {...toolbarMotion} className="flex items-center justify-between"><span aria-hidden="true" /><div className="w-11"><IconAction icon={CheckCircle2} label="Select all subjects" active={sortedSubjects.length > 0 && selected.size === sortedSubjects.length} disabled={!sortedSubjects.length} onClick={() => setSelected(current => current.size === sortedSubjects.length ? new Set() : new Set(sortedSubjects.map(item => item.id)))} /></div></motion.div>}
     </AnimatePresence>
-
-    {mode === "manage" && reorder
-      ? <Reorder.Group axis="y" values={orderedSubjects} onReorder={handleReorder} layoutScroll className="-mx-1 flex max-h-[72vh] flex-col gap-4 overflow-y-auto overscroll-contain px-1 py-4">{orderedSubjects.map(subject => <Reorder.Item key={subject.id} value={subject} dragListener dragElastic={0.26} dragMomentum={false} layout="position" style={{ touchAction: "none" }} className="list-none cursor-grab select-none active:cursor-grabbing" onDragEnd={commitReorder} whileDrag={{ scale: 1.045, y: -2, boxShadow: "0 20px 44px hsl(var(--foreground) / 0.18)", zIndex: 50 }} transition={{ type: "spring", stiffness: 520, damping: 30, mass: .6 }}>{subjectCard(subject, "drag")}</Reorder.Item>)}</Reorder.Group>
-      : sortedSubjects.length === 0 ? <GlassCard className="mt-12 flex flex-col items-center justify-center border-2 border-dashed bg-transparent p-12 text-center"><div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full border border-border/50 bg-secondary/50 text-3xl">📚</div><h2 className="mb-2 text-2xl font-semibold tracking-tight">No subjects yet</h2><p className="max-w-md text-muted-foreground">Create your first subject to start organizing your lectures, exams, and tasks.</p></GlassCard>
-      : <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">{sortedSubjects.map(subject => <div key={subject.id}>{subjectCard(subject, mode === "select" ? "select" : mode === "manage" ? "manage" : "normal")}</div>)}</div>}
-
-    <AnimatePresence>{mode === "select" && <motion.div {...actionBarMotion} className="fixed inset-x-4 bottom-20 z-40 mx-auto flex max-w-md gap-3 rounded-3xl border border-border/60 bg-card p-3 shadow-xl md:bottom-8"><button type="button" disabled={!selected.size} onClick={deleteSelected} className="min-h-12 flex-1 rounded-2xl bg-destructive px-4 font-semibold text-destructive-foreground transition-all duration-200 hover:opacity-90 active:scale-[.98] disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transform-none"><Trash2 className="mr-2 inline h-4 w-4" />Delete</button><button type="button" onClick={() => { setMode("manage"); setSelected(new Set()); }} className="min-h-12 flex-1 rounded-2xl border border-border/60 bg-secondary px-4 font-semibold text-foreground transition-all duration-200 hover:bg-secondary/80 active:scale-[.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transform-none">Cancel</button></motion.div>}</AnimatePresence>
+    {mode === "manage" && reorder ? <SortableCardList items={orderedSubjects} onChange={applyOrder} renderItem={subject => subjectCard(subject, "drag")} /> : sortedSubjects.length === 0 ? <GlassCard className="mt-12 flex flex-col items-center justify-center border-2 border-dashed bg-transparent p-12 text-center"><div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full border border-border/50 bg-secondary/50 text-3xl">📚</div><h2 className="mb-2 text-2xl font-semibold tracking-tight">No subjects yet</h2><p className="max-w-md text-muted-foreground">Create your first subject to start organizing your lectures, exams, and tasks.</p></GlassCard> : <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">{sortedSubjects.map(subject => <div key={subject.id}>{subjectCard(subject, mode === "select" ? "select" : mode === "manage" ? "manage" : "normal")}</div>)}</div>}
+    <AnimatePresence>{mode === "select" && <motion.div {...actionBarMotion} className="fixed inset-x-4 bottom-20 z-40 mx-auto flex max-w-md gap-3 rounded-3xl border border-border/60 bg-card p-3 shadow-xl md:bottom-8"><button type="button" disabled={!selected.size} onClick={deleteSelected} className="min-h-12 flex-1 rounded-2xl bg-destructive px-4 font-semibold text-destructive-foreground transition-all duration-200 hover:opacity-90 active:scale-[.98] disabled:opacity-40"><Trash2 className="mr-2 inline h-4 w-4" />Delete</button><button type="button" onClick={() => { setMode("manage"); setSelected(new Set()); }} className="min-h-12 flex-1 rounded-2xl border border-border/60 bg-secondary px-4 font-semibold text-foreground">Cancel</button></motion.div>}</AnimatePresence>
     <BottomSheet isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} title="New Subject"><form onSubmit={handleSubmit(onSubmit)} className="space-y-6"><div><label className="mb-2 block text-sm font-medium">Subject Name</label><input {...register("name", { required: true })} className={inputCls} placeholder="e.g. Advanced Mathematics" /></div><div><label className="mb-3 block text-sm font-medium">Icon</label><EmojiPicker selected={addEmoji} onSelect={setAddEmoji} /></div><div><label className="mb-3 block text-sm font-medium">Color</label><ColorPicker selected={addColor} onSelect={setAddColor} /></div><button type="submit" className="w-full rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-opacity hover:opacity-90">Create Subject</button></form></BottomSheet>
     <BottomSheet isOpen={!!editingId} onClose={() => setEditingId(null)} title="Edit Subject"><form onSubmit={handleEditSubmit(onEditSubmit)} className="space-y-6"><div><label className="mb-2 block text-sm font-medium">Subject Name</label><input {...regEdit("name", { required: true })} className={inputCls} /></div><div><label className="mb-3 block text-sm font-medium">Icon</label><EmojiPicker selected={editEmoji} onSelect={setEditEmoji} /></div><div><label className="mb-3 block text-sm font-medium">Color</label><ColorPicker selected={editColor} onSelect={setEditColor} /></div><button type="submit" className="w-full rounded-xl bg-primary py-3.5 font-semibold text-primary-foreground transition-opacity hover:opacity-90">Save Changes</button></form></BottomSheet>
     <ConfirmSheet isOpen={!!deletingId} onClose={() => setDeletingId(null)} onConfirm={() => { if (deletingId) { deleteSubject(deletingId); setDeletingId(null); } }} title="Delete subject?" message="This will move the subject, along with its lectures, exams, and linked tasks, to the Archive. You can restore it later from Settings." confirmLabel="Move to Archive" />
