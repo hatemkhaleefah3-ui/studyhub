@@ -7,10 +7,12 @@ const EXAM_HEADERS = [
   "Correct Answer (1-4)", "Labs", "Histo",
 ];
 
+type MediaFlashcard = Flashcard & { frontImage?: string; backImage?: string };
+
 export interface FinalExamImportError { filename: string; reason: string }
 export interface FinalExamImportResult {
   questions: ExamQuestion[];
-  flashcards: Flashcard[];
+  flashcards: MediaFlashcard[];
   errors: FinalExamImportError[];
 }
 
@@ -31,10 +33,15 @@ export async function parseFinalExamFiles(files: File[]): Promise<FinalExamImpor
         const rows: unknown[][] = XLSX.utils.sheet_to_json(flashSheet, { header: 1, blankrows: false });
         if (rows[0] && exactHeader(rows[0], FLASHCARD_HEADERS)) {
           recognized = true;
+          const headers = rows[0].map(value => String(value ?? "").trim().toLowerCase());
+          const frontImageIndex = headers.findIndex(value => value === "front image" || value === "front image link");
+          const backImageIndex = headers.findIndex(value => value === "back image" || value === "back image link");
           rows.slice(1).forEach((row) => {
             const front = String(row[0] ?? "").trim();
             const back = String(row[1] ?? "").trim();
-            if (front && back) result.flashcards.push({ id: crypto.randomUUID(), front, back });
+            const frontImage = String(frontImageIndex >= 0 ? row[frontImageIndex] ?? "" : row[2] ?? "").trim();
+            const backImage = String(backImageIndex >= 0 ? row[backImageIndex] ?? "" : row[3] ?? "").trim();
+            if ((front || frontImage) && (back || backImage)) result.flashcards.push({ id: crypto.randomUUID(), front, back, frontImage: frontImage || undefined, backImage: backImage || undefined });
           });
         }
       }
