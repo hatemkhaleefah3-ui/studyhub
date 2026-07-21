@@ -1,313 +1,87 @@
-import { useState } from "react";
-import { Link, useRoute, useLocation } from "wouter";
-import { ArrowLeft, CheckCircle2, RotateCcw, ChevronLeft, ChevronRight } from "lucide-react";
-import { useStudyData } from "@/hooks/useStudyData";
+import { useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { ArrowLeft, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock3, RotateCcw, X } from "lucide-react";
+import { useLocation, useRoute } from "wouter";
+import { useStudyData, getScoreBand, type ExamQuestion } from "@/hooks/useStudyData";
 import { GlassCard } from "@/components/shared/GlassCard";
-import { getScoreBand } from "@/hooks/useStudyData";
-import { motion, AnimatePresence } from "framer-motion";
 
-/**
- * Exam-taking flow: one question at a time with Previous / Next / Submit.
- * The question navigator at the bottom lets the user jump to any question.
- * >=70% checks the exam and cascade-checks any same-type linked lectures.
- */
+const transition = { duration: 0.34, ease: [0.4, 0, 0.2, 1] as const };
+
 export function ExamTake() {
   const [, params] = useRoute("/subjects/:subjectId/exams/:examId/take");
   const [, setLocation] = useLocation();
   const { subjects, submitExamAttempt } = useStudyData();
-
-  const subject = subjects.find(s => s.id === params?.subjectId);
-  const exam = subject?.exams.find(e => e.id === params?.examId);
-
-  const questions = exam?.questions || [];
-  const [answers, setAnswers] = useState<number[]>(Array(questions.length).fill(0));
-  const [currentQ, setCurrentQ] = useState(0);
+  const subject = subjects.find((item) => item.id === params?.subjectId);
+  const exam = subject?.exams.find((item) => item.id === params?.examId);
+  const allQuestions = exam?.questions ?? [];
+  const [questions, setQuestions] = useState<ExamQuestion[]>(allQuestions);
+  const [answers, setAnswers] = useState<number[]>(Array(allQuestions.length).fill(0));
+  const [confirmed, setConfirmed] = useState<boolean[]>(Array(allQuestions.length).fill(false));
+  const [index, setIndex] = useState(0);
+  const [seconds, setSeconds] = useState(0);
   const [result, setResult] = useState<{ correct: number; total: number; percentage: number } | null>(null);
+  const [showMissed, setShowMissed] = useState(false);
 
-  if (!subject || !exam) {
-    return <div className="p-8 text-center text-muted-foreground">Exam not found</div>;
-  }
+  useEffect(() => {
+    if (result) return;
+    const timer = window.setInterval(() => setSeconds((value) => value + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [result]);
 
-  // No per-subject color theming anymore
+  if (!subject || !exam) return <div className="p-8 text-center text-muted-foreground">Exam not found</div>;
+  const goBack = () => window.history.length > 1 ? window.history.back() : setLocation(`/subjects/${subject.id}/lectures?type=${exam.type}`);
 
-  if (questions.length === 0) {
-    return (
-      <div className="space-y-6 pb-20">
-        <div className="flex items-center gap-3">
-          <Link
-            href={`/subjects/${subject.id}`}
-            className="p-2 rounded-full bg-secondary hover:bg-secondary/80 transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-          <h1 className="text-2xl font-bold text-primary">{exam.name}</h1>
-        </div>
-        <GlassCard className="p-10 text-center text-muted-foreground border-dashed border-2 bg-transparent">
-          <p className="font-medium">No questions yet</p>
-          <p className="text-sm mt-1 opacity-70">Import questions from the exam's edit page first.</p>
-          <button
-            onClick={() => setLocation(`/subjects/${subject.id}/exams/${exam.id}/edit`)}
-            className="mt-4 text-primary-foreground bg-primary hover:bg-primary/90 transition-colors font-semibold rounded-xl px-5 py-2.5"
-          >
-            Go to Edit
-          </button>
-        </GlassCard>
-      </div>
-    );
-  }
+  if (!questions.length) return <div className="mx-auto flex min-h-[70vh] max-w-xl items-center justify-center"><GlassCard className="w-full border-dashed border-2 bg-transparent p-10 text-center"><p className="text-xl font-bold">No questions yet</p><p className="mt-2 text-sm text-muted-foreground">Return to the exam settings and import an Excel question file.</p><button onClick={goBack} className="mt-5 rounded-xl bg-primary px-5 py-3 font-semibold text-primary-foreground">Go back</button></GlassCard></div>;
 
-  const setAnswer = (choice: number) => {
-    setAnswers(prev => prev.map((a, i) => (i === currentQ ? choice : a)));
+  const question = questions[index];
+  const selected = answers[index];
+  const isConfirmed = confirmed[index];
+  const progress = Math.round(((index + 1) / questions.length) * 100);
+  const time = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+  const missed = questions.map((item, itemIndex) => ({ item, itemIndex, answer: answers[itemIndex] })).filter(({ item, answer }) => answer !== item.correctAnswer);
+  const medicalCount = questions.filter((item) => item.questionType === "Medical Case MCQ").length;
+  const mcqCount = questions.length - medicalCount;
+
+  const confirmAnswer = () => {
+    if (!selected) return;
+    setConfirmed((current) => current.map((value, itemIndex) => itemIndex === index ? true : value));
   };
-
-  const handleSubmit = () => {
+  const next = () => {
+    if (!isConfirmed) { confirmAnswer(); return; }
+    if (index < questions.length - 1) setIndex((value) => value + 1);
+  };
+  const submit = () => {
     const score = submitExamAttempt(subject.id, exam.id, answers);
     setResult(score);
+    const historyKey = `studyhub:exam-history:${exam.id}`;
+    const previous = JSON.parse(localStorage.getItem(historyKey) ?? "[]");
+    localStorage.setItem(historyKey, JSON.stringify([{ ...score, answers, missed: missed.map(({ itemIndex }) => itemIndex), takenAt: new Date().toISOString() }, ...previous].slice(0, 20)));
   };
-
-  const retake = () => {
-    setAnswers(Array(questions.length).fill(0));
-    setCurrentQ(0);
-    setResult(null);
+  const retryWrong = () => {
+    const wrong = missed.map(({ item }) => item);
+    setQuestions(wrong); setAnswers(Array(wrong.length).fill(0)); setConfirmed(Array(wrong.length).fill(false)); setIndex(0); setSeconds(0); setResult(null); setShowMissed(false);
   };
+  const restart = () => { setQuestions(allQuestions); setAnswers(Array(allQuestions.length).fill(0)); setConfirmed(Array(allQuestions.length).fill(false)); setIndex(0); setSeconds(0); setResult(null); setShowMissed(false); };
 
-  // ── Results screen ─────────────────────────────────────────────────────────
   if (result) {
     const band = getScoreBand(result.percentage);
-    return (
-      <div className="space-y-6 pb-20">
-        <div className="flex items-center gap-3">
-          <Link
-            href={`/subjects/${subject.id}`}
-            className="p-2 rounded-full bg-secondary hover:bg-secondary/80 transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-          <h1 className="text-2xl font-bold text-primary">Results</h1>
-        </div>
-        <GlassCard className="p-8 text-center space-y-4">
-          <div
-            className="w-24 h-24 rounded-full mx-auto flex items-center justify-center text-3xl font-bold text-white"
-            style={{ backgroundColor: band.color }}
-          >
-            {result.percentage}%
-          </div>
-          <div>
-            <p className="text-xl font-bold" style={{ color: band.color }}>{band.label}</p>
-            <p className="text-muted-foreground mt-1">{result.correct} / {result.total} correct</p>
-          </div>
-          {result.percentage >= 70 ? (
-            <p className="text-sm text-muted-foreground">
-              Passed — this exam and its linked lectures are now checked.
-            </p>
-          ) : (
-            <p className="text-sm text-muted-foreground">Below 70% — try again to check this exam.</p>
-          )}
-          <div className="flex gap-3 pt-2">
-            <button
-              onClick={retake}
-              className="flex-1 flex items-center justify-center gap-2 rounded-xl py-3 font-semibold bg-secondary hover:bg-secondary/80 transition-colors"
-            >
-              <RotateCcw className="w-4 h-4" /> Retake
-            </button>
-            <button
-              onClick={() => setLocation(`/subjects/${subject.id}`)}
-              className="flex-1 rounded-xl py-3 font-semibold text-primary-foreground bg-primary hover:bg-primary/90 transition-colors"
-            >
-              Done
-            </button>
-          </div>
-        </GlassCard>
-
-        {/* Wrong answers breakdown */}
-        {questions.some((_: any, i: number) => answers[i] !== questions[i].correctAnswer) && (
-          <div className="space-y-3">
-            <h2 className="text-lg font-bold tracking-tight px-1">Review Wrong Answers</h2>
-            {questions.map((q: any, i: number) => {
-              const userAnswer = answers[i];
-              const correct = q.correctAnswer;
-              if (userAnswer === correct) return null;
-              const label = (n: number) => String.fromCharCode(64 + n);
-              return (
-                <GlassCard key={i} className="p-4 space-y-3">
-                  <div className="flex items-start gap-2">
-                    <span className="px-2 py-0.5 rounded-md text-xs font-bold text-primary-foreground bg-primary shrink-0 mt-0.5">
-                      Q{i + 1}
-                    </span>
-                    <p className="font-medium text-sm leading-relaxed">{q.text}</p>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-destructive/10 border border-destructive/20">
-                      <span className="text-xs font-bold text-destructive shrink-0 mt-0.5 whitespace-nowrap">✗ Your answer</span>
-                      <p className="text-sm text-destructive">{label(userAnswer)}. {q.choices[userAnswer - 1]}</p>
-                    </div>
-                    <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-                      <span className="text-xs font-bold text-emerald-600 shrink-0 mt-0.5 whitespace-nowrap">✓ Correct</span>
-                      <p className="text-sm text-emerald-700 dark:text-emerald-400">{label(correct)}. {q.choices[correct - 1]}</p>
-                    </div>
-                  </div>
-                </GlassCard>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    );
+    const mcqCorrect = questions.filter((item, i) => item.questionType === "MCQ" && answers[i] === item.correctAnswer).length;
+    const caseCorrect = questions.filter((item, i) => item.questionType === "Medical Case MCQ" && answers[i] === item.correctAnswer).length;
+    return <div className="mx-auto max-w-3xl space-y-5 pb-24">
+      <header className="flex items-center gap-3"><button onClick={goBack} className="flex h-11 w-11 items-center justify-center rounded-full border border-border bg-secondary"><ArrowLeft className="h-5 w-5" /></button><div><p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Exam complete</p><h1 className="text-2xl font-bold">{exam.name}</h1></div></header>
+      <GlassCard className="overflow-hidden p-0"><div className="p-7 text-center"><div className="mx-auto flex h-28 w-28 items-center justify-center rounded-full text-3xl font-black text-white shadow-lg" style={{ backgroundColor: band.color }}>{result.percentage}%</div><h2 className="mt-4 text-2xl font-bold" style={{ color: band.color }}>{band.label}</h2><p className="mt-1 text-muted-foreground">{result.correct} of {result.total} correct · {time}</p></div><div className="grid grid-cols-2 border-t border-border"><div className="p-4 text-center"><p className="text-xl font-bold">{mcqCorrect}/{mcqCount}</p><p className="text-xs text-muted-foreground">MCQs</p></div><div className="border-l border-border p-4 text-center"><p className="text-xl font-bold">{caseCorrect}/{medicalCount}</p><p className="text-xs text-muted-foreground">Medical cases</p></div></div></GlassCard>
+      <button onClick={() => setShowMissed((value) => !value)} className="w-full rounded-2xl border border-border bg-card p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"><div className="flex items-center justify-between"><div><p className="font-bold">Missed Items</p><p className="text-sm text-muted-foreground">{missed.length} question{missed.length === 1 ? "" : "s"}</p></div><ChevronRight className={`h-5 w-5 transition ${showMissed ? "rotate-90" : ""}`} /></div></button>
+      <AnimatePresence>{showMissed && <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} transition={transition} className="space-y-3 overflow-hidden">{missed.map(({ item, itemIndex, answer }) => <GlassCard key={`${item.id}-${itemIndex}`} className="space-y-3 p-4"><div className="flex items-start gap-2"><span className="rounded-md bg-primary px-2 py-1 text-xs font-bold text-primary-foreground">Q{itemIndex + 1}</span><p className="font-semibold">{item.text}</p></div><div className="rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive"><span className="font-bold">Your answer: </span>{answer ? item.choices[answer - 1] : "No answer"}</div><div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-emerald-600 dark:text-emerald-400"><span className="font-bold">Correct: </span>{item.choices[item.correctAnswer - 1]}</div></GlassCard>)}</motion.div>}</AnimatePresence>
+      <div className="grid gap-3 sm:grid-cols-3"><button onClick={restart} className="flex items-center justify-center gap-2 rounded-2xl bg-secondary py-4 font-semibold"><RotateCcw className="h-4 w-4" />Retake all</button><button disabled={!missed.length} onClick={retryWrong} className="rounded-2xl border border-primary/20 bg-primary/10 py-4 font-semibold text-primary disabled:opacity-40">Retry wrong only</button><button onClick={goBack} className="rounded-2xl bg-primary py-4 font-semibold text-primary-foreground">Done</button></div>
+    </div>;
   }
 
-  // ── Taking the exam ────────────────────────────────────────────────────────
-  const isFirst = currentQ === 0;
-  const isLast = currentQ === questions.length - 1;
-  const allAnswered = answers.every(a => a !== 0);
-  const answeredCount = answers.filter(a => a !== 0).length;
-  const q = questions[currentQ];
-  const progressPct = Math.round(((currentQ + 1) / questions.length) * 100);
-
-  return (
-    <div className="space-y-5 pb-20">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <Link
-          href={`/subjects/${subject.id}`}
-          className="p-2 rounded-full bg-secondary hover:bg-secondary/80 transition-colors shrink-0"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </Link>
-        <div className="flex-1 min-w-0">
-          <h1 className="text-xl font-bold truncate text-primary">{exam.name}</h1>
-          <p className="text-sm text-muted-foreground">
-            Question {currentQ + 1} of {questions.length}
-            {answeredCount > 0 && (
-              <span className="ml-2 opacity-70">· {answeredCount} answered</span>
-            )}
-          </p>
-        </div>
-      </div>
-
-      {/* Progress bar */}
-      <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
-        <motion.div
-          className="h-full rounded-full bg-primary"
-          animate={{ width: `${progressPct}%` }}
-          transition={{ duration: 0.3, ease: "easeOut" }}
-        />
-      </div>
-
-      {/* Question card */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={currentQ}
-          initial={{ opacity: 0, x: 32 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -32 }}
-          transition={{ duration: 0.18, ease: "easeInOut" }}
-        >
-          <GlassCard className="p-5 space-y-4">
-            <div className="flex items-start gap-2">
-              <span
-                className="px-2 py-0.5 rounded-md text-xs font-bold text-primary-foreground bg-primary shrink-0 mt-0.5"
-              >
-                Q{currentQ + 1}
-              </span>
-              <div className="flex-1">
-                <p className="font-medium leading-relaxed">{q.text}</p>
-                {q.questionType === "Medical Case MCQ" && (q.labs || q.histo) && (
-                  <div className="mt-2 space-y-1 text-sm text-muted-foreground bg-secondary/40 rounded-lg p-3">
-                    {q.labs && <p><span className="font-semibold">Labs:</span> {q.labs}</p>}
-                    {q.histo && <p><span className="font-semibold">Histo:</span> {q.histo}</p>}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-2.5">
-              {q.choices.map((choice: string, cIdx: number) => {
-                const choiceNum = cIdx + 1;
-                const selected = answers[currentQ] === choiceNum;
-                const label = String.fromCharCode(65 + cIdx);
-                return (
-                  <button
-                    key={cIdx}
-                    onClick={() => setAnswer(choiceNum)}
-                    className={`w-full text-left px-4 py-3.5 rounded-xl border-2 transition-all text-sm flex items-center gap-3 ${
-                      selected
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-border hover:border-border/50 hover:bg-secondary/40"
-                    }`}
-                  >
-                    <span
-                      className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs font-bold shrink-0 ${
-                        selected ? "border-white/50 text-white" : "border-border text-muted-foreground"
-                      }`}
-                    >
-                      {label}
-                    </span>
-                    <span className="flex-1">{choice}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </GlassCard>
-        </motion.div>
-      </AnimatePresence>
-
-      {/* Navigation buttons */}
-      <div className="flex gap-3">
-        <button
-          onClick={() => setCurrentQ(q => q - 1)}
-          disabled={isFirst}
-          className="flex-1 py-4 rounded-2xl font-semibold bg-secondary hover:bg-secondary/80 transition-colors disabled:opacity-30 flex items-center justify-center gap-2 text-sm"
-        >
-          <ChevronLeft className="w-4 h-4" /> Previous
-        </button>
-        {isLast ? (
-          <button
-            onClick={handleSubmit}
-            disabled={!allAnswered}
-            className="flex-1 py-4 rounded-2xl font-semibold text-primary-foreground bg-primary hover:bg-primary/90 flex items-center justify-center gap-2 text-sm transition-opacity disabled:opacity-40"
-          >
-            <CheckCircle2 className="w-4 h-4" /> Submit Exam
-          </button>
-        ) : (
-          <button
-            onClick={() => setCurrentQ(q => q + 1)}
-            className="flex-1 py-4 rounded-2xl font-semibold text-primary-foreground bg-primary hover:bg-primary/90 flex items-center justify-center gap-2 text-sm"
-          >
-            Next <ChevronRight className="w-4 h-4" />
-          </button>
-        )}
-      </div>
-
-      {/* Question navigator */}
-      <div className="flex gap-1.5 flex-wrap justify-center pt-1">
-        {questions.map((_: any, i: number) => {
-          const isAnswered = answers[i] !== 0;
-          const isCurrent = i === currentQ;
-          return (
-            <button
-              key={i}
-              onClick={() => setCurrentQ(i)}
-              title={`Q${i + 1}${isAnswered ? " — answered" : " — not answered"}`}
-              className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
-                isCurrent
-                  ? "bg-primary text-primary-foreground shadow-sm scale-110"
-                  : isAnswered
-                  ? "bg-secondary text-foreground"
-                  : "bg-secondary/40 text-muted-foreground"
-              }`}
-            >
-              {i + 1}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Submit hint */}
-      {isLast && !allAnswered && (
-        <p className="text-xs text-center text-muted-foreground">
-          {answers.filter(a => a === 0).length} question{answers.filter(a => a === 0).length !== 1 ? "s" : ""} still unanswered
-        </p>
-      )}
+  return <div className="-mx-4 -mt-4 min-h-[calc(100vh-5rem)] bg-background px-4 pb-24 pt-4 md:-mx-6 md:px-6">
+    <div className="mx-auto max-w-3xl space-y-5">
+      <header className="flex items-center gap-3"><button onClick={goBack} className="flex h-11 w-11 items-center justify-center rounded-full border border-border bg-secondary"><ArrowLeft className="h-5 w-5" /></button><div className="min-w-0 flex-1"><p className="truncate text-lg font-bold">{exam.name}</p><p className="text-sm text-muted-foreground">Question {index + 1} of {questions.length}</p></div><div className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 font-mono text-sm"><Clock3 className="h-4 w-4 text-primary" />{time}</div></header>
+      <div className="h-2 overflow-hidden rounded-full bg-secondary"><motion.div className="h-full rounded-full bg-primary" animate={{ width: `${progress}%` }} transition={transition} /></div>
+      <AnimatePresence mode="wait"><motion.div key={index} initial={{ opacity: 0, x: 28 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -28 }} transition={transition}><GlassCard className="space-y-5 p-5 md:p-7"><div><div className="mb-3 flex items-center gap-2"><span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-wider text-primary">{question.questionType}</span></div>{question.questionType === "Medical Case MCQ" && (question.labs || question.histo) && <div className="mb-4 rounded-2xl border border-border bg-secondary/30 p-4 text-sm"><p className="mb-2 font-bold">Case context</p>{question.labs && <p><span className="font-semibold">Labs:</span> {question.labs}</p>}{question.histo && <p className="mt-1"><span className="font-semibold">Histo:</span> {question.histo}</p>}</div>}<h2 className="text-xl font-bold leading-relaxed">{question.text}</h2></div><div className="space-y-3">{question.choices.map((choice, choiceIndex) => {const number=choiceIndex+1;const chosen=selected===number;const correct=isConfirmed&&number===question.correctAnswer;const wrong=isConfirmed&&chosen&&number!==question.correctAnswer;return <button key={choiceIndex} disabled={isConfirmed} onClick={()=>setAnswers((current)=>current.map((value,itemIndex)=>itemIndex===index?number:value))} className={`flex min-h-14 w-full items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left transition ${correct?"border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400":wrong?"border-destructive bg-destructive/10 text-destructive":chosen?"border-primary bg-primary/10":"border-border hover:border-primary/40 hover:bg-secondary/30"}`}><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-sm font-bold">{String.fromCharCode(65+choiceIndex)}</span><span className="flex-1">{choice}</span>{correct&&<Check className="h-5 w-5"/>}{wrong&&<X className="h-5 w-5"/>}</button>})}</div></GlassCard></motion.div></AnimatePresence>
+      <div className="grid grid-cols-2 gap-3"><button disabled={index===0} onClick={()=>setIndex((value)=>value-1)} className="flex items-center justify-center gap-2 rounded-2xl bg-secondary py-4 font-semibold disabled:opacity-30"><ChevronLeft className="h-4 w-4"/>Previous</button>{index===questions.length-1&&isConfirmed?<button onClick={submit} className="flex items-center justify-center gap-2 rounded-2xl bg-primary py-4 font-semibold text-primary-foreground"><CheckCircle2 className="h-4 w-4"/>Submit</button>:<button disabled={!selected} onClick={next} className="flex items-center justify-center gap-2 rounded-2xl bg-primary py-4 font-semibold text-primary-foreground disabled:opacity-40">{isConfirmed?"Next":"Check answer"}<ChevronRight className="h-4 w-4"/></button>}</div>
     </div>
-  );
+  </div>;
 }
