@@ -5,17 +5,14 @@ import { LucideIcon } from 'lucide-react';
 interface SwipeRowProps {
   children: React.ReactNode;
   onTap?: () => void;
-  /** Swipe left-to-right (dragging the row to the right) */
   onSwipeRight?: () => void;
   rightLabel?: string;
   rightIcon?: LucideIcon;
   rightColor?: string;
-  /** Swipe right-to-left (dragging the row to the left) */
   onSwipeLeft?: () => void;
   leftLabel?: string;
   leftIcon?: LucideIcon;
   leftColor?: string;
-  /** Optional click/touch-and-hold action. Movement cancels the hold. */
   onLongPress?: () => void;
   longPressColor?: string;
   longPressDuration?: number;
@@ -67,13 +64,10 @@ export function SwipeRow({
   const handleDragEnd = (_: unknown, info: PanInfo) => {
     const swipedRight = info.offset.x > THRESHOLD && !!onSwipeRight;
     const swipedLeft = info.offset.x < -THRESHOLD && !!onSwipeLeft;
-
     setDragX(0);
     setHoldActive(false);
     clearHoldTimer();
-
     if (swipedRight || swipedLeft) suppressTap.current = true;
-
     if (swipedRight) onSwipeRight?.();
     else if (swipedLeft) onSwipeLeft?.();
   };
@@ -99,10 +93,7 @@ export function SwipeRow({
 
   const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
     if (!onLongPress || longPressCommitted.current) return;
-    const distance = Math.hypot(
-      event.clientX - pointerStart.current.x,
-      event.clientY - pointerStart.current.y,
-    );
+    const distance = Math.hypot(event.clientX - pointerStart.current.x, event.clientY - pointerStart.current.y);
     if (distance > HOLD_MOVE_THRESHOLD) cancelHold();
   };
 
@@ -115,20 +106,20 @@ export function SwipeRow({
   const showLeft = dragX < -8 && !!onSwipeLeft;
 
   return (
-    <div className={`relative overflow-hidden rounded-3xl ${className || ''}`}>
+    <div className={`relative isolate overflow-hidden rounded-3xl ${className || ''}`}>
       {(showRight || showLeft) && (
         <div
-          className="absolute inset-0 flex items-center rounded-3xl px-5"
+          className="absolute inset-0 flex items-center overflow-hidden rounded-3xl px-5"
           style={{
             backgroundColor: showRight ? rightColor : leftColor,
             justifyContent: showRight ? 'flex-start' : 'flex-end',
           }}
         >
-          <div className="flex items-center gap-2 text-white font-semibold">
-            {showRight && RightIcon && <RightIcon className="w-5 h-5" />}
+          <div className="flex items-center gap-2 font-semibold text-white">
+            {showRight && RightIcon && <RightIcon className="h-5 w-5" />}
             {showRight && rightLabel && <span>{rightLabel}</span>}
             {showLeft && leftLabel && <span>{leftLabel}</span>}
-            {showLeft && LeftIcon && <LeftIcon className="w-5 h-5" />}
+            {showLeft && LeftIcon && <LeftIcon className="h-5 w-5" />}
           </div>
         </div>
       )}
@@ -150,13 +141,13 @@ export function SwipeRow({
           }
           if (Math.abs(dragX) < 4) onTap?.();
         }}
-        className="relative bg-card"
+        className="relative overflow-hidden rounded-3xl bg-card will-change-transform"
         style={{ touchAction: 'pan-y' }}
       >
         {onLongPress && (
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 z-10 motion-reduce:transition-none"
+            className="pointer-events-none absolute inset-0 z-10 rounded-3xl motion-reduce:transition-none"
             style={{
               backgroundColor: longPressColor,
               clipPath: `circle(${holdActive ? 150 : 0}% at ${holdOrigin.x}% ${holdOrigin.y}%)`,
@@ -164,7 +155,7 @@ export function SwipeRow({
             }}
           />
         )}
-        <div className="relative z-20">{children}</div>
+        <div className="relative z-20 overflow-hidden rounded-3xl">{children}</div>
       </motion.div>
     </div>
   );
