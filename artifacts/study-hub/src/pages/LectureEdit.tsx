@@ -1,309 +1,192 @@
-import { useState, useRef } from "react";
+import { useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import { Link, useRoute, useLocation } from "wouter";
+import { useLocation, useRoute } from "wouter";
 import {
-  ArrowLeft, Trash2, Layers, Brain, Upload, ExternalLink, Plus,
+  ArrowLeft, BookOpen, Brain, ExternalLink, FileQuestion, Layers,
+  Link2, Plus, Trash2, Upload, X,
 } from "lucide-react";
-import { useStudyData, StudyType, Flashcard } from "@/hooks/useStudyData";
-import { BottomSheet } from "@/components/shared/BottomSheet";
-import { ConfirmSheet } from "@/components/shared/ConfirmSheet";
-import { LectureCoverBadge } from "@/components/study/LectureCoverBadge";
-import { parseFlashcardExcel } from "@/lib/excelImport";
+import { useStudyData, type ExamQuestion, type Flashcard, type StudyType } from "@/hooks/useStudyData";
+import { parseExamExcel, parseFlashcardExcel } from "@/lib/excelImport";
 
 export function LectureEdit() {
   const [, params] = useRoute("/subjects/:subjectId/lectures/:lectureId");
   const [, setLocation] = useLocation();
-  const { subjects, updateLecture, deleteLecture } = useStudyData();
+  const {
+    subjects, updateLecture, deleteLecture, addExam, updateExam,
+  } = useStudyData();
 
-  const subject = subjects.find(s => s.id === params?.subjectId);
-  const lecture = subject?.lectures.find(l => l.id === params?.lectureId);
-
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [flashcardsOpen, setFlashcardsOpen] = useState(false);
-
-  // Flashcard import state
-  const addMoreRef = useRef<HTMLInputElement>(null);
-  const replaceAllRef = useRef<HTMLInputElement>(null);
-  const [isImporting, setIsImporting] = useState(false);
-  const [importError, setImportError] = useState<string | null>(null);
+  const subject = subjects.find((s) => s.id === params?.subjectId);
+  const lecture = subject?.lectures.find((l) => l.id === params?.lectureId);
+  const [sheet, setSheet] = useState<"flashcards" | "mcqs" | null>(null);
+  const [notice, setNotice] = useState("");
+  const flashcardRef = useRef<HTMLInputElement>(null);
+  const mcqRef = useRef<HTMLInputElement>(null);
 
   const form = useForm({
-    defaultValues: { name: lecture?.name ?? "", link: lecture?.link ?? "" },
+    values: { name: lecture?.name ?? "", link: lecture?.link ?? "" },
   });
 
   if (!subject || !lecture) {
     return <div className="p-8 text-center text-muted-foreground">Lecture not found</div>;
   }
 
-  const handleFlashcardImport = async (
-    e: React.ChangeEvent<HTMLInputElement>,
-    mode: "append" | "replace",
-  ) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setImportError(null);
-    setIsImporting(true);
-    setFlashcardsOpen(false);
-    try {
-      const { rows } = await parseFlashcardExcel(file);
-      const newCards: Flashcard[] = rows.map(r => ({
-        id: crypto.randomUUID(),
-        front: r.front,
-        back: r.back,
-      }));
-      const existing = mode === "append" ? (lecture.flashcards ?? []) : [];
-      updateLecture(subject.id, lecture.id, { flashcards: [...existing, ...newCards] });
-    } catch {
-      setImportError("Could not parse the file. Make sure it's a valid Excel/CSV with Front and Back columns.");
-    } finally {
-      setIsImporting(false);
-      if (e.target) e.target.value = "";
-    }
-  };
-
-  const onSave = (data: any) => {
-    updateLecture(subject.id, lecture.id, { name: data.name, link: data.link });
-  };
-
-  const setType = (type: StudyType) => {
-    updateLecture(subject.id, lecture.id, { type });
-  };
-
-  const handleDelete = () => {
-    deleteLecture(subject.id, lecture.id);
-    setLocation(`/subjects/${subject.id}?tab=lectures`);
-  };
-
+  const exam = subject.exams.find((item) => item.linkedLectureIds?.includes(lecture.id));
   const flashcardCount = lecture.flashcards?.length ?? 0;
+  const mcqCount = exam?.questions?.length ?? 0;
 
-  const inputCls =
-    "w-full bg-secondary/40 border border-border/60 rounded-2xl px-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 text-foreground placeholder:text-muted-foreground/50 transition-all text-sm";
+  const save = (data: { name: string; link: string }) => {
+    updateLecture(subject.id, lecture.id, { name: data.name.trim(), link: data.link.trim() });
+    setNotice("Lecture details saved.");
+  };
+
+  const changeType = (type: StudyType) => {
+    updateLecture(subject.id, lecture.id, { type });
+    if (exam) updateExam(subject.id, exam.id, { type });
+    setNotice(`Moved to ${type}.`);
+  };
+
+  const importFlashcards = async (file?: File) => {
+    if (!file) return;
+    const { rows, skipped } = await parseFlashcardExcel(file);
+    const cards: Flashcard[] = rows.map((row) => ({ id: crypto.randomUUID(), front: row.front, back: row.back }));
+    updateLecture(subject.id, lecture.id, { flashcards: [...(lecture.flashcards ?? []), ...cards] });
+    setNotice(`Added ${cards.length} flashcards${skipped ? `; skipped ${skipped}` : ""}.`);
+    setSheet(null);
+  };
+
+  const importMcqs = async (file?: File) => {
+    if (!file) return;
+    const questions: ExamQuestion[] = await parseExamExcel(file);
+    if (exam) {
+      updateExam(subject.id, exam.id, { questions: [...(exam.questions ?? []), ...questions] });
+    } else {
+      addExam(subject.id, {
+        name: `${lecture.name} MCQs`, link: "", grade: null, date: null, weight: 1,
+        type: lecture.type, linkedLectureIds: [lecture.id], questions,
+      });
+    }
+    setNotice(`Added ${questions.length} MCQs.`);
+    setSheet(null);
+  };
+
+  const removeFlashcards = () => {
+    updateLecture(subject.id, lecture.id, { flashcards: [], readerLastPercentage: null });
+    setNotice("All flashcards removed.");
+    setSheet(null);
+  };
+
+  const removeMcqs = () => {
+    if (exam) updateExam(subject.id, exam.id, { questions: [], lastScore: null, checked: false });
+    setNotice("All MCQs removed.");
+    setSheet(null);
+  };
+
+  const inputClass = "w-full rounded-2xl border border-border/60 bg-secondary/35 px-4 py-3.5 text-sm outline-none transition focus:border-primary/50 focus:ring-2 focus:ring-primary/20";
 
   return (
-    <div className="pb-24 space-y-0">
-
-      {/* ── Hero ─────────────────────────────────────────────────────── */}
-      <div className="relative -mx-4 md:-mx-6 px-4 md:px-6 pt-2 pb-6 mb-6 bg-gradient-to-b from-primary/8 via-primary/4 to-transparent border-b border-border/30">
+    <div className="space-y-6 pb-24">
+      <div className="rounded-[30px] border border-border/60 bg-gradient-to-br from-card via-card to-primary/10 p-5 shadow-xl shadow-black/5">
         <div className="flex items-start gap-3">
-          <Link
-            href={`/subjects/${subject.id}?tab=lectures&type=${lecture.type}`}
-            className="mt-1 p-2 rounded-full bg-background/80 hover:bg-background border border-border/50 shadow-sm transition-colors shrink-0"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </Link>
-          <div className="flex-1 min-w-0 py-1">
-            <p className="text-xs font-semibold text-primary/70 uppercase tracking-widest mb-1">
-              {subject.name} · Lecture
-            </p>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground leading-snug">
-              {lecture.name}
-            </h1>
-            <div className="flex items-center gap-2 mt-2">
-              <span className={`text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
-                lecture.type === "theoretical"
-                  ? "bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20"
-                  : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
-              }`}>
-                {lecture.type}
-              </span>
-              {flashcardCount > 0 && (
-                <span className="text-[11px] font-semibold text-muted-foreground">
-                  {flashcardCount} flashcard{flashcardCount !== 1 ? "s" : ""}
-                </span>
-              )}
+          <button onClick={() => setLocation(`/subjects/${subject.id}`)} className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-border/60 bg-background/80">
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-black uppercase tracking-[0.2em] text-primary">Lecture settings</p>
+            <h1 className="mt-1 truncate text-3xl font-black tracking-tight">{lecture.name}</h1>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <span className="rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-xs font-bold capitalize text-primary">{lecture.type}</span>
+              <span className="rounded-full border border-border/60 bg-secondary/50 px-3 py-1 text-xs font-bold text-muted-foreground">{mcqCount} MCQs</span>
+              <span className="rounded-full border border-border/60 bg-secondary/50 px-3 py-1 text-xs font-bold text-muted-foreground">{flashcardCount} flashcards</span>
             </div>
           </div>
-          <div className="shrink-0 mt-1">
-            <LectureCoverBadge percentage={lecture.readerLastPercentage} />
+          <div className="grid h-14 w-14 place-items-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
+            <BookOpen className="h-7 w-7" />
           </div>
         </div>
       </div>
 
-      {/* ── Quick actions ─────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-3 mb-5">
-        <button
-          onClick={() => { setImportError(null); setFlashcardsOpen(true); }}
-          className="group relative overflow-hidden rounded-2xl p-4 bg-violet-500/10 hover:bg-violet-500/15 border border-violet-500/20 hover:border-violet-500/35 transition-all text-left"
-        >
-          <div className="w-9 h-9 rounded-xl bg-violet-500/15 border border-violet-500/20 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
-            <Layers className="w-4.5 h-4.5 text-violet-600 dark:text-violet-400" />
-          </div>
-          <p className="font-bold text-sm text-foreground">Flashcards</p>
-          <p className="text-[11px] text-muted-foreground mt-0.5">
-            {flashcardCount > 0 ? `${flashcardCount} cards` : "Make · Import"}
-          </p>
-        </button>
-
-        <button
-          onClick={() => setLocation(`/subjects/${subject.id}/lectures/${lecture.id}/study`)}
-          className="group relative overflow-hidden rounded-2xl p-4 bg-emerald-500/10 hover:bg-emerald-500/15 border border-emerald-500/20 hover:border-emerald-500/35 transition-all text-left"
-        >
-          <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
-            <Brain className="w-4.5 h-4.5 text-emerald-600 dark:text-emerald-400" />
-          </div>
-          <p className="font-bold text-sm text-foreground">Study</p>
-          <p className="text-[11px] text-muted-foreground mt-0.5">Flip-card review</p>
-        </button>
-      </div>
-
-      {/* ── Edit form ────────────────────────────────────────────────── */}
-      <form
-        onSubmit={form.handleSubmit(onSave)}
-        onBlur={form.handleSubmit(onSave)}
-        className="space-y-3 mb-5"
-      >
-        {/* Name */}
-        <div className="bg-card border border-border/50 rounded-2xl p-4 shadow-sm space-y-2">
-          <label className="block text-xs font-bold uppercase tracking-widest text-muted-foreground">
-            Lecture Name
-          </label>
-          <input
-            {...form.register("name", { required: true })}
-            className={inputCls}
-            placeholder="Enter lecture name…"
-          />
+      {notice && (
+        <div className="flex items-center justify-between rounded-2xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm font-semibold">
+          <span>{notice}</span><button onClick={() => setNotice("")}><X className="h-4 w-4" /></button>
         </div>
+      )}
 
-        {/* Link */}
-        <div className="bg-card border border-border/50 rounded-2xl p-4 shadow-sm space-y-2">
-          <label className="block text-xs font-bold uppercase tracking-widest text-muted-foreground">
-            Link <span className="font-normal normal-case tracking-normal text-muted-foreground/60">(optional)</span>
-          </label>
-          <div className="relative">
-            <input
-              {...form.register("link")}
-              className={inputCls + " pr-10"}
-              placeholder="https://…"
-            />
-            {form.watch("link") && (
-              <a
-                href={form.watch("link")}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={e => e.stopPropagation()}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-lg text-muted-foreground hover:text-primary transition-colors"
-              >
-                <ExternalLink className="w-4 h-4" />
-              </a>
-            )}
+      <form onSubmit={form.handleSubmit(save)} className="space-y-4">
+        <section className="rounded-[26px] border border-border/60 bg-card p-5 shadow-sm">
+          <p className="mb-4 text-xs font-black uppercase tracking-[0.18em] text-muted-foreground">Lecture information</p>
+          <div className="space-y-4">
+            <label className="block space-y-2">
+              <span className="text-sm font-bold">Name</span>
+              <input {...form.register("name", { required: true })} className={inputClass} />
+            </label>
+            <label className="block space-y-2">
+              <span className="text-sm font-bold">Link</span>
+              <div className="relative">
+                <Link2 className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input {...form.register("link")} className={`${inputClass} pl-11 pr-11`} placeholder="https://..." />
+                {form.watch("link") && <a href={form.watch("link")} target="_blank" rel="noreferrer" className="absolute right-4 top-1/2 -translate-y-1/2 text-primary"><ExternalLink className="h-4 w-4" /></a>}
+              </div>
+            </label>
+            <div className="space-y-2">
+              <span className="text-sm font-bold">Lecture type</span>
+              <div className="grid grid-cols-2 gap-2 rounded-2xl bg-secondary/45 p-1.5">
+                {(["theoretical", "practical"] as StudyType[]).map((type) => (
+                  <button key={type} type="button" onClick={() => changeType(type)} className={`rounded-xl py-3 text-sm font-bold capitalize transition ${lecture.type === type ? "bg-background shadow ring-1 ring-border/50" : "text-muted-foreground"}`}>{type}</button>
+                ))}
+              </div>
+            </div>
+            <button className="w-full rounded-2xl bg-primary py-3.5 font-black text-primary-foreground shadow-lg shadow-primary/15">Save changes</button>
           </div>
-        </div>
+        </section>
       </form>
 
-      {/* ── Type ─────────────────────────────────────────────────────── */}
-      <div className="bg-card border border-border/50 rounded-2xl p-4 shadow-sm mb-5">
-        <label className="block text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">
-          Type
-        </label>
-        <div className="bg-secondary/50 p-1 rounded-xl flex gap-1">
-          {(["theoretical", "practical"] as StudyType[]).map(t => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setType(t)}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-semibold capitalize transition-all ${
-                lecture.type === t
-                  ? "bg-background shadow-sm text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-      </div>
+      <section className="grid grid-cols-2 gap-3">
+        <button onClick={() => setSheet("flashcards")} className="rounded-[26px] border border-violet-500/25 bg-gradient-to-br from-violet-500/15 to-card p-5 text-left shadow-sm">
+          <div className="mb-5 grid h-12 w-12 place-items-center rounded-2xl bg-violet-500/15 text-violet-500"><Layers className="h-6 w-6" /></div>
+          <p className="text-lg font-black">Flashcards</p><p className="mt-1 text-xs text-muted-foreground">Import, clear or study · {flashcardCount} cards</p>
+        </button>
+        <button onClick={() => setSheet("mcqs")} className="rounded-[26px] border border-emerald-500/25 bg-gradient-to-br from-emerald-500/15 to-card p-5 text-left shadow-sm">
+          <div className="mb-5 grid h-12 w-12 place-items-center rounded-2xl bg-emerald-500/15 text-emerald-500"><Brain className="h-6 w-6" /></div>
+          <p className="text-lg font-black">MCQs</p><p className="mt-1 text-xs text-muted-foreground">Import, clear or examine · {mcqCount} questions</p>
+        </button>
+      </section>
 
-      {/* ── Delete ───────────────────────────────────────────────────── */}
-      <button
-        type="button"
-        onClick={() => setIsDeleting(true)}
-        className="w-full flex items-center justify-center gap-2 rounded-2xl py-3.5 font-semibold text-destructive/80 hover:text-destructive bg-destructive/6 hover:bg-destructive/12 border border-destructive/15 hover:border-destructive/30 transition-all"
-      >
-        <Trash2 className="w-4 h-4" /> Delete Lecture
+      <button onClick={() => { deleteLecture(subject.id, lecture.id); setLocation(`/subjects/${subject.id}`); }} className="flex w-full items-center justify-center gap-2 rounded-2xl border border-destructive/25 bg-destructive/10 py-3.5 font-bold text-destructive">
+        <Trash2 className="h-4 w-4" /> Delete lecture
       </button>
 
-      {/* ── Flashcards bottom sheet ───────────────────────────────────── */}
-      <BottomSheet isOpen={flashcardsOpen} onClose={() => setFlashcardsOpen(false)} title="Flashcards">
-        <div className="space-y-2.5 pb-2">
+      <input ref={flashcardRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => { importFlashcards(e.target.files?.[0]); e.target.value = ""; }} />
+      <input ref={mcqRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => { importMcqs(e.target.files?.[0]); e.target.value = ""; }} />
 
-          {/* 1 — Add more Flashcards (append from Excel) */}
-          <button
-            onClick={() => addMoreRef.current?.click()}
-            disabled={isImporting}
-            className="w-full flex items-center gap-4 rounded-2xl p-4 bg-secondary/50 hover:bg-secondary transition-colors text-left border border-border/40 hover:border-border/60 disabled:opacity-50"
-          >
-            <div className="w-11 h-11 rounded-xl bg-violet-500/12 border border-violet-500/20 flex items-center justify-center shrink-0">
-              <Upload className="w-5 h-5 text-violet-600 dark:text-violet-400" />
+      {sheet && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-0 backdrop-blur-sm md:items-center md:p-5" onClick={() => setSheet(null)}>
+          <div className="max-h-[88vh] w-full max-w-lg overflow-auto rounded-t-[38px] border border-border/70 bg-background px-5 pb-7 pt-3 shadow-2xl md:rounded-[38px]" onClick={(e) => e.stopPropagation()}>
+            <div className="mx-auto mb-6 h-1.5 w-24 rounded-full bg-muted" />
+            <div className="mb-6 flex items-start justify-between">
+              <div><p className="text-[11px] font-black uppercase tracking-[0.2em] text-primary">{lecture.name}</p><h2 className="mt-1 text-3xl font-black">Organize {sheet === "mcqs" ? "MCQs" : "Flashcards"}</h2></div>
+              <button onClick={() => setSheet(null)} className="grid h-11 w-11 place-items-center rounded-full bg-secondary"><X className="h-5 w-5" /></button>
             </div>
-            <div>
-              <p className="font-bold text-sm text-foreground">Add more Flashcards</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Import from Excel · keeps existing cards</p>
+            <div className="mb-5 rounded-3xl border border-border/60 bg-secondary/30 p-4">
+              <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Current content</p>
+              <p className="mt-2 text-2xl font-black">{sheet === "mcqs" ? mcqCount : flashcardCount} {sheet === "mcqs" ? "questions" : "cards"}</p>
             </div>
-          </button>
-
-          {/* 2 — Replace all Flashcards (replace from Excel) */}
-          <button
-            onClick={() => replaceAllRef.current?.click()}
-            disabled={isImporting}
-            className="w-full flex items-center gap-4 rounded-2xl p-4 bg-secondary/50 hover:bg-secondary transition-colors text-left border border-border/40 hover:border-border/60 disabled:opacity-50"
-          >
-            <div className="w-11 h-11 rounded-xl bg-sky-500/12 border border-sky-500/20 flex items-center justify-center shrink-0">
-              <Upload className="w-5 h-5 text-sky-600 dark:text-sky-400" />
+            <div className="space-y-3">
+              <button onClick={() => sheet === "mcqs" ? mcqRef.current?.click() : flashcardRef.current?.click()} className="flex w-full items-center gap-4 rounded-3xl border border-border/60 bg-card p-4 text-left">
+                <div className="grid h-12 w-12 place-items-center rounded-2xl bg-primary/10 text-primary"><Upload className="h-5 w-5" /></div>
+                <div><p className="font-black">Add more {sheet === "mcqs" ? "MCQs" : "flashcards"}</p><p className="mt-1 text-xs text-muted-foreground">Import from the confirmed Excel format</p></div>
+              </button>
+              <button onClick={() => sheet === "mcqs" ? removeMcqs() : removeFlashcards()} className="flex w-full items-center gap-4 rounded-3xl border border-destructive/20 bg-destructive/10 p-4 text-left text-destructive">
+                <div className="grid h-12 w-12 place-items-center rounded-2xl bg-destructive/10"><Trash2 className="h-5 w-5" /></div>
+                <div><p className="font-black">Remove all {sheet === "mcqs" ? "MCQs" : "flashcards"}</p><p className="mt-1 text-xs opacity-70">Clear this lecture’s current content</p></div>
+              </button>
+              <button disabled={sheet === "mcqs" ? !mcqCount : !flashcardCount} onClick={() => setLocation(sheet === "mcqs" ? `/subjects/${subject.id}/exams/${exam!.id}/take` : `/subjects/${subject.id}/lectures/${lecture.id}/study`)} className="flex w-full items-center justify-center gap-2 rounded-3xl bg-primary py-4 font-black text-primary-foreground disabled:opacity-40">
+                {sheet === "mcqs" ? <FileQuestion className="h-5 w-5" /> : <Layers className="h-5 w-5" />} Study {sheet === "mcqs" ? "the MCQs" : "the flashcards"}
+              </button>
+              {sheet === "flashcards" && <button onClick={() => setLocation(`/subjects/${subject.id}/lectures/${lecture.id}/flashcards`)} className="flex w-full items-center justify-center gap-2 rounded-3xl border border-border/60 py-4 font-black"><Plus className="h-5 w-5" /> Create flashcard manually</button>}
             </div>
-            <div>
-              <p className="font-bold text-sm text-foreground">Replace all Flashcards</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Import from Excel · replaces all existing cards</p>
-            </div>
-          </button>
-
-          {/* 3 — Add a new flashcard manually */}
-          <button
-            onClick={() => {
-              setLocation(`/subjects/${subject.id}/lectures/${lecture.id}/flashcards`);
-              setFlashcardsOpen(false);
-            }}
-            className="w-full flex items-center gap-4 rounded-2xl p-4 bg-secondary/50 hover:bg-secondary transition-colors text-left border border-border/40 hover:border-border/60"
-          >
-            <div className="w-11 h-11 rounded-xl bg-emerald-500/12 border border-emerald-500/20 flex items-center justify-center shrink-0">
-              <Plus className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <div>
-              <p className="font-bold text-sm text-foreground">Add a new flashcard</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Create front / back cards manually</p>
-            </div>
-          </button>
-
-          {importError && (
-            <p className="text-sm text-destructive font-medium bg-destructive/10 border border-destructive/20 rounded-xl px-3 py-2">
-              {importError}
-            </p>
-          )}
+          </div>
         </div>
-      </BottomSheet>
-
-      {/* Hidden file inputs */}
-      <input
-        ref={addMoreRef}
-        type="file"
-        accept=".xlsx,.xls,.csv"
-        className="hidden"
-        onChange={e => handleFlashcardImport(e, "append")}
-      />
-      <input
-        ref={replaceAllRef}
-        type="file"
-        accept=".xlsx,.xls,.csv"
-        className="hidden"
-        onChange={e => handleFlashcardImport(e, "replace")}
-      />
-
-      <ConfirmSheet
-        isOpen={isDeleting}
-        onClose={() => setIsDeleting(false)}
-        onConfirm={handleDelete}
-        title="Delete lecture?"
-        message="This lecture and all its flashcards will be permanently removed."
-      />
+      )}
     </div>
   );
 }
