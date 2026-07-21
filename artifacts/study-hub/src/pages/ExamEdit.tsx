@@ -12,6 +12,7 @@ export function ExamEdit() {
   const { subjects, updateExam, schedulePlans, addSchedulePlan, updateSchedulePlan, deleteSchedulePlan } = useStudyData(); const subject = subjects.find(x => x.id === params?.subjectId); const exam = subject?.exams.find(x => x.id === params?.examId); const from = new URLSearchParams(search).get("from");
   const [questionsOpen, setQuestionsOpen] = useState(false), [confirmRemoveAll, setConfirmRemoveAll] = useState(false), [isImporting, setIsImporting] = useState(false), [errors, setErrors] = useState<FinalExamImportError[]>([]);
   const importRef = useRef<HTMLInputElement>(null);
+  const lastSavedRef = useRef("");
   const form = useForm({ defaultValues: { name: exam?.name ?? "", date: exam?.date ?? "", time: (exam as any)?.time ?? "09:00", weight: exam?.weight ?? 1 } });
   if (!subject || !exam) return <div className="p-8 text-center text-muted-foreground">Exam not found</div>;
   const flashKey = `studyhub:final-flashcards:${subject.id}:${exam.type}`; const flashcards = JSON.parse(localStorage.getItem(flashKey) ?? "[]"); const questionCount = exam.questions?.length ?? 0; const total = questionCount + flashcards.length;
@@ -23,7 +24,11 @@ export function ExamEdit() {
     const date = data.date || null;
     const time = data.time || "09:00";
     const name = data.name.trim() || exam.name;
-    updateExam(subject.id, exam.id, { name, date, weight: parseFloat(data.weight) || 1, time } as any);
+    const weight = parseFloat(data.weight) || 1;
+    const signature = JSON.stringify({ name, date, time, weight });
+    if (lastSavedRef.current === signature) return;
+    lastSavedRef.current = signature;
+    updateExam(subject.id, exam.id, { name, date, weight, time } as any);
     const linkedPlan = schedulePlans.find(plan => plan.type === "exam" && plan.source === "quickExam" && plan.items.some(item => (item as any).examId === exam.id));
     if (!date) { if (linkedPlan) deleteSchedulePlan(linkedPlan.id); return; }
     const existingItem = linkedPlan?.items.find(item => (item as any).examId === exam.id);
