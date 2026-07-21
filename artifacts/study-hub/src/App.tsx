@@ -9,7 +9,7 @@ import { AppShell } from '@/components/layout/AppShell';
 
 import { Dashboard } from '@/pages/Dashboard';
 import { Subjects } from '@/pages/Subjects';
-import { SubjectDetail } from '@/pages/SubjectDetail';
+import { SubjectStudyHub } from '@/pages/SubjectStudyHub';
 import { LectureEdit } from '@/pages/LectureEdit';
 import { ExamEdit } from '@/pages/ExamEdit';
 import { ExamTake } from '@/pages/ExamTake';
@@ -29,7 +29,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Dashboard} />
       <Route path="/subjects" component={Subjects} />
-      <Route path="/subjects/:id" component={SubjectDetail} />
+      <Route path="/subjects/:id" component={SubjectStudyHub} />
       <Route path="/subjects/:subjectId/lectures/:lectureId" component={LectureEdit} />
       <Route path="/subjects/:subjectId/lectures/:lectureId/flashcards" component={FlashcardsMaker} />
       <Route path="/subjects/:subjectId/lectures/:lectureId/study" component={FlashcardsReader} />
