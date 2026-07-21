@@ -21,14 +21,12 @@ export function LectureEdit() {
   const appendQuestions = (questions: ExamQuestion[]) => { if (lectureExam) updateExam(subject.id, lectureExam.id, { questions: [...(lectureExam.questions ?? []), ...questions] }); else addExam(subject.id, { name: `${lecture.name} MCQs`, link: "", grade: null, date: null, weight: 1, type: lecture.type, linkedLectureIds: [lecture.id], questions }); };
 
   return <div className="space-y-6 pb-24">
-    <div className="rounded-[2rem] bg-gradient-to-br from-primary/35 via-border/70 to-border/40 p-[1px] shadow-xl">
-      <div className="relative isolate overflow-hidden rounded-[calc(2rem-1px)] bg-card p-5">
-        <div className="pointer-events-none absolute inset-3 overflow-hidden rounded-[1.55rem]"><div className="absolute -right-16 -top-16 h-52 w-52 rounded-full bg-primary/14 blur-3xl" /><div className="absolute -bottom-20 left-1/3 h-40 w-40 rounded-full bg-primary/5 blur-3xl" /></div>
-        <div className="relative flex items-start gap-4">
-          <button onClick={goBack} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-border/60 bg-background/75 shadow-sm"><ArrowLeft className="h-5 w-5" /></button>
-          <div className="min-w-0 flex-1"><p className="text-xs font-black uppercase tracking-[0.2em] text-primary">Lecture settings</p><h1 className="mt-2 truncate text-3xl font-black tracking-tight">{lecture.name}</h1><p className="mt-2 text-sm capitalize text-muted-foreground">{subject.name} · {lecture.type}</p></div>
-          <div className="shrink-0 rounded-2xl border border-border/60 bg-background/70 px-3 py-2 text-center shadow-sm"><p className="text-xl font-black">{lecture.readerLastPercentage ?? 0}%</p><p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">mastered</p></div>
-        </div>
+    <div className="relative isolate overflow-hidden rounded-[2rem] border border-border/60 bg-card p-5 shadow-xl">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[2rem]"><div className="absolute -right-14 -top-14 h-48 w-48 rounded-full bg-primary/14 blur-3xl" /><div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-primary/[.03] to-transparent" /></div>
+      <div className="relative flex items-start gap-4">
+        <button onClick={goBack} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-border/60 bg-background/75 shadow-sm"><ArrowLeft className="h-5 w-5" /></button>
+        <div className="min-w-0 flex-1"><p className="text-xs font-black uppercase tracking-[0.2em] text-primary">Lecture settings</p><h1 className="mt-2 truncate text-3xl font-black tracking-tight">{lecture.name}</h1><p className="mt-2 text-sm capitalize text-muted-foreground">{subject.name} · {lecture.type}</p></div>
+        <div className="mr-0.5 shrink-0 rounded-2xl border border-border/60 bg-background/70 px-3 py-2 text-center shadow-sm"><p className="text-xl font-black">{lecture.readerLastPercentage ?? 0}%</p><p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">mastered</p></div>
       </div>
     </div>
     {notice && <div className="flex items-center justify-between rounded-2xl border border-border bg-secondary/40 px-4 py-3 text-sm"><span>{notice}</span><button onClick={() => setNotice("")}><X className="h-4 w-4" /></button></div>}
