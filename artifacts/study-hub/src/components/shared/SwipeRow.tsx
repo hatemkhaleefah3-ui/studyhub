@@ -65,14 +65,23 @@ export function SwipeRow({
   };
 
   const handleDragEnd = (_: unknown, info: PanInfo) => {
+    const swipedRight = info.offset.x > THRESHOLD && !!onSwipeRight;
+    const swipedLeft = info.offset.x < -THRESHOLD && !!onSwipeLeft;
+
     setDragX(0);
     setHoldActive(false);
     clearHoldTimer();
-    if (info.offset.x > THRESHOLD && onSwipeRight) onSwipeRight();
-    else if (info.offset.x < -THRESHOLD && onSwipeLeft) onSwipeLeft();
+
+    // Framer Motion can emit a click after drag-end. Mark completed swipes so
+    // that click cannot immediately trigger the card's tap/navigation action.
+    if (swipedRight || swipedLeft) suppressTap.current = true;
+
+    if (swipedRight) onSwipeRight?.();
+    else if (swipedLeft) onSwipeLeft?.();
   };
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    suppressTap.current = false;
     if (!onLongPress) return;
     const rect = event.currentTarget.getBoundingClientRect();
     setHoldOrigin({
@@ -81,7 +90,6 @@ export function SwipeRow({
     });
     pointerStart.current = { x: event.clientX, y: event.clientY };
     longPressCommitted.current = false;
-    suppressTap.current = false;
     setHoldActive(true);
     clearHoldTimer();
     holdTimer.current = setTimeout(() => {
