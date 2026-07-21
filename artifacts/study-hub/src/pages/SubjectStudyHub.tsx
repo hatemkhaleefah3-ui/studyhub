@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import { useLocation, useRoute } from "wouter";
-import { BookOpen, Brain, FileQuestion, Layers, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
+import { BookOpen, Brain, FileQuestion, Layers, Pencil, Plus, Sparkles, Trash2, Upload, X } from "lucide-react";
 import { GlassCard } from "@/components/shared/GlassCard";
 import { SwipeRow } from "@/components/shared/SwipeRow";
 import { useStudyData, type Exam, type ExamQuestion, type StudyType } from "@/hooks/useStudyData";
@@ -23,10 +23,7 @@ const scoreBand = (percentage?: number) => {
 export function SubjectStudyHub() {
   const [, params] = useRoute("/subjects/:id");
   const [, setLocation] = useLocation();
-  const {
-    subjects, addLecture, addExam, updateExam, deleteExam,
-    addFlashcard, deleteFlashcard,
-  } = useStudyData();
+  const { subjects, addLecture, addExam, updateExam, addFlashcard, deleteFlashcard } = useStudyData();
   const subject = subjects.find((s) => s.id === params?.id);
   const [type, setType] = useState<StudyType>("theoretical");
   const [panel, setPanel] = useState<Panel>(null);
@@ -38,15 +35,11 @@ export function SubjectStudyHub() {
   const [flashcardLectureId, setFlashcardLectureId] = useState<string | null>(null);
 
   const lectures = useMemo(() => subject?.lectures.filter((l) => l.type === type) ?? [], [subject, type]);
-  const finalExam = useMemo(
-    () => subject?.exams.find((e) => e.type === type && e.name === "Final Exam"),
-    [subject, type],
-  );
+  const finalExam = useMemo(() => subject?.exams.find((e) => e.type === type && e.name === "Final Exam"), [subject, type]);
 
   if (!subject) return <div className="p-8 text-center text-muted-foreground">Subject not found</div>;
 
-  const lectureExam = (lectureId: string) =>
-    subject.exams.find((e) => e.type === type && e.linkedLectureIds?.includes(lectureId));
+  const lectureExam = (lectureId: string) => subject.exams.find((e) => e.type === type && e.linkedLectureIds?.includes(lectureId));
 
   const ensureExam = (target: { examId?: string; lectureId?: string; type: StudyType }, questions: ExamQuestion[]) => {
     if (target.examId) {
@@ -120,21 +113,16 @@ export function SubjectStudyHub() {
 
   return (
     <div className="space-y-6 pb-20">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <button onClick={() => setLocation("/subjects")} className="text-sm text-muted-foreground hover:text-foreground">← Subjects</button>
-          <h1 className="text-3xl font-bold mt-1">{subject.name}</h1>
-        </div>
-        <button onClick={() => lectureImportRef.current?.click()} className="inline-flex items-center gap-2 rounded-xl bg-primary text-primary-foreground px-4 py-2.5 font-semibold">
-          <Upload className="w-4 h-4" /> Import Lectures
-        </button>
+      <div>
+        <button onClick={() => setLocation("/subjects")} className="text-sm text-muted-foreground hover:text-foreground">← Subjects</button>
+        <h1 className="text-3xl font-bold mt-1">{subject.name}</h1>
       </div>
 
       {notice && <div className="rounded-xl border border-border bg-secondary/40 px-4 py-3 text-sm flex justify-between gap-3"><span>{notice}</span><button onClick={() => setNotice("")}><X className="w-4 h-4" /></button></div>}
 
       <div className="grid grid-cols-2 gap-2 rounded-2xl bg-secondary/40 border border-border/50 p-1.5">
         {(["theoretical", "practical"] as StudyType[]).map((item) => (
-          <button key={item} onClick={() => setType(item)} className={`rounded-xl py-2.5 font-semibold capitalize ${type === item ? "bg-background shadow-sm" : "text-muted-foreground"}`}>{item}</button>
+          <button key={item} onClick={() => setType(item)} className={`rounded-xl py-2.5 font-semibold capitalize transition-all ${type === item ? "bg-background shadow-sm ring-1 ring-border/50" : "text-muted-foreground hover:text-foreground"}`}>{item}</button>
         ))}
       </div>
 
@@ -144,23 +132,44 @@ export function SubjectStudyHub() {
         onSwipeLeft={() => finalExam?.questions?.length ? setLocation(`/subjects/${subject.id}/exams/${finalExam.id}/take`) : openQuestionUpload(finalExam)}
         leftLabel={finalExam?.questions?.length ? "Examine" : "Add questions"} leftIcon={FileQuestion} leftColor="#10b981"
       >
-        <GlassCard className="p-5 border-primary/25 bg-gradient-to-br from-primary/10 to-card">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-primary/15 flex items-center justify-center"><FileQuestion className="w-6 h-6 text-primary" /></div>
-            <div className="flex-1 min-w-0">
-              <p className="font-bold text-lg">Final Exam</p>
-              <p className="text-xs text-muted-foreground mt-1">{finalExam?.questions?.length ?? 0} questions · swipe to examine or edit</p>
+        <GlassCard className="relative overflow-hidden border-primary/20 bg-gradient-to-br from-primary/15 via-card to-card p-0 shadow-lg">
+          <div className="absolute -right-10 -top-10 h-36 w-36 rounded-full bg-primary/10 blur-2xl" />
+          <div className="relative p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex min-w-0 items-center gap-4">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary shadow-sm">
+                  <Sparkles className="h-7 w-7" />
+                </div>
+                <div className="min-w-0">
+                  <div className="mb-1 flex items-center gap-2">
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-primary">Pinned</span>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{type}</span>
+                  </div>
+                  <p className="text-xl font-black tracking-tight">Final Exam</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Swipe left to {finalExam?.questions?.length ? "start" : "add questions"} · swipe right to edit</p>
+                </div>
+              </div>
+              <div className="shrink-0 rounded-2xl border border-border/60 bg-background/70 px-3 py-2 text-right shadow-sm backdrop-blur">
+                <p className="text-sm font-black">{scoreBand(finalExam?.lastScore?.percentage)}</p>
+                <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{finalExam?.lastScore?.total ?? 0} answered</p>
+              </div>
             </div>
-            <div className="text-right">
-              <p className="font-bold text-sm">{scoreBand(finalExam?.lastScore?.percentage)}</p>
-              <p className="text-xs text-muted-foreground">{finalExam?.lastScore?.total ?? 0} answered</p>
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <div className="rounded-2xl border border-border/50 bg-background/55 p-3">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Question bank</p>
+                <p className="mt-1 text-2xl font-black">{finalExam?.questions?.length ?? 0}</p>
+              </div>
+              <div className="rounded-2xl border border-border/50 bg-background/55 p-3">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Last score</p>
+                <p className="mt-1 text-2xl font-black">{finalExam?.lastScore ? `${finalExam.lastScore.percentage}%` : "—"}</p>
+              </div>
             </div>
           </div>
         </GlassCard>
       </SwipeRow>
 
       <div className="space-y-3">
-        {lectures.map((lecture) => {
+        {lectures.map((lecture, index) => {
           const exam = lectureExam(lecture.id);
           const flashcards = lecture.flashcards ?? [];
           const mastered = lecture.readerLastPercentage ?? 0;
@@ -173,15 +182,45 @@ export function SubjectStudyHub() {
               onSwipeLeft={() => studyMcqs(lecture.id)}
               leftLabel="Study MCQs" leftIcon={Brain} leftColor="#10b981"
             >
-              <GlassCard className="p-4 flex items-center gap-4 border-border/60">
-                <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center"><BookOpen className="w-5 h-5" /></div>
-                <div className="flex-1 min-w-0"><p className="font-semibold truncate">{lecture.name}</p><p className="text-xs text-muted-foreground mt-1">{exam?.questions?.length ?? 0} MCQs · {flashcards.length} flashcards</p></div>
-                <div className="w-12 h-12 rounded-full border-4 border-primary/25 flex items-center justify-center text-xs font-bold">{mastered}%</div>
+              <GlassCard className="group overflow-hidden border-border/60 bg-card p-0 transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-md">
+                <div className="flex items-center gap-4 p-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-border/50 bg-secondary/70 text-muted-foreground transition-colors group-hover:text-primary">
+                    <span className="text-xs font-black">{String(index + 1).padStart(2, "0")}</span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-bold text-foreground">{lecture.name}</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <span className="rounded-full bg-emerald-500/10 px-2 py-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">{exam?.questions?.length ?? 0} MCQs</span>
+                      <span className="rounded-full bg-indigo-500/10 px-2 py-1 text-[10px] font-bold text-indigo-600 dark:text-indigo-400">{flashcards.length} cards</span>
+                    </div>
+                  </div>
+                  <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-secondary/60">
+                    <div className="absolute inset-1 rounded-full border-4 border-primary/20" />
+                    <span className="relative text-xs font-black">{mastered}%</span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 border-t border-border/50 bg-secondary/20 px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <span>→ Flashcards</span>
+                  <span className="text-center">Tap settings</span>
+                  <span className="text-right">MCQs ←</span>
+                </div>
               </GlassCard>
             </SwipeRow>
           );
         })}
-        <button onClick={() => addLecture(subject.id, { name: `New ${type} lecture`, link: "", type })} className="w-full border-2 border-dashed border-border rounded-2xl py-4 text-muted-foreground font-semibold inline-flex items-center justify-center gap-2"><Plus className="w-4 h-4" /> Add lecture</button>
+
+        <div className="grid grid-cols-2 gap-3 pt-2">
+          <button onClick={() => addLecture(subject.id, { name: `New ${type} lecture`, link: "", type })} className="min-h-24 rounded-2xl border-2 border-dashed border-border bg-secondary/20 p-4 text-muted-foreground transition-all hover:border-primary/40 hover:bg-primary/5 hover:text-primary">
+            <span className="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-xl bg-background shadow-sm"><Plus className="h-4 w-4" /></span>
+            <span className="block text-sm font-bold">Add Lecture</span>
+            <span className="mt-1 block text-[10px] font-medium">Create one empty card</span>
+          </button>
+          <button onClick={() => lectureImportRef.current?.click()} className="min-h-24 rounded-2xl border-2 border-dashed border-border bg-secondary/20 p-4 text-muted-foreground transition-all hover:border-primary/40 hover:bg-primary/5 hover:text-primary">
+            <span className="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-xl bg-background shadow-sm"><Upload className="h-4 w-4" /></span>
+            <span className="block text-sm font-bold">Import Lectures</span>
+            <span className="mt-1 block text-[10px] font-medium">Upload Name-column Excel</span>
+          </button>
+        </div>
       </div>
 
       <input ref={lectureImportRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => { importLectures(e.target.files?.[0]); e.target.value = ""; }} />
