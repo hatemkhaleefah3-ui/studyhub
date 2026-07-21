@@ -72,8 +72,6 @@ export function SwipeRow({
     setHoldActive(false);
     clearHoldTimer();
 
-    // Framer Motion can emit a click after drag-end. Mark completed swipes so
-    // that click cannot immediately trigger the card's tap/navigation action.
     if (swipedRight || swipedLeft) suppressTap.current = true;
 
     if (swipedRight) onSwipeRight?.();
@@ -152,7 +150,7 @@ export function SwipeRow({
           }
           if (Math.abs(dragX) < 4) onTap?.();
         }}
-        className="relative"
+        className="relative bg-card"
         style={{ touchAction: 'pan-y' }}
       >
         {onLongPress && (
