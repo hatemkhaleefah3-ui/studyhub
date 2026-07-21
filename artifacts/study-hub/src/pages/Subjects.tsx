@@ -59,7 +59,7 @@ export function Subjects() {
   const onEditSubmit = (data: { name: string }) => { if (!editingId) return; updateSubject(editingId, { name: data.name, emoji: editEmoji, color: editColor }); setEditingId(null); };
   const toggle = (id: string) => setSelected(current => { const next = new Set(current); next.has(id) ? next.delete(id) : next.add(id); return next; });
   const handleReorder = (next: OrderedSubject[]) => { orderedRef.current = next; setOrderedSubjects(next); };
-  const commitReorder = () => orderedRef.current.forEach((subject, index) => updateSubject(subject.id, { sortOrder: index } as Partial<Subject>));
+  const commitReorder = () => orderedRef.current.forEach((subject, index) => updateSubject(subject.id, { sortOrder: index } as any));
   const deleteSelected = () => { if (!selected.size) return; selected.forEach(deleteSubject); setSelected(new Set()); setMode("manage"); setReorder(false); };
 
   const subjectCard = (subject: OrderedSubject, interaction: "normal" | "manage" | "select" | "drag" = "normal") => {
