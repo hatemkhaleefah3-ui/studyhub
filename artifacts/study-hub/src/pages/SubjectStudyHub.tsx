@@ -106,7 +106,6 @@ export function SubjectStudyHub() {
   useEffect(() => {
     setOrderedLectures(lectures);
     setSelectedLectures(new Set());
-    setReorderMode(false);
   }, [lectureType, subject.lectures]);
 
   const lectureExam = (lectureId: string) => subject.exams.find(item => item.linkedLectureIds?.includes(lectureId));
@@ -134,6 +133,8 @@ export function SubjectStudyHub() {
     if (!selectedLectures.size) return;
     selectedLectures.forEach(lectureId => deleteLecture(subject.id, lectureId));
     setSelectedLectures(new Set());
+    setLectureMode("manage");
+    setReorderMode(false);
     setNotice("Selected lectures deleted.");
   };
 
@@ -169,10 +170,10 @@ export function SubjectStudyHub() {
         <AnimatePresence mode="wait" initial={false}>
           {lectureMode === "normal" && <motion.div key="normal-toolbar" {...toolbarMotion} className="space-y-4"><div className="flex w-full gap-3"><IconAction icon={Plus} label="Add lecture" onClick={() => addLecture(subject.id, { name: `New ${lectureType} lecture`, link: "", type: lectureType })} /><IconAction icon={Upload} label="Import lectures" onClick={() => lectureImportRef.current?.click()} /><IconAction icon={Pencil} label="Edit lectures" onClick={enterManage} /></div><FinalExamCard exam={finalExam} flashcardCount={finalFlashcards.length} subjectId={subject.id} type={lectureType} onImport={() => setFinalImportOpen(true)} onEdit={openFinalEdit} /></motion.div>}
           {lectureMode === "manage" && <motion.div key="manage-toolbar" {...toolbarMotion} className="flex items-center justify-between gap-3"><button onClick={exitManage} className="flex min-h-11 items-center gap-2 rounded-2xl border border-border/60 bg-card px-4 font-semibold shadow-sm transition-all duration-200 hover:bg-secondary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><ArrowLeft className="h-4 w-4" />Back</button><div className="flex gap-2"><IconAction icon={Trash2} label="Select lectures to delete" destructive onClick={enterSelect} /><IconAction icon={GripVertical} label="Toggle lecture reordering" active={reorderMode} onClick={() => setReorderMode(current => !current)} /></div></motion.div>}
-          {lectureMode === "select" && <motion.div key="select-toolbar" {...toolbarMotion} className="flex justify-end"><div className="w-24"><IconAction icon={CheckCircle2} label="Select all lectures" active={lectures.length > 0 && selectedLectures.size === lectures.length} disabled={!lectures.length} onClick={toggleSelectAll} /></div></motion.div>}
+          {lectureMode === "select" && <motion.div key="select-toolbar" {...toolbarMotion} className="flex items-center justify-between"><span aria-hidden="true" /><div className="w-11"><IconAction icon={CheckCircle2} label="Select all lectures" active={lectures.length > 0 && selectedLectures.size === lectures.length} disabled={!lectures.length} onClick={toggleSelectAll} /></div></motion.div>}
         </AnimatePresence>
         {lectureMode === "manage" && reorderMode
-          ? <Reorder.Group axis="y" values={orderedLectures} onReorder={persistReorder} className="grid gap-3 md:grid-cols-2">{orderedLectures.map((lecture, index) => <Reorder.Item key={lecture.id} value={lecture} dragListener className="list-none cursor-grab active:cursor-grabbing" whileDrag={{ scale: 1.02, boxShadow: "0 14px 30px hsl(var(--foreground) / 0.12)", zIndex: 20 }}>{renderLectureCard(lecture, index, "drag")}</Reorder.Item>)}</Reorder.Group>
+          ? <Reorder.Group axis="y" values={orderedLectures} onReorder={persistReorder} className="flex flex-col gap-3">{orderedLectures.map((lecture, index) => <Reorder.Item key={lecture.id} value={lecture} dragListener dragElastic={0.08} dragMomentum={false} layout="position" style={{ touchAction: "none" }} className="list-none cursor-grab select-none active:cursor-grabbing" whileDrag={{ scale: 1.025, boxShadow: "0 16px 34px hsl(var(--foreground) / 0.14)", zIndex: 20 }} transition={{ duration: .18, ease: [.4, 0, .2, 1] }}>{renderLectureCard(lecture, index, "drag")}</Reorder.Item>)}</Reorder.Group>
           : lectureMode === "select"
             ? <div className="grid gap-3 md:grid-cols-2">{lectures.map((lecture, index) => <div key={lecture.id}>{renderLectureCard(lecture, index, "select")}</div>)}</div>
             : <div className="grid gap-3 md:grid-cols-2">{lectures.map((lecture, index) => <div key={lecture.id}>{renderLectureCard(lecture, index, lectureMode === "manage" ? "manage" : "normal")}</div>)}</div>}
