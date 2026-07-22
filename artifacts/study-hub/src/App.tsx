@@ -9,6 +9,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { AttachmentFormatNormalizer } from '@/components/shared/AttachmentFormatNormalizer';
 import { FinalExamImportSheet } from '@/components/shared/FinalExamImportSheet';
 import { ScheduleTaskGestureBridge } from '@/components/shared/ScheduleTaskGestureBridge';
+import { LectureEnhancements } from '@/components/shared/LectureEnhancements';
 import { Dashboard } from '@/pages/Dashboard';
 import { Subjects } from '@/pages/Subjects';
 import { SubjectStudyHub } from '@/pages/SubjectStudyHub';
@@ -123,7 +124,7 @@ function ExamBrowserGuard() {
 function SubjectStudyHubRoute() { const search = useSearch(); return <SubjectStudyHub key={search} />; }
 function ExamTakeRoute() { const { isLoaded } = useStudyData(); return isLoaded ? <ExamTake /> : <div className="p-8 text-center text-muted-foreground">Loading exam…</div>; }
 function FlashcardsReaderRoute() { const { isLoaded } = useStudyData(); return isLoaded ? <FlashcardsReader /> : <div className="p-8 text-center text-muted-foreground">Loading flashcards…</div>; }
-function Router() { return <><ExamBrowserGuard /><QuickExamScheduleVisibility /><ScheduleTaskGestureBridge /><FinalExamImportSheet /><Switch>
+function Router() { return <><ExamBrowserGuard /><QuickExamScheduleVisibility /><ScheduleTaskGestureBridge /><LectureEnhancements /><FinalExamImportSheet /><Switch>
   <Route path="/" component={Dashboard} /><Route path="/subjects" component={Subjects} />
   <Route path="/subjects/:id/progress" component={SubjectStudyHubRoute} /><Route path="/subjects/:id/lectures" component={SubjectStudyHubRoute} /><Route path="/subjects/:id/attachments" component={SubjectStudyHubRoute} /><Route path="/subjects/:id" component={SubjectStudyHubRoute} />
   <Route path="/subjects/:subjectId/lectures/:lectureId" component={LectureEdit} /><Route path="/subjects/:subjectId/lectures/:lectureId/flashcards" component={FlashcardsMaker} /><Route path="/subjects/:subjectId/lectures/:lectureId/study" component={FlashcardsReaderRoute} />
