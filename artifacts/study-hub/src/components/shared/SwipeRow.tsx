@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { motion, type PanInfo } from 'framer-motion';
-import { Check, type LucideIcon } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 interface SwipeRowProps {
   children: React.ReactNode;
@@ -44,7 +44,6 @@ export function SwipeRow({
   const [holdRadius, setHoldRadius] = useState(0);
   const [holdOrigin, setHoldOrigin] = useState({ x: 50, y: 50 });
   const [holdTransitionMs, setHoldTransitionMs] = useState(longPressDuration);
-  const [holdComplete, setHoldComplete] = useState(false);
 
   const armTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const commitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -59,7 +58,7 @@ export function SwipeRow({
   const isFinalExamCard = rightLabel === 'Edit' && (leftLabel === 'Examine' || leftLabel === 'Add Questions');
   const isLectureCard = !!leftLabel?.toLowerCase().includes('mcq') && !!rightLabel?.toLowerCase().includes('flashcard');
   const hasLongPress = !!onLongPress || isLectureCard;
-  const effectiveHoldColor = longPressColor ?? (isLectureCard ? 'hsl(var(--primary) / 0.94)' : 'hsl(var(--primary) / 0.22)');
+  const effectiveHoldColor = longPressColor ?? (isLectureCard ? 'hsl(var(--primary) / 0.34)' : 'hsl(var(--primary) / 0.22)');
 
   const clearTimers = () => {
     if (armTimer.current) clearTimeout(armTimer.current);
@@ -76,7 +75,6 @@ export function SwipeRow({
     const fraction = Math.min(1, Math.max(0, elapsed / longPressDuration));
     setHoldTransitionMs(Math.max(MIN_RETREAT_DURATION, Math.round(longPressDuration * fraction)));
     setHoldRadius(0);
-    setHoldComplete(false);
     longPressCommitted.current = false;
     holdGestureOwned.current = false;
   };
@@ -133,7 +131,6 @@ export function SwipeRow({
     longPressCommitted.current = false;
     holdGestureOwned.current = false;
     holdStartedAt.current = 0;
-    setHoldComplete(false);
     setHoldTransitionMs(0);
     setHoldRadius(0);
     clearTimers();
@@ -146,7 +143,6 @@ export function SwipeRow({
       requestAnimationFrame(() => setHoldRadius(targetRadius.current));
       commitTimer.current = setTimeout(() => {
         longPressCommitted.current = true;
-        setHoldComplete(true);
       }, longPressDuration);
     }, HOLD_ARM_DELAY);
   };
@@ -166,7 +162,6 @@ export function SwipeRow({
       runLongPressAction();
       setHoldTransitionMs(180);
       setHoldRadius(0);
-      setHoldComplete(false);
     } else {
       retreatHold();
     }
@@ -220,29 +215,18 @@ export function SwipeRow({
         className="relative overflow-hidden rounded-3xl bg-card will-change-transform"
         style={{ touchAction: 'pan-y' }}
       >
-        {hasLongPress && (
-          <>
-            <span
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-0 z-10 rounded-3xl motion-reduce:transition-none"
-              style={{
-                backgroundColor: effectiveHoldColor,
-                clipPath: `circle(${holdRadius}px at ${holdOrigin.x}% ${holdOrigin.y}%)`,
-                transition: `clip-path ${holdTransitionMs}ms cubic-bezier(0.4, 0, 0.2, 1)`,
-              }}
-            />
-            <span
-              aria-hidden="true"
-              className={`pointer-events-none absolute z-30 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/35 bg-white/20 text-white shadow-lg backdrop-blur-sm transition-all duration-150 motion-reduce:transition-none ${
-                holdComplete ? 'scale-100 opacity-100' : 'scale-75 opacity-0'
-              }`}
-              style={{ left: `${holdOrigin.x}%`, top: `${holdOrigin.y}%` }}
-            >
-              <Check className="h-5 w-5" strokeWidth={3} />
-            </span>
-          </>
-        )}
         <div className="relative z-20 overflow-hidden rounded-3xl">{children}</div>
+        {hasLongPress && (
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 z-30 rounded-3xl motion-reduce:transition-none"
+            style={{
+              backgroundColor: effectiveHoldColor,
+              clipPath: `circle(${holdRadius}px at ${holdOrigin.x}% ${holdOrigin.y}%)`,
+              transition: `clip-path ${holdTransitionMs}ms cubic-bezier(0.4, 0, 0.2, 1)`,
+            }}
+          />
+        )}
       </motion.div>
     </div>
   );
