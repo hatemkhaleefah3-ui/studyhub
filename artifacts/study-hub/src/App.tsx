@@ -26,6 +26,16 @@ import { Archive } from '@/pages/Archive';
 
 const queryClient = new QueryClient();
 
+function ThemePersistence() {
+  const { settings, isLoaded } = useStudyData();
+  useEffect(() => {
+    if (!isLoaded) return;
+    localStorage.setItem('studyhub:theme', settings.theme);
+    document.documentElement.classList.toggle('dark', settings.theme === 'dark');
+  }, [isLoaded, settings.theme]);
+  return null;
+}
+
 function ExamBrowserGuard() {
   const [location] = useLocation();
   const active = /\/subjects\/[^/]+\/(?:exams\/[^/]+\/take|lectures\/[^/]+\/study)$/.test(location);
@@ -62,5 +72,5 @@ function Router() { return <><ExamBrowserGuard /><FinalExamImportSheet /><Switch
   <Route path="/subjects/:subjectId/exams/:examId/questions" component={FinalExamQuestions} /><Route path="/subjects/:subjectId/exams/:examId/edit" component={ExamEdit} /><Route path="/subjects/:subjectId/exams/:examId/take" component={ExamTakeRoute} />
   <Route path="/schedule" component={Schedule} /><Route path="/checklist" component={Checklist} /><Route path="/checklist/:id" component={TaskListDetail} /><Route path="/progress" component={Progress} /><Route path="/settings" component={Settings} /><Route path="/archive" component={Archive} /><Route component={NotFound} />
 </Switch></>; }
-function App() { return <QueryClientProvider client={queryClient}><TooltipProvider><StudyDataProvider><AttachmentFormatNormalizer /><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><AppShell><Router /></AppShell></WouterRouter></StudyDataProvider><Toaster /></TooltipProvider></QueryClientProvider>; }
+function App() { return <QueryClientProvider client={queryClient}><TooltipProvider><StudyDataProvider><ThemePersistence /><AttachmentFormatNormalizer /><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><AppShell><Router /></AppShell></WouterRouter></StudyDataProvider><Toaster /></TooltipProvider></QueryClientProvider>; }
 export default App;
