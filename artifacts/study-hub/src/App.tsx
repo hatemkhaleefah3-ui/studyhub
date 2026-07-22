@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { ReactNode, useEffect, useLayoutEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -7,6 +7,8 @@ import { Route, Switch, Router as WouterRouter, useLocation, useSearch } from 'w
 import { StudyDataProvider, useStudyData } from '@/hooks/useStudyData';
 import { AppShell } from '@/components/layout/AppShell';
 import { AttachmentFormatNormalizer } from '@/components/shared/AttachmentFormatNormalizer';
+import { FinalExamImportSheet } from '@/components/shared/FinalExamImportSheet';
+import { ScheduleTaskGestureBridge } from '@/components/shared/ScheduleTaskGestureBridge';
 import { Dashboard } from '@/pages/Dashboard';
 import { Subjects } from '@/pages/Subjects';
 import { SubjectStudyHub } from '@/pages/SubjectStudyHub';
@@ -24,6 +26,73 @@ import { Settings } from '@/pages/Settings';
 import { Archive } from '@/pages/Archive';
 
 const queryClient = new QueryClient();
+
+function ThemePersistence() {
+  const { settings, isLoaded } = useStudyData();
+  useLayoutEffect(() => {
+    if (!isLoaded) return;
+    localStorage.setItem('studyhub:theme', settings.theme);
+    document.documentElement.classList.toggle('dark', settings.theme === 'dark');
+    document.documentElement.style.colorScheme = settings.theme;
+    document.documentElement.style.backgroundColor = settings.theme === 'dark'
+      ? 'hsl(240 5% 8%)'
+      : 'hsl(240 10% 96%)';
+  }, [isLoaded, settings.theme]);
+  return null;
+}
+
+function AppReady({ children }: { children: ReactNode }) {
+  const { isLoaded } = useStudyData();
+  return isLoaded ? <>{children}</> : null;
+}
+
+/**
+ * Exam entries use the shared schedule-plan model so they can power Calendar,
+ * Next Exam, and Exams. Only true schedules belong in the Schedules section:
+ * Study, Review, and plans explicitly created through "Exam Schedule".
+ */
+function QuickExamScheduleVisibility() {
+  const { schedulePlans } = useStudyData();
+  const [location] = useLocation();
+
+  useLayoutEffect(() => {
+    if (location !== '/schedule') return;
+
+    const isVisibleSchedule = (plan: (typeof schedulePlans)[number] | undefined) =>
+      !!plan && (plan.type !== 'exam' || plan.source === 'examSchedule');
+
+    const apply = () => {
+      const schedulesSection = Array.from(document.querySelectorAll<HTMLElement>('section')).find((section) =>
+        Array.from(section.querySelectorAll('h2')).some((heading) => heading.textContent?.trim() === 'Schedules')
+      );
+      if (!schedulesSection) return;
+
+      const list = schedulesSection.querySelector<HTMLElement>(':scope > div.space-y-3');
+      const hasVisibleSchedules = schedulePlans.some(isVisibleSchedule);
+
+      if (list) {
+        const rows = Array.from(list.children) as HTMLElement[];
+        rows.forEach((row, index) => {
+          row.style.setProperty('display', isVisibleSchedule(schedulePlans[index]) ? '' : 'none', 'important');
+        });
+      }
+
+      schedulesSection.style.setProperty('display', hasVisibleSchedules ? '' : 'none', 'important');
+    };
+
+    apply();
+    const frame = requestAnimationFrame(apply);
+    const observer = new MutationObserver(apply);
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }, [location, schedulePlans]);
+
+  return null;
+}
 
 function ExamBrowserGuard() {
   const [location] = useLocation();
@@ -54,12 +123,12 @@ function ExamBrowserGuard() {
 function SubjectStudyHubRoute() { const search = useSearch(); return <SubjectStudyHub key={search} />; }
 function ExamTakeRoute() { const { isLoaded } = useStudyData(); return isLoaded ? <ExamTake /> : <div className="p-8 text-center text-muted-foreground">Loading exam…</div>; }
 function FlashcardsReaderRoute() { const { isLoaded } = useStudyData(); return isLoaded ? <FlashcardsReader /> : <div className="p-8 text-center text-muted-foreground">Loading flashcards…</div>; }
-function Router() { return <><ExamBrowserGuard /><Switch>
+function Router() { return <><ExamBrowserGuard /><QuickExamScheduleVisibility /><ScheduleTaskGestureBridge /><FinalExamImportSheet /><Switch>
   <Route path="/" component={Dashboard} /><Route path="/subjects" component={Subjects} />
   <Route path="/subjects/:id/progress" component={SubjectStudyHubRoute} /><Route path="/subjects/:id/lectures" component={SubjectStudyHubRoute} /><Route path="/subjects/:id/attachments" component={SubjectStudyHubRoute} /><Route path="/subjects/:id" component={SubjectStudyHubRoute} />
   <Route path="/subjects/:subjectId/lectures/:lectureId" component={LectureEdit} /><Route path="/subjects/:subjectId/lectures/:lectureId/flashcards" component={FlashcardsMaker} /><Route path="/subjects/:subjectId/lectures/:lectureId/study" component={FlashcardsReaderRoute} />
   <Route path="/subjects/:subjectId/exams/:examId/questions" component={FinalExamQuestions} /><Route path="/subjects/:subjectId/exams/:examId/edit" component={ExamEdit} /><Route path="/subjects/:subjectId/exams/:examId/take" component={ExamTakeRoute} />
   <Route path="/schedule" component={Schedule} /><Route path="/checklist" component={Checklist} /><Route path="/checklist/:id" component={TaskListDetail} /><Route path="/progress" component={Progress} /><Route path="/settings" component={Settings} /><Route path="/archive" component={Archive} /><Route component={NotFound} />
 </Switch></>; }
-function App() { return <QueryClientProvider client={queryClient}><TooltipProvider><StudyDataProvider><AttachmentFormatNormalizer /><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><AppShell><Router /></AppShell></WouterRouter></StudyDataProvider><Toaster /></TooltipProvider></QueryClientProvider>; }
+function App() { return <QueryClientProvider client={queryClient}><TooltipProvider><StudyDataProvider><ThemePersistence /><AttachmentFormatNormalizer /><AppReady><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><AppShell><Router /></AppShell></WouterRouter></AppReady></StudyDataProvider><Toaster /></TooltipProvider></QueryClientProvider>; }
 export default App;

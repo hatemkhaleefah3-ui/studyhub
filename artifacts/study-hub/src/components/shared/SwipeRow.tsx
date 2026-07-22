@@ -45,6 +45,7 @@ export function SwipeRow({
   const pointerStart = useRef({ x: 0, y: 0 });
   const longPressCommitted = useRef(false);
   const suppressTap = useRef(false);
+  const isFinalExamCard = rightLabel === 'Edit' && (leftLabel === 'Examine' || leftLabel === 'Add Questions');
 
   const clearHoldTimer = () => {
     if (holdTimer.current) clearTimeout(holdTimer.current);
@@ -68,8 +69,10 @@ export function SwipeRow({
     setHoldActive(false);
     clearHoldTimer();
     if (swipedRight || swipedLeft) suppressTap.current = true;
-    if (swipedRight) onSwipeRight?.();
-    else if (swipedLeft) onSwipeLeft?.();
+    if (swipedRight) {
+      if (isFinalExamCard) window.dispatchEvent(new CustomEvent('studyhub:final-exam-import-sheet'));
+      else onSwipeRight?.();
+    } else if (swipedLeft) onSwipeLeft?.();
   };
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -104,6 +107,8 @@ export function SwipeRow({
 
   const showRight = dragX > 8 && !!onSwipeRight;
   const showLeft = dragX < -8 && !!onSwipeLeft;
+  const displayedRightLabel = isFinalExamCard ? 'Add Questions' : rightLabel;
+  const DisplayedRightIcon = isFinalExamCard ? LeftIcon : RightIcon;
 
   return (
     <div className={`relative isolate overflow-hidden rounded-3xl ${className || ''}`}>
@@ -116,8 +121,8 @@ export function SwipeRow({
           }}
         >
           <div className="flex items-center gap-2 font-semibold text-white">
-            {showRight && RightIcon && <RightIcon className="h-5 w-5" />}
-            {showRight && rightLabel && <span>{rightLabel}</span>}
+            {showRight && DisplayedRightIcon && <DisplayedRightIcon className="h-5 w-5" />}
+            {showRight && displayedRightLabel && <span>{displayedRightLabel}</span>}
             {showLeft && leftLabel && <span>{leftLabel}</span>}
             {showLeft && LeftIcon && <LeftIcon className="h-5 w-5" />}
           </div>
