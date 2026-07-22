@@ -16,6 +16,5 @@ export function ProgressOrb({ value, label = "Overall", size = "md" }: { value: 
       <span className={`${size === "sm" ? "text-3xl" : "text-4xl"} font-black leading-none tabular-nums tracking-tight`}>{value}<span className="text-[.58em]">%</span></span>
       <span className="mt-1 text-[8px] font-black uppercase tracking-[.18em] text-muted-foreground">{label}</span>
     </div>
-    <span className="absolute right-[9%] top-[13%] h-2.5 w-2.5 rounded-full bg-primary shadow-[0_0_12px_hsl(var(--primary))]" />
   </div>;
 }
