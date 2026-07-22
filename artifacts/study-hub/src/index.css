@@ -110,6 +110,11 @@
   body {
     @apply font-sans antialiased bg-background text-foreground selection:bg-primary/20 selection:text-primary;
   }
+
+  /* Grid cards must be able to shrink inside the page container. */
+  .grid > * {
+    min-width: 0;
+  }
 }
 
 .scrollbar-hide {
