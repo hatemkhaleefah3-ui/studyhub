@@ -6,6 +6,15 @@ export interface NameImportResult {
   skipped: number;
 }
 
+export interface LectureImportRow {
+  name: string;
+  link: string;
+}
+
+export interface LectureImportResult extends NameImportResult {
+  rows: LectureImportRow[];
+}
+
 export async function parseNameListExcel(file: File): Promise<NameImportResult> {
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: 'array' });
@@ -13,7 +22,7 @@ export async function parseNameListExcel(file: File): Promise<NameImportResult> 
   const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, blankrows: false });
   if (rows.length === 0) return { names: [], skipped: 0 };
   const firstRow = rows[0];
-  const hasHeader = firstRow && typeof firstRow[0] === 'string' && firstRow[0].trim().toLowerCase() === 'name';
+  const hasHeader = firstRow && typeof firstRow[0] === 'string' && ['name', 'names'].includes(firstRow[0].trim().toLowerCase());
   const dataRows = hasHeader ? rows.slice(1) : rows;
   const names: string[] = [];
   let skipped = 0;
@@ -26,7 +35,45 @@ export async function parseNameListExcel(file: File): Promise<NameImportResult> 
   return { names, skipped };
 }
 
-export const parseLectureExcel = parseNameListExcel;
+/**
+ * Lecture lists support either:
+ * - one column: Names
+ * - two columns: Names | Links
+ *
+ * Singular Name/Link headers and headerless rows remain supported for older files.
+ * The existing Subjects page still receives the names array, while the parsed rows
+ * are announced so the matching newly-created lectures can receive their links.
+ */
+export async function parseLectureExcel(file: File): Promise<LectureImportResult> {
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: 'array' });
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const rawRows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, blankrows: false });
+  if (rawRows.length === 0) return { names: [], rows: [], skipped: 0 };
+
+  const headers = (rawRows[0] ?? []).map(value => String(value ?? '').trim().toLowerCase());
+  const hasHeader = ['name', 'names'].includes(headers[0]);
+  const headerLinkIndex = headers.findIndex(value => value === 'link' || value === 'links');
+  const linkIndex = headerLinkIndex >= 0 ? headerLinkIndex : 1;
+  const dataRows = hasHeader ? rawRows.slice(1) : rawRows;
+  const rows: LectureImportRow[] = [];
+  let skipped = 0;
+
+  for (const row of dataRows) {
+    if (!row || row.length === 0) continue;
+    const name = String(row[0] ?? '').trim();
+    const link = String(row[linkIndex] ?? '').trim();
+    if (!name) { skipped++; continue; }
+    rows.push({ name, link });
+  }
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('studyhub:lecture-import-parsed', { detail: { rows } }));
+  }
+
+  return { names: rows.map(row => row.name), rows, skipped };
+}
+
 export const parseExamNameListExcel = parseNameListExcel;
 
 export interface FlashcardImportRow {
