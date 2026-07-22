@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { cloneElement, isValidElement, useRef, useState, type ReactElement } from 'react';
 import { motion, type PanInfo } from 'framer-motion';
 import type { LucideIcon } from 'lucide-react';
 
@@ -48,6 +48,7 @@ export function SwipeRow({
   const armTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const commitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pointerStart = useRef({ x: 0, y: 0 });
+  const activePointerId = useRef<number | null>(null);
   const holdStartedAt = useRef(0);
   const targetRadius = useRef(0);
   const longPressCommitted = useRef(false);
@@ -58,13 +59,27 @@ export function SwipeRow({
   const isFinalExamCard = rightLabel === 'Edit' && (leftLabel === 'Examine' || leftLabel === 'Add Questions');
   const isLectureCard = !!leftLabel?.toLowerCase().includes('mcq') && !!rightLabel?.toLowerCase().includes('flashcard');
   const hasLongPress = !!onLongPress || isLectureCard;
-  const effectiveHoldColor = longPressColor ?? (isLectureCard ? 'hsl(var(--primary))' : 'hsl(var(--primary) / 0.22)');
+  const effectiveHoldColor = longPressColor ?? (isLectureCard ? 'hsl(var(--primary))' : 'hsl(var(--primary))');
+
+  const foregroundChildren = isValidElement(children)
+    ? cloneElement(children as ReactElement<{ className?: string }>, {
+        className: `${(children as ReactElement<{ className?: string }>).props.className ?? ''} !border-transparent !bg-transparent !shadow-none`,
+      })
+    : children;
 
   const clearTimers = () => {
     if (armTimer.current) clearTimeout(armTimer.current);
     if (commitTimer.current) clearTimeout(commitTimer.current);
     armTimer.current = null;
     commitTimer.current = null;
+  };
+
+  const releasePointerCapture = (element?: HTMLDivElement | null) => {
+    const pointerId = activePointerId.current;
+    if (element && pointerId != null && element.hasPointerCapture(pointerId)) {
+      element.releasePointerCapture(pointerId);
+    }
+    activePointerId.current = null;
   };
 
   const retreatHold = () => {
@@ -115,6 +130,9 @@ export function SwipeRow({
     suppressTap.current = false;
     if (!hasLongPress) return;
 
+    event.currentTarget.setPointerCapture(event.pointerId);
+    activePointerId.current = event.pointerId;
+
     const rect = event.currentTarget.getBoundingClientRect();
     const localX = event.clientX - rect.left;
     const localY = event.clientY - rect.top;
@@ -153,9 +171,10 @@ export function SwipeRow({
     if (distance > HOLD_MOVE_THRESHOLD) retreatHold();
   };
 
-  const handlePointerEnd = () => {
+  const handlePointerEnd = (event: React.PointerEvent<HTMLDivElement>) => {
     const shouldCommit = longPressCommitted.current && holdGestureOwned.current;
     clearTimers();
+    releasePointerCapture(event.currentTarget);
 
     if (shouldCommit) {
       suppressTap.current = true;
@@ -168,6 +187,11 @@ export function SwipeRow({
 
     longPressCommitted.current = false;
     holdGestureOwned.current = false;
+  };
+
+  const handlePointerCancel = (event: React.PointerEvent<HTMLDivElement>) => {
+    releasePointerCapture(event.currentTarget);
+    retreatHold();
   };
 
   const showRight = dragX > 8 && !!onSwipeRight;
@@ -203,8 +227,8 @@ export function SwipeRow({
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerEnd}
-        onPointerCancel={retreatHold}
-        onPointerLeave={retreatHold}
+        onPointerCancel={handlePointerCancel}
+        onContextMenu={(event) => hasLongPress && event.preventDefault()}
         onClick={() => {
           if (suppressTap.current) {
             suppressTap.current = false;
@@ -213,23 +237,25 @@ export function SwipeRow({
           if (Math.abs(dragX) < 4) onTap?.();
         }}
         className="relative overflow-hidden rounded-3xl bg-card will-change-transform"
-        style={{ touchAction: 'pan-y' }}
+        style={{ touchAction: 'pan-y', WebkitTouchCallout: 'none', userSelect: 'none' }}
       >
+        <div className="relative z-10 overflow-hidden rounded-3xl">{children}</div>
         {hasLongPress && (
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 z-10 rounded-3xl motion-reduce:transition-none"
+            className="pointer-events-none absolute inset-0 z-20 rounded-3xl motion-reduce:transition-none"
             style={{
               backgroundColor: effectiveHoldColor,
-              opacity: 1,
               clipPath: `circle(${holdRadius}px at ${holdOrigin.x}% ${holdOrigin.y}%)`,
               transition: `clip-path ${holdTransitionMs}ms cubic-bezier(0.4, 0, 0.2, 1)`,
             }}
           />
         )}
-        <div className={`relative z-20 overflow-hidden rounded-3xl ${isLectureCard ? '[&>*]:!bg-transparent' : ''}`}>
-          {children}
-        </div>
+        {hasLongPress && holdRadius > 0 && (
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-30 overflow-hidden rounded-3xl">
+            {foregroundChildren}
+          </div>
+        )}
       </motion.div>
     </div>
   );
