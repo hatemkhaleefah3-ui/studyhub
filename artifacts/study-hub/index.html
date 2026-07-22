@@ -3,6 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <script>
+      (() => {
+        const key = 'studyhub:theme';
+        const apply = () => {
+          const theme = localStorage.getItem(key);
+          if (theme === 'dark') document.documentElement.classList.add('dark');
+          else if (theme === 'light') document.documentElement.classList.remove('dark');
+        };
+        apply();
+        new MutationObserver(apply).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+      })();
+    </script>
     <title>👋 Study Hub</title>
     <meta name="description" content="Study Hub — built on Replit. Update this description to reflect the app." />
     <meta name="robots" content="index, follow" />
