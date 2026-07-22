@@ -5,15 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
     <script>
       (() => {
+        let theme = 'light';
         try {
-          const theme = localStorage.getItem('studyhub:theme');
-          if (theme === 'dark') document.documentElement.classList.add('dark');
-          else if (theme === 'light') document.documentElement.classList.remove('dark');
+          const savedTheme = localStorage.getItem('studyhub:theme');
+          if (savedTheme === 'dark' || savedTheme === 'light') theme = savedTheme;
         } catch (_) {
           // Storage can be unavailable in strict/private browser contexts.
         }
+        const dark = theme === 'dark';
+        document.documentElement.classList.toggle('dark', dark);
+        document.documentElement.style.colorScheme = theme;
+        document.documentElement.style.backgroundColor = dark
+          ? 'hsl(240 5% 8%)'
+          : 'hsl(240 10% 96%)';
       })();
     </script>
+    <style>
+      html, body, #root { min-height: 100%; background: inherit; }
+      body { margin: 0; }
+    </style>
     <title>👋 Study Hub</title>
     <meta name="description" content="Study Hub — built on Replit. Update this description to reflect the app." />
     <meta name="robots" content="index, follow" />
