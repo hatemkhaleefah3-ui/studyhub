@@ -80,7 +80,13 @@ function QuickExamScheduleVisibility() {
 
     apply();
     const frame = requestAnimationFrame(apply);
-    return () => cancelAnimationFrame(frame);
+    const observer = new MutationObserver(apply);
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
   }, [location, schedulePlans]);
 
   return null;
