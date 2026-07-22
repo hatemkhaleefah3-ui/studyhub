@@ -7,7 +7,10 @@ export function Settings() {
   const { settings, updateSettings } = useStudyData();
 
   const toggleTheme = () => {
-    updateSettings({ theme: settings.theme === "light" ? "dark" : "light" });
+    const theme = settings.theme === "light" ? "dark" : "light";
+    localStorage.setItem("studyhub:theme", theme);
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    updateSettings({ theme });
   };
 
   return (
