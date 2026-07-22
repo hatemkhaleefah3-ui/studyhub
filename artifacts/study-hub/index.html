@@ -5,14 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
     <script>
       (() => {
-        const key = 'studyhub:theme';
-        const apply = () => {
-          const theme = localStorage.getItem(key);
+        try {
+          const theme = localStorage.getItem('studyhub:theme');
           if (theme === 'dark') document.documentElement.classList.add('dark');
           else if (theme === 'light') document.documentElement.classList.remove('dark');
-        };
-        apply();
-        new MutationObserver(apply).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+        } catch (_) {
+          // Storage can be unavailable in strict/private browser contexts.
+        }
       })();
     </script>
     <title>👋 Study Hub</title>
