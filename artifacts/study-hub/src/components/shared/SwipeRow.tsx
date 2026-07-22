@@ -58,7 +58,7 @@ export function SwipeRow({
   const isFinalExamCard = rightLabel === 'Edit' && (leftLabel === 'Examine' || leftLabel === 'Add Questions');
   const isLectureCard = !!leftLabel?.toLowerCase().includes('mcq') && !!rightLabel?.toLowerCase().includes('flashcard');
   const hasLongPress = !!onLongPress || isLectureCard;
-  const effectiveHoldColor = longPressColor ?? (isLectureCard ? 'hsl(var(--primary) / 0.34)' : 'hsl(var(--primary) / 0.22)');
+  const effectiveHoldColor = longPressColor ?? (isLectureCard ? 'hsl(var(--primary))' : 'hsl(var(--primary) / 0.22)');
 
   const clearTimers = () => {
     if (armTimer.current) clearTimeout(armTimer.current);
@@ -215,18 +215,21 @@ export function SwipeRow({
         className="relative overflow-hidden rounded-3xl bg-card will-change-transform"
         style={{ touchAction: 'pan-y' }}
       >
-        <div className="relative z-20 overflow-hidden rounded-3xl">{children}</div>
         {hasLongPress && (
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 z-30 rounded-3xl motion-reduce:transition-none"
+            className="pointer-events-none absolute inset-0 z-10 rounded-3xl motion-reduce:transition-none"
             style={{
               backgroundColor: effectiveHoldColor,
+              opacity: 1,
               clipPath: `circle(${holdRadius}px at ${holdOrigin.x}% ${holdOrigin.y}%)`,
               transition: `clip-path ${holdTransitionMs}ms cubic-bezier(0.4, 0, 0.2, 1)`,
             }}
           />
         )}
+        <div className={`relative z-20 overflow-hidden rounded-3xl ${isLectureCard ? '[&>*]:!bg-transparent' : ''}`}>
+          {children}
+        </div>
       </motion.div>
     </div>
   );
