@@ -65,14 +65,17 @@ function QuickExamScheduleVisibility() {
       if (!schedulesSection) return;
 
       const list = schedulesSection.querySelector<HTMLElement>(':scope > div.space-y-3');
-      if (!list) return;
+      if (!list) {
+        schedulesSection.hidden = true;
+        return;
+      }
 
       const rows = Array.from(list.children) as HTMLElement[];
       rows.forEach((row, index) => {
         row.hidden = schedulePlans[index]?.source === 'quickExam';
       });
 
-      schedulesSection.hidden = !schedulePlans.some((plan) => plan.source !== 'quickExam');
+      schedulesSection.hidden = rows.length === 0 || rows.every((row) => row.hidden);
     };
 
     apply();
