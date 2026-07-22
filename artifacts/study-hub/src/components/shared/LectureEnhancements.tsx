@@ -20,6 +20,13 @@ function lectureRoute(location: string) {
   };
 }
 
+function normalizeLectureLink(value: string) {
+  const link = value.trim();
+  if (!link) return '';
+  if (/^(https?:|mailto:|tel:|file:)/i.test(link)) return link;
+  return `https://${link}`;
+}
+
 /**
  * Keeps the existing lecture page implementation small while connecting two
  * cross-cutting behaviors:
@@ -83,13 +90,20 @@ export function LectureEnhancements() {
       if (!route) return;
       const subject = subjects.find(item => item.id === route.subjectId);
       if (!subject) return;
-      const text = String((event as CustomEvent<{ text?: string }>).detail?.text ?? '');
+
+      const text = String((event as CustomEvent<{ text?: string }>).detail?.text ?? '')
+        .replace(/\s+/g, ' ')
+        .trim();
       const lecture = subject.lectures
         .filter(item => item.type === route.type && item.link.trim())
         .sort((a, b) => b.name.length - a.name.length)
-        .find(item => text.includes(item.name));
+        .find(item => text.toLocaleLowerCase().includes(item.name.trim().toLocaleLowerCase()));
       if (!lecture?.link) return;
-      window.open(lecture.link, '_blank', 'noopener,noreferrer');
+
+      const link = normalizeLectureLink(lecture.link);
+      if (!link) return;
+      const opened = window.open(link, '_blank', 'noopener,noreferrer');
+      if (!opened) window.location.assign(link);
     };
 
     window.addEventListener('studyhub:lecture-longpress-open', handleOpen);
