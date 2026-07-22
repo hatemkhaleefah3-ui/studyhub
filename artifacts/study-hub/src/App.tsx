@@ -46,10 +46,9 @@ function AppReady({ children }: { children: ReactNode }) {
 }
 
 /**
- * Quick-added exams share the schedule-plan data model so they can appear in
- * Calendar, Next Exam, and Exams. They must not also appear as generic schedule
- * cards. The Schedule page renders plans in source order, so rows can be hidden
- * by the corresponding source tag without changing its established internals.
+ * Exam entries use the shared schedule-plan model so they can power Calendar,
+ * Next Exam, and Exams. Only true schedules belong in the Schedules section:
+ * Study, Review, and plans explicitly created through "Exam Schedule".
  */
 function QuickExamScheduleVisibility() {
   const { schedulePlans } = useStudyData();
@@ -58,6 +57,9 @@ function QuickExamScheduleVisibility() {
   useLayoutEffect(() => {
     if (location !== '/schedule') return;
 
+    const isVisibleSchedule = (plan: (typeof schedulePlans)[number] | undefined) =>
+      !!plan && (plan.type !== 'exam' || plan.source === 'examSchedule');
+
     const apply = () => {
       const schedulesSection = Array.from(document.querySelectorAll<HTMLElement>('section')).find((section) =>
         Array.from(section.querySelectorAll('h2')).some((heading) => heading.textContent?.trim() === 'Schedules')
@@ -65,17 +67,16 @@ function QuickExamScheduleVisibility() {
       if (!schedulesSection) return;
 
       const list = schedulesSection.querySelector<HTMLElement>(':scope > div.space-y-3');
-      if (!list) {
-        schedulesSection.hidden = true;
-        return;
+      const hasVisibleSchedules = schedulePlans.some(isVisibleSchedule);
+
+      if (list) {
+        const rows = Array.from(list.children) as HTMLElement[];
+        rows.forEach((row, index) => {
+          row.style.setProperty('display', isVisibleSchedule(schedulePlans[index]) ? '' : 'none', 'important');
+        });
       }
 
-      const rows = Array.from(list.children) as HTMLElement[];
-      rows.forEach((row, index) => {
-        row.hidden = schedulePlans[index]?.source === 'quickExam';
-      });
-
-      schedulesSection.hidden = rows.length === 0 || rows.every((row) => row.hidden);
+      schedulesSection.style.setProperty('display', hasVisibleSchedules ? '' : 'none', 'important');
     };
 
     apply();
