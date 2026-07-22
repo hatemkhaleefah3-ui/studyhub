@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { ReactNode, useEffect, useLayoutEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -28,12 +28,21 @@ const queryClient = new QueryClient();
 
 function ThemePersistence() {
   const { settings, isLoaded } = useStudyData();
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!isLoaded) return;
     localStorage.setItem('studyhub:theme', settings.theme);
     document.documentElement.classList.toggle('dark', settings.theme === 'dark');
+    document.documentElement.style.colorScheme = settings.theme;
+    document.documentElement.style.backgroundColor = settings.theme === 'dark'
+      ? 'hsl(240 5% 8%)'
+      : 'hsl(240 10% 96%)';
   }, [isLoaded, settings.theme]);
   return null;
+}
+
+function AppReady({ children }: { children: ReactNode }) {
+  const { isLoaded } = useStudyData();
+  return isLoaded ? <>{children}</> : null;
 }
 
 function ExamBrowserGuard() {
@@ -72,5 +81,5 @@ function Router() { return <><ExamBrowserGuard /><FinalExamImportSheet /><Switch
   <Route path="/subjects/:subjectId/exams/:examId/questions" component={FinalExamQuestions} /><Route path="/subjects/:subjectId/exams/:examId/edit" component={ExamEdit} /><Route path="/subjects/:subjectId/exams/:examId/take" component={ExamTakeRoute} />
   <Route path="/schedule" component={Schedule} /><Route path="/checklist" component={Checklist} /><Route path="/checklist/:id" component={TaskListDetail} /><Route path="/progress" component={Progress} /><Route path="/settings" component={Settings} /><Route path="/archive" component={Archive} /><Route component={NotFound} />
 </Switch></>; }
-function App() { return <QueryClientProvider client={queryClient}><TooltipProvider><StudyDataProvider><ThemePersistence /><AttachmentFormatNormalizer /><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><AppShell><Router /></AppShell></WouterRouter></StudyDataProvider><Toaster /></TooltipProvider></QueryClientProvider>; }
+function App() { return <QueryClientProvider client={queryClient}><TooltipProvider><StudyDataProvider><ThemePersistence /><AttachmentFormatNormalizer /><AppReady><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><AppShell><Router /></AppShell></WouterRouter></AppReady></StudyDataProvider><Toaster /></TooltipProvider></QueryClientProvider>; }
 export default App;
