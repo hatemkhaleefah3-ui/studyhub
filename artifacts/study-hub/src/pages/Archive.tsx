@@ -5,7 +5,7 @@ import { GlassCard } from "@/components/shared/GlassCard";
 import { ConfirmSheet } from "@/components/shared/ConfirmSheet";
 import { ArchiveEntry } from "@/lib/api";
 import { format } from "date-fns";
-import { ArchiveIcon, ArrowLeft, RotateCcw, Trash2, BookOpen, Calendar as CalendarIcon, Check, CheckSquare } from "lucide-react";
+import { ArchiveIcon, ArrowLeft, RotateCcw, Trash2, BookOpen, Calendar as CalendarIcon, Check, CheckSquare, X } from "lucide-react";
 
 const CATEGORY_META: Record<ArchiveEntry["category"], { label: string; icon: typeof BookOpen }> = {
   subject: { label: "Subject", icon: BookOpen },
@@ -32,6 +32,7 @@ export function Archive() {
   const selectedEntries = useMemo(() => archive.filter(entry => selected.has(entry.id)), [archive, selected]);
   const toggle = (id: string) => setSelected(current => { const next = new Set(current); next.has(id) ? next.delete(id) : next.add(id); return next; });
   const toggleAll = () => setSelected(allSelected ? new Set() : new Set(archive.map(entry => entry.id)));
+  const cancelSelection = () => { setSelecting(false); setSelected(new Set()); setConfirmPurge(false); };
   const restoreSelected = () => {
     selectedEntries.forEach(entry => restoreArchiveItem(entry.id));
     setSelected(new Set());
@@ -68,22 +69,29 @@ export function Archive() {
       </header>
 
       {selecting && (
-        <div className="grid w-full grid-cols-2 gap-3">
+        <div className="grid w-full grid-cols-3 gap-2 sm:gap-3">
           <button
             type="button"
             disabled={!selected.size}
             onClick={restoreSelected}
-            className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl border border-primary/25 bg-primary/10 px-3 font-bold text-primary transition-all duration-200 active:scale-[.98] disabled:opacity-40"
+            className="flex min-h-14 w-full min-w-0 items-center justify-center gap-1.5 rounded-2xl border border-primary/25 bg-primary/10 px-2 text-xs font-bold text-primary transition-all duration-200 active:scale-[.98] disabled:opacity-40 sm:gap-2 sm:px-3 sm:text-sm"
           >
-            <RotateCcw className="h-5 w-5" /> Restore Selected
+            <RotateCcw className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" /> <span className="truncate">Restore</span>
           </button>
           <button
             type="button"
             disabled={!selected.size}
             onClick={() => setConfirmPurge(true)}
-            className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-destructive px-3 font-bold text-destructive-foreground transition-all duration-200 active:scale-[.98] disabled:opacity-40"
+            className="flex min-h-14 w-full min-w-0 items-center justify-center gap-1.5 rounded-2xl bg-destructive px-2 text-xs font-bold text-destructive-foreground transition-all duration-200 active:scale-[.98] disabled:opacity-40 sm:gap-2 sm:px-3 sm:text-sm"
           >
-            <Trash2 className="h-5 w-5" /> Delete Forever
+            <Trash2 className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" /> <span className="truncate">Delete</span>
+          </button>
+          <button
+            type="button"
+            onClick={cancelSelection}
+            className="flex min-h-14 w-full min-w-0 items-center justify-center gap-1.5 rounded-2xl border border-border/60 bg-secondary px-2 text-xs font-bold transition-all duration-200 active:scale-[.98] sm:gap-2 sm:px-3 sm:text-sm"
+          >
+            <X className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" /> <span className="truncate">Cancel</span>
           </button>
         </div>
       )}
