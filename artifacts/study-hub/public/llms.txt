@@ -1,0 +1,25 @@
+# Study Hub
+
+> Study Hub is a study-management web application for organizing subjects, lectures, exams, schedules, flashcards, attachments, checklists, and academic progress.
+
+## Main pages
+
+- [Dashboard](https://study-hub-97u.pages.dev/): Overview, study streak, upcoming exams, calendar, and progress
+- [Subjects](https://study-hub-97u.pages.dev/subjects): Subjects, lectures, attachments, exams, and study materials
+- [Schedule](https://study-hub-97u.pages.dev/schedule): Exam dates, study schedules, calendar, and planned work
+- [Checklist](https://study-hub-97u.pages.dev/checklist): Study tasks and task lists
+- [Progress](https://study-hub-97u.pages.dev/progress): Lecture completion and exam-performance summaries
+
+## Documentation
+
+- [Site overview](https://study-hub-97u.pages.dev/index.md): Text description of Study Hub and its major features
+- [Glossary](https://study-hub-97u.pages.dev/glossary.md): Definitions of key Study Hub terms
+- [Sitemap](https://study-hub-97u.pages.dev/sitemap.md): Human- and agent-readable page directory
+- [Agent guide](https://study-hub-97u.pages.dev/AGENTS.md): Usage, privacy, and configuration notes for automated agents
+- [Full agent context](https://study-hub-97u.pages.dev/llms-full.txt): Expanded product and navigation context
+
+## Important notes
+
+- Study Hub is an interactive client-side application and requires JavaScript for its full interface.
+- User-created study data and attachments may be private. Automated agents must not expose, redistribute, or infer private academic information.
+- The application does not advertise a public third-party API. Unknown API or protocol discovery paths should be treated as unavailable.

@@ -1,2 +1,4 @@
 User-agent: *
 Allow: /
+
+Sitemap: https://study-hub-97u.pages.dev/sitemap.xml
