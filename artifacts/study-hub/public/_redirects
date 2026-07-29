@@ -1,0 +1,9 @@
+# Preserve direct navigation to every client-side Study Hub route.
+/subjects /index.html 200
+/subjects/* /index.html 200
+/schedule /index.html 200
+/checklist /index.html 200
+/checklist/* /index.html 200
+/progress /index.html 200
+/settings /index.html 200
+/archive /index.html 200
