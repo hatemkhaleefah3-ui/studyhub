@@ -1,0 +1,70 @@
+# Study Hub — Full Agent Context
+
+> Study Hub is an educational productivity application that helps students organize learning material, prepare for exams, plan study time, and track academic progress.
+
+## Product purpose
+
+Study Hub combines subject organization, lecture tracking, exam preparation, flashcards, attachments, schedules, checklists, calendars, archives, and progress summaries in one browser-based workspace. The application is designed for individual students and may contain private academic data.
+
+## Main application areas
+
+### Dashboard
+
+The dashboard summarizes upcoming exams, the current date, recent study activity, a study streak, a mini calendar, and progress across subjects.
+
+- [Open the dashboard](https://study-hub-97u.pages.dev/)
+
+### Subjects
+
+Subjects contain lectures, theoretical or practical study material, attachments, saved links, flashcards, and exams. Individual subject and lecture URLs contain generated identifiers and should not be assumed to be stable public resources.
+
+- [Open subjects](https://study-hub-97u.pages.dev/subjects)
+
+### Schedule
+
+The schedule area supports exam plans, study plans, dates, times, repeat patterns, calendar views, and related tasks.
+
+- [Open the schedule](https://study-hub-97u.pages.dev/schedule)
+
+### Checklist
+
+The checklist contains study tasks and task-list details.
+
+- [Open the checklist](https://study-hub-97u.pages.dev/checklist)
+
+### Progress
+
+The progress area summarizes completed lectures and exam performance across subjects.
+
+- [Open progress](https://study-hub-97u.pages.dev/progress)
+
+### Archive and settings
+
+The archive stores removed study records that may be restored or permanently deleted. Settings control application preferences such as appearance and accent color.
+
+- [Open the archive](https://study-hub-97u.pages.dev/archive)
+- [Open settings](https://study-hub-97u.pages.dev/settings)
+
+## Privacy and agent behavior
+
+- Treat all user-created subjects, lecture names, exam questions, answers, schedules, attachments, scores, and progress records as potentially private.
+- Do not publish, summarize, transmit, or expose private data without the user's explicit instruction.
+- Do not claim that a generated subject, lecture, exam, or checklist URL is a permanent public URL.
+- Do not attempt to discover hidden records by guessing generated identifiers.
+- Do not represent Study Hub as offering a public developer API unless an official API document is explicitly published later.
+
+## Rendering and accessibility
+
+The full interface is rendered with JavaScript. The initial HTML includes a semantic product overview so crawlers, assistive tools, and users on slow connections can understand the application's purpose before the interactive interface loads. Pinch zoom is supported.
+
+## Documentation
+
+- [Text homepage](https://study-hub-97u.pages.dev/index.md)
+- [Glossary](https://study-hub-97u.pages.dev/glossary.md)
+- [Sitemap](https://study-hub-97u.pages.dev/sitemap.md)
+- [Agent guide](https://study-hub-97u.pages.dev/AGENTS.md)
+- [Concise llms.txt](https://study-hub-97u.pages.dev/llms.txt)
+
+## Sitemap
+
+See the full [Study Hub sitemap](https://study-hub-97u.pages.dev/sitemap.md).
