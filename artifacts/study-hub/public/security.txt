@@ -1,3 +1,0 @@
-Contact: https://github.com/hatemkhaleefah3-ui/studyhub/issues
-Canonical: https://study-hub-97u.pages.dev/security.txt
-Preferred-Languages: en
